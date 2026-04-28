@@ -1,5 +1,5 @@
 # generated: 2026-04-26T15:41:58+0600
-# last_updated: 2026-04-26T16:16:43+0600
+# last_updated: 2026-04-28T15:33:39+0600
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-26T15:41:58+0600
-last_updated: 2026-04-26T16:16:43+0600
+last_updated: 2026-04-28T15:33:39+0600
 project: medical-ai-agent
 project_key: NOKEY
 tracking_system: file-system
@@ -44,7 +44,7 @@ story_location: /Users/maker/Work/medical-ai-agent/_bmad-output/implementation-a
 development_status:
   epic-1: in-progress
   1-1-backend-scaffold-и-health-api: done
-  1-2-case-identity-и-lifecycle-model: backlog
+  1-2-case-identity-и-lifecycle-model: done
   1-3-case-linked-core-records: backlog
   1-4-role-separation-и-access-foundation: backlog
   1-5-handoff-readiness-gate-и-shared-status-view: backlog
