@@ -12,6 +12,13 @@ Install dependencies:
 uv sync
 ```
 
+Create a local `.env` file from `.env.example` and fill runtime secrets:
+
+- `PATIENT_BOT_TOKEN` - Telegram bot token for the patient bot.
+- `DOCTOR_BOT_TOKEN` - Telegram bot token for the doctor bot.
+- `DOCTOR_TELEGRAM_ID` - Telegram ID allowed to use doctor-facing bot flows.
+- `HF_TOKEN` - Hugging Face token for model access.
+
 Run the local API:
 
 ```bash
