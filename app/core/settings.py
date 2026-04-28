@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
     doctor_telegram_id_allowlist: Annotated[tuple[int, ...], NoDecode] = ()
+    patient_bot_token: str | None = None
     debug_admin_static_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
@@ -42,6 +43,17 @@ class Settings(BaseSettings):
             normalized = value.strip()
             return normalized or None
         msg = "DEBUG_ADMIN_STATIC_TOKEN must be a string"
+        raise ValueError(msg)
+
+    @field_validator("patient_bot_token", mode="before")
+    @classmethod
+    def normalize_patient_bot_token(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        msg = "PATIENT_BOT_TOKEN must be a string"
         raise ValueError(msg)
 
     @field_validator("api_v1_prefix")

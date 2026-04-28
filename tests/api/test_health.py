@@ -87,6 +87,18 @@ def test_settings_parse_artifact_root_dir(monkeypatch) -> None:
     assert settings.artifact_root_dir == Path("custom/artifacts")
 
 
+def test_settings_parse_patient_bot_token(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("PATIENT_BOT_TOKEN", " demo-patient-token ")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.patient_bot_token == "demo-patient-token"
+
+
 def test_settings_reject_empty_artifact_root_dir(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("ARTIFACT_ROOT_DIR", "   ")
