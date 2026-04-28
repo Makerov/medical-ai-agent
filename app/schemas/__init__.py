@@ -1,5 +1,11 @@
 """API and domain schema package."""
 
+from app.schemas.auth import (
+    AuthorizationError,
+    CallerContext,
+    CallerRole,
+    Capability,
+)
 from app.schemas.case import (
     CaseCoreRecords,
     CaseRecordKind,
@@ -12,6 +18,10 @@ from app.schemas.case import (
 )
 
 __all__ = [
+    "AuthorizationError",
+    "CallerContext",
+    "CallerRole",
+    "Capability",
     "CaseCoreRecords",
     "CaseRecordKind",
     "CaseRecordReference",
