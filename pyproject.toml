@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "medical-ai-agent"
+version = "0.1.0"
+description = "Telegram-based medical consultation workflow with AI agents, RAG, lab result extraction, and human-in-the-loop recommendations."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi>=0.124.0",
+    "pydantic-settings>=2.12.0",
+    "uvicorn[standard]>=0.38.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.0",
+    "pytest>=9.0.0",
+    "ruff>=0.14.0",
+]
+
+[project.scripts]
+medical-ai-api = "app.main:run"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+extend-exclude = [".agents", "_bmad", "_bmad-output"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

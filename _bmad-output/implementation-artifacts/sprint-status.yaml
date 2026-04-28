@@ -1,0 +1,98 @@
+# generated: 2026-04-26T15:41:58+0600
+# last_updated: 2026-04-26T16:16:43+0600
+# project: medical-ai-agent
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: /Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog -> in-progress: Automatically when first story is created (via create-story)
+#   - in-progress -> done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-04-26T15:41:58+0600
+last_updated: 2026-04-26T16:16:43+0600
+project: medical-ai-agent
+project_key: NOKEY
+tracking_system: file-system
+story_location: /Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts
+
+development_status:
+  epic-1: in-progress
+  1-1-backend-scaffold-и-health-api: done
+  1-2-case-identity-и-lifecycle-model: backlog
+  1-3-case-linked-core-records: backlog
+  1-4-role-separation-и-access-foundation: backlog
+  1-5-handoff-readiness-gate-и-shared-status-view: backlog
+  1-6-audit-events-и-case-scoped-artifacts-foundation: backlog
+  epic-1-retrospective: optional
+  epic-2: backlog
+  2-1-старт-patient-intake-через-patient-bot: backlog
+  2-2-ai-boundary-explanation-перед-consent: backlog
+  2-3-explicit-consent-capture: backlog
+  2-4-сбор-patient-profile-и-consultation-goal: backlog
+  2-5-patient-facing-case-status: backlog
+  2-6-demo-case-deletion-request: backlog
+  epic-2-retrospective: optional
+  epic-3: backlog
+  3-1-document-upload-в-active-case: backlog
+  3-2-supported-file-validation-и-recoverable-rejection: backlog
+  3-3-text-extraction-из-pdf-image-documents: backlog
+  3-4-extraction-quality-detection-и-retry-flow: backlog
+  3-5-structured-medical-indicator-extraction: backlog
+  3-6-uncertainty-marking-и-partial-processing: backlog
+  3-7-original-document-references-для-doctor-review: backlog
+  epic-3-retrospective: optional
+  epic-4: backlog
+  4-1-curated-knowledge-base-seed-и-qdrant-collection: backlog
+  4-2-retrieval-релевантных-knowledge-entries: backlog
+  4-3-reference-range-provenance-и-applicability-checks: backlog
+  4-4-grounded-facts-vs-generated-summary-contract: backlog
+  4-5-doctor-facing-summary-draft-with-uncertainty-markers: backlog
+  4-6-safety-validation-и-safetycheckresult: backlog
+  4-7-safety-boundary-consistency-across-outputs: backlog
+  4-8-provenance-и-safety-decisions-в-audit-trail: backlog
+  epic-4-retrospective: optional
+  epic-5: backlog
+  5-1-doctor-ready-case-notification: backlog
+  5-2-structured-case-card-для-ready-case: backlog
+  5-3-extracted-facts-deviations-и-uncertainty-view: backlog
+  5-4-ai-prepared-questions-для-doctor-follow-up: backlog
+  5-5-source-document-references-в-doctor-bot: backlog
+  5-6-doctor-facing-ai-boundary-labeling: backlog
+  5-7-doctor-case-status-и-problem-cases: backlog
+  epic-5-retrospective: optional
+  epic-6: backlog
+  6-1-reproducible-local-demo-setup: backlog
+  6-2-seed-demo-case-и-end-to-end-happy-path: backlog
+  6-3-structured-extraction-examples: backlog
+  6-4-safety-check-result-examples: backlog
+  6-5-rag-и-source-provenance-examples: backlog
+  6-6-minimal-eval-suite-for-extraction-groundedness-and-safety: backlog
+  6-7-demo-artifacts-export-by-case-id: backlog
+  6-8-portfolio-readme-architecture-diagram-и-known-limitations: backlog
+  epic-6-retrospective: optional
