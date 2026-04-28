@@ -46,7 +46,7 @@ development_status:
   1-1-backend-scaffold-и-health-api: done
   1-2-case-identity-и-lifecycle-model: done
   1-3-case-linked-core-records: done
-  1-4-role-separation-и-access-foundation: backlog
+  1-4-role-separation-и-access-foundation: done
   1-5-handoff-readiness-gate-и-shared-status-view: backlog
   1-6-audit-events-и-case-scoped-artifacts-foundation: backlog
   epic-1-retrospective: optional
