@@ -1,0 +1,84 @@
+from collections.abc import Callable
+from datetime import UTC, datetime
+from enum import StrEnum
+from uuid import uuid4
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class CaseStatus(StrEnum):
+    DRAFT = "draft"
+    AWAITING_CONSENT = "awaiting_consent"
+    COLLECTING_INTAKE = "collecting_intake"
+    DOCUMENTS_UPLOADED = "documents_uploaded"
+    PROCESSING_DOCUMENTS = "processing_documents"
+    EXTRACTION_FAILED = "extraction_failed"
+    PARTIAL_EXTRACTION = "partial_extraction"
+    READY_FOR_SUMMARY = "ready_for_summary"
+    SUMMARY_FAILED = "summary_failed"
+    SAFETY_FAILED = "safety_failed"
+    READY_FOR_DOCTOR = "ready_for_doctor"
+    DOCTOR_REVIEWED = "doctor_reviewed"
+    DELETION_REQUESTED = "deletion_requested"
+    DELETED = "deleted"
+
+
+class PatientCase(BaseModel):
+    case_id: str = Field(min_length=1)
+    status: CaseStatus
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("created_at", "updated_at")
+    @classmethod
+    def validate_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            msg = "Case timestamps must be timezone-aware"
+            raise ValueError(msg)
+        return value
+
+
+class CaseTransition(BaseModel):
+    case_id: str = Field(min_length=1)
+    from_status: CaseStatus
+    to_status: CaseStatus
+    transitioned_at: datetime
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("transitioned_at")
+    @classmethod
+    def validate_transitioned_at_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            msg = "Case transition timestamp must be timezone-aware"
+            raise ValueError(msg)
+        return value
+
+
+class CaseTransitionError(Exception):
+    def __init__(
+        self,
+        *,
+        code: str,
+        case_id: str,
+        from_status: CaseStatus | None,
+        to_status: CaseStatus | str,
+    ) -> None:
+        self.code = code
+        self.case_id = case_id
+        self.from_status = from_status
+        self.to_status = to_status
+        super().__init__(code)
+
+
+CaseIdGenerator = Callable[[], str]
+
+
+def generate_case_id() -> str:
+    return f"case_{uuid4().hex}"
+
+
+def utc_now() -> datetime:
+    return datetime.now(UTC)
