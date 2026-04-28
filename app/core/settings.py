@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated
 
 from pydantic import field_validator
@@ -9,6 +10,7 @@ class Settings(BaseSettings):
     app_name: str = "medical-ai-agent"
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
+    artifact_root_dir: Path = Path("data/artifacts")
     debug: bool = False
     log_level: str = "INFO"
     doctor_telegram_id_allowlist: Annotated[tuple[int, ...], NoDecode] = ()
@@ -56,6 +58,14 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         if value != "/" and value.endswith("/"):
             return value.rstrip("/")
+        return value
+
+    @field_validator("artifact_root_dir", mode="before")
+    @classmethod
+    def validate_artifact_root_dir(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            msg = "ARTIFACT_ROOT_DIR must not be empty"
+            raise ValueError(msg)
         return value
 
 
