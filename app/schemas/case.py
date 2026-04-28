@@ -23,6 +23,28 @@ class CaseStatus(StrEnum):
     DELETED = "deleted"
 
 
+class SharedCaseStatusCode(StrEnum):
+    INTAKE_REQUIRED = "intake_required"
+    PROCESSING_PENDING = "processing_pending"
+    SAFETY_REVIEW_REQUIRED = "safety_review_required"
+    READY_FOR_DOCTOR = "ready_for_doctor"
+    CASE_CLOSED = "case_closed"
+
+
+class HandoffBlockingReasonCode(StrEnum):
+    PATIENT_PROFILE_MISSING = "patient_profile_missing"
+    CONSENT_MISSING = "consent_missing"
+    DOCUMENTS_MISSING = "documents_missing"
+    EXTRACTIONS_MISSING = "extractions_missing"
+    SUMMARY_MISSING = "summary_missing"
+    INTAKE_READINESS_MISSING = "intake_readiness_missing"
+    PROCESSING_READINESS_MISSING = "processing_readiness_missing"
+    SAFETY_CLEARANCE_MISSING = "safety_clearance_missing"
+    CASE_STATUS_NOT_READY = "case_status_not_ready"
+    CASE_NOT_ACTIVE = "case_not_active"
+    CASE_DELETED = "case_deleted"
+
+
 class CaseRecordKind(StrEnum):
     PATIENT_PROFILE = "patient_profile"
     CONSENT = "consent"
@@ -30,6 +52,14 @@ class CaseRecordKind(StrEnum):
     EXTRACTION = "extraction"
     SUMMARY = "summary"
     AUDIT = "audit"
+
+
+class CaseReadinessSnapshot(BaseModel):
+    intake_ready: bool | None = None
+    processing_ready: bool | None = None
+    safety_cleared: bool | None = None
+
+    model_config = ConfigDict(frozen=True)
 
 
 class PatientCase(BaseModel):
@@ -130,12 +160,40 @@ class CaseTransitionError(Exception):
         case_id: str,
         from_status: CaseStatus | None,
         to_status: CaseStatus | str,
+        details: dict[str, object] | None = None,
     ) -> None:
         self.code = code
         self.case_id = case_id
         self.from_status = from_status
         self.to_status = to_status
+        self.details = details
         super().__init__(code)
+
+
+class HandoffBlockingReason(BaseModel):
+    code: HandoffBlockingReasonCode
+    detail: str
+
+    model_config = ConfigDict(frozen=True)
+
+
+class HandoffReadinessResult(BaseModel):
+    case_id: str = Field(min_length=1)
+    is_ready_for_doctor: bool
+    shared_status: SharedCaseStatusCode
+    blocking_reasons: tuple[HandoffBlockingReason, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+
+class SharedStatusView(BaseModel):
+    case_id: str = Field(min_length=1)
+    lifecycle_status: CaseStatus
+    patient_status: SharedCaseStatusCode
+    doctor_status: SharedCaseStatusCode
+    handoff_readiness: HandoffReadinessResult
+
+    model_config = ConfigDict(frozen=True)
 
 
 CaseIdGenerator = Callable[[], str]
