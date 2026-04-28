@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CaseStatus(StrEnum):
@@ -23,6 +23,15 @@ class CaseStatus(StrEnum):
     DELETED = "deleted"
 
 
+class CaseRecordKind(StrEnum):
+    PATIENT_PROFILE = "patient_profile"
+    CONSENT = "consent"
+    DOCUMENT = "document"
+    EXTRACTION = "extraction"
+    SUMMARY = "summary"
+    AUDIT = "audit"
+
+
 class PatientCase(BaseModel):
     case_id: str = Field(min_length=1)
     status: CaseStatus
@@ -38,6 +47,62 @@ class PatientCase(BaseModel):
             msg = "Case timestamps must be timezone-aware"
             raise ValueError(msg)
         return value
+
+
+class CaseRecordReference(BaseModel):
+    case_id: str = Field(min_length=1)
+    record_kind: CaseRecordKind
+    record_id: str = Field(min_length=1)
+    created_at: datetime
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("created_at")
+    @classmethod
+    def validate_created_at_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            msg = "Case record reference timestamp must be timezone-aware"
+            raise ValueError(msg)
+        return value
+
+
+class CaseCoreRecords(BaseModel):
+    patient_case: PatientCase
+    patient_profile: CaseRecordReference | None = None
+    consent: CaseRecordReference | None = None
+    documents: tuple[CaseRecordReference, ...] = ()
+    extractions: tuple[CaseRecordReference, ...] = ()
+    summaries: tuple[CaseRecordReference, ...] = ()
+    audit_events: tuple[CaseRecordReference, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+    @model_validator(mode="after")
+    def validate_references_match_case_and_section(self) -> "CaseCoreRecords":
+        case_id = self.patient_case.case_id
+        sections = (
+            (CaseRecordKind.PATIENT_PROFILE, self._as_tuple(self.patient_profile)),
+            (CaseRecordKind.CONSENT, self._as_tuple(self.consent)),
+            (CaseRecordKind.DOCUMENT, self.documents),
+            (CaseRecordKind.EXTRACTION, self.extractions),
+            (CaseRecordKind.SUMMARY, self.summaries),
+            (CaseRecordKind.AUDIT, self.audit_events),
+        )
+        for expected_kind, references in sections:
+            for reference in references:
+                if reference.case_id != case_id:
+                    msg = "Case core record references must match patient case id"
+                    raise ValueError(msg)
+                if reference.record_kind != expected_kind:
+                    msg = "Case core record references must match aggregate section kind"
+                    raise ValueError(msg)
+        return self
+
+    @staticmethod
+    def _as_tuple(reference: CaseRecordReference | None) -> tuple[CaseRecordReference, ...]:
+        if reference is None:
+            return ()
+        return (reference,)
 
 
 class CaseTransition(BaseModel):

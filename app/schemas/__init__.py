@@ -1,6 +1,9 @@
 """API and domain schema package."""
 
 from app.schemas.case import (
+    CaseCoreRecords,
+    CaseRecordKind,
+    CaseRecordReference,
     CaseStatus,
     CaseTransition,
     CaseTransitionError,
@@ -9,6 +12,9 @@ from app.schemas.case import (
 )
 
 __all__ = [
+    "CaseCoreRecords",
+    "CaseRecordKind",
+    "CaseRecordReference",
     "CaseStatus",
     "CaseTransition",
     "CaseTransitionError",
