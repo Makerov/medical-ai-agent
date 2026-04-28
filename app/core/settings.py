@@ -1,7 +1,8 @@
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -10,8 +11,36 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     debug: bool = False
     log_level: str = "INFO"
+    doctor_telegram_id_allowlist: Annotated[tuple[int, ...], NoDecode] = ()
+    debug_admin_static_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("doctor_telegram_id_allowlist", mode="before")
+    @classmethod
+    def parse_doctor_telegram_id_allowlist(cls, value: object) -> tuple[int, ...]:
+        if value in (None, ""):
+            return ()
+        if isinstance(value, str):
+            raw_items = [item.strip() for item in value.split(",")]
+            return tuple(int(item) for item in raw_items if item)
+        if isinstance(value, int):
+            return (value,)
+        if isinstance(value, list | tuple | set):
+            return tuple(int(item) for item in value)
+        msg = "DOCTOR_TELEGRAM_ID_ALLOWLIST must be a comma-separated list of integers"
+        raise ValueError(msg)
+
+    @field_validator("debug_admin_static_token", mode="before")
+    @classmethod
+    def normalize_debug_admin_static_token(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        msg = "DEBUG_ADMIN_STATIC_TOKEN must be a string"
+        raise ValueError(msg)
 
     @field_validator("api_v1_prefix")
     @classmethod
