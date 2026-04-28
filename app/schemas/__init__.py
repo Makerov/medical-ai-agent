@@ -1,5 +1,13 @@
 """API and domain schema package."""
 
+from app.schemas.audit import (
+    ArtifactKind,
+    AuditEvent,
+    AuditEventType,
+    AuditMetadata,
+    AuditMetadataValue,
+    CaseArtifactPath,
+)
 from app.schemas.auth import (
     AuthorizationError,
     CallerContext,
@@ -22,6 +30,12 @@ __all__ = [
     "CallerContext",
     "CallerRole",
     "Capability",
+    "AuditEvent",
+    "AuditEventType",
+    "AuditMetadata",
+    "AuditMetadataValue",
+    "ArtifactKind",
+    "CaseArtifactPath",
     "CaseCoreRecords",
     "CaseRecordKind",
     "CaseRecordReference",

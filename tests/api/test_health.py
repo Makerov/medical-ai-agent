@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
@@ -71,3 +73,26 @@ def test_settings_normalize_debug_admin_static_token(monkeypatch) -> None:
         get_settings.cache_clear()
 
     assert settings.debug_admin_static_token == "demo-token"
+
+
+def test_settings_parse_artifact_root_dir(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", "custom/artifacts")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.artifact_root_dir == Path("custom/artifacts")
+
+
+def test_settings_reject_empty_artifact_root_dir(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("ARTIFACT_ROOT_DIR", "   ")
+
+    try:
+        with pytest.raises(ValidationError, match="ARTIFACT_ROOT_DIR must not be empty"):
+            get_settings()
+    finally:
+        get_settings.cache_clear()
