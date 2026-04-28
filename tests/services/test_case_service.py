@@ -2,7 +2,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus, CaseTransitionError
+from app.schemas.case import (
+    CaseReadinessSnapshot,
+    CaseRecordKind,
+    CaseRecordReference,
+    CaseStatus,
+    CaseTransitionError,
+    SharedCaseStatusCode,
+)
 from app.services.case_service import CaseService
 
 
@@ -342,3 +349,340 @@ def test_attach_case_record_reference_rejects_unknown_case_with_domain_error() -
 
     assert exc_info.value.code == "case_not_found"
     assert exc_info.value.case_id == "case_missing"
+
+
+def test_evaluate_handoff_readiness_returns_structured_blocking_reasons_for_empty_case() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_readiness_blocked")
+    patient_case = service.create_case()
+
+    readiness = service.evaluate_handoff_readiness(patient_case.case_id)
+
+    assert readiness.case_id == patient_case.case_id
+    assert readiness.is_ready_for_doctor is False
+    assert readiness.shared_status == SharedCaseStatusCode.INTAKE_REQUIRED
+    assert {reason.code.value for reason in readiness.blocking_reasons} >= {
+        "patient_profile_missing",
+        "consent_missing",
+        "documents_missing",
+        "extractions_missing",
+        "summary_missing",
+        "safety_clearance_missing",
+    }
+
+
+def test_transition_to_ready_for_doctor_uses_shared_status_view() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_readiness_ready")
+    patient_case = service.create_case()
+
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.PATIENT_PROFILE,
+            record_id="patient_profile_001",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.CONSENT,
+            record_id="consent_001",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.DOCUMENT,
+            record_id="document_001",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.EXTRACTION,
+            record_id="extraction_001",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.SUMMARY,
+            record_id="summary_001",
+            created_at=now,
+        )
+    )
+
+    for status in (
+        CaseStatus.AWAITING_CONSENT,
+        CaseStatus.COLLECTING_INTAKE,
+        CaseStatus.DOCUMENTS_UPLOADED,
+        CaseStatus.PROCESSING_DOCUMENTS,
+        CaseStatus.READY_FOR_SUMMARY,
+    ):
+        service.transition_case(patient_case.case_id, status)
+
+    service.set_case_readiness_snapshot(
+        patient_case.case_id,
+        CaseReadinessSnapshot(safety_cleared=True),
+    )
+
+    readiness = service.evaluate_handoff_readiness(patient_case.case_id)
+    assert readiness.is_ready_for_doctor is True
+    assert readiness.blocking_reasons == ()
+    assert readiness.shared_status == SharedCaseStatusCode.READY_FOR_DOCTOR
+
+    transitioned_case = service.transition_case(patient_case.case_id, CaseStatus.READY_FOR_DOCTOR)
+
+    assert transitioned_case.status == CaseStatus.READY_FOR_DOCTOR
+    shared_status_view = service.get_shared_status_view(patient_case.case_id)
+    assert shared_status_view.lifecycle_status == CaseStatus.READY_FOR_DOCTOR
+    assert shared_status_view.patient_status == SharedCaseStatusCode.READY_FOR_DOCTOR
+    assert shared_status_view.doctor_status == SharedCaseStatusCode.READY_FOR_DOCTOR
+    assert shared_status_view.patient_status is shared_status_view.doctor_status
+    assert shared_status_view.handoff_readiness.is_ready_for_doctor is True
+
+
+def test_transition_to_ready_for_doctor_blocks_without_safety_clearance() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(
+        clock=lambda: now,
+        id_generator=lambda: "case_readiness_blocked_transition",
+    )
+    patient_case = service.create_case()
+
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.PATIENT_PROFILE,
+            record_id="patient_profile_002",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.CONSENT,
+            record_id="consent_002",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.DOCUMENT,
+            record_id="document_002",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.EXTRACTION,
+            record_id="extraction_002",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.SUMMARY,
+            record_id="summary_002",
+            created_at=now,
+        )
+    )
+
+    for status in (
+        CaseStatus.AWAITING_CONSENT,
+        CaseStatus.COLLECTING_INTAKE,
+        CaseStatus.DOCUMENTS_UPLOADED,
+        CaseStatus.PROCESSING_DOCUMENTS,
+        CaseStatus.READY_FOR_SUMMARY,
+    ):
+        service.transition_case(patient_case.case_id, status)
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.transition_case(patient_case.case_id, CaseStatus.READY_FOR_DOCTOR)
+
+    error = exc_info.value
+    assert error.code == "handoff_readiness_blocked"
+    assert error.case_id == patient_case.case_id
+    assert error.from_status == CaseStatus.READY_FOR_SUMMARY
+    assert error.to_status == CaseStatus.READY_FOR_DOCTOR
+    assert error.details is not None
+    blocking_codes = {
+        reason["code"]
+        for reason in error.details["handoff_readiness"]["blocking_reasons"]
+    }
+    assert "safety_clearance_missing" in blocking_codes
+
+
+def test_evaluate_handoff_readiness_blocks_when_consent_is_missing() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_missing_consent")
+    patient_case = service.create_case()
+
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.PATIENT_PROFILE,
+            record_id="patient_profile_003",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.DOCUMENT,
+            record_id="document_003",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.EXTRACTION,
+            record_id="extraction_003",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.SUMMARY,
+            record_id="summary_003",
+            created_at=now,
+        )
+    )
+
+    for status in (
+        CaseStatus.AWAITING_CONSENT,
+        CaseStatus.COLLECTING_INTAKE,
+        CaseStatus.DOCUMENTS_UPLOADED,
+        CaseStatus.PROCESSING_DOCUMENTS,
+        CaseStatus.READY_FOR_SUMMARY,
+    ):
+        service.transition_case(patient_case.case_id, status)
+
+    service.set_case_readiness_snapshot(
+        patient_case.case_id,
+        CaseReadinessSnapshot(safety_cleared=True),
+    )
+
+    readiness = service.evaluate_handoff_readiness(patient_case.case_id)
+
+    assert readiness.is_ready_for_doctor is False
+    assert readiness.shared_status == SharedCaseStatusCode.INTAKE_REQUIRED
+    assert {reason.code.value for reason in readiness.blocking_reasons} >= {
+        "consent_missing",
+    }
+
+
+def test_snapshot_flags_do_not_bypass_missing_handoff_prerequisites() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_snapshot_bypass")
+    patient_case = service.create_case()
+
+    for status in (
+        CaseStatus.AWAITING_CONSENT,
+        CaseStatus.COLLECTING_INTAKE,
+        CaseStatus.DOCUMENTS_UPLOADED,
+        CaseStatus.PROCESSING_DOCUMENTS,
+        CaseStatus.READY_FOR_SUMMARY,
+    ):
+        service.transition_case(patient_case.case_id, status)
+
+    service.set_case_readiness_snapshot(
+        patient_case.case_id,
+        CaseReadinessSnapshot(
+            intake_ready=True,
+            processing_ready=True,
+            safety_cleared=True,
+        ),
+    )
+
+    readiness = service.evaluate_handoff_readiness(patient_case.case_id)
+
+    assert readiness.is_ready_for_doctor is False
+    assert readiness.shared_status == SharedCaseStatusCode.INTAKE_REQUIRED
+    assert {reason.code.value for reason in readiness.blocking_reasons} >= {
+        "patient_profile_missing",
+        "consent_missing",
+        "documents_missing",
+        "extractions_missing",
+        "summary_missing",
+    }
+
+
+def test_failure_state_never_reports_ready_for_doctor() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_failure_state")
+    patient_case = service.create_case()
+
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.PATIENT_PROFILE,
+            record_id="patient_profile_004",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.CONSENT,
+            record_id="consent_004",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.DOCUMENT,
+            record_id="document_004",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.EXTRACTION,
+            record_id="extraction_004",
+            created_at=now,
+        )
+    )
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.SUMMARY,
+            record_id="summary_004",
+            created_at=now,
+        )
+    )
+
+    for status in (
+        CaseStatus.AWAITING_CONSENT,
+        CaseStatus.COLLECTING_INTAKE,
+        CaseStatus.DOCUMENTS_UPLOADED,
+        CaseStatus.PROCESSING_DOCUMENTS,
+        CaseStatus.READY_FOR_SUMMARY,
+        CaseStatus.SAFETY_FAILED,
+    ):
+        service.transition_case(patient_case.case_id, status)
+
+    service.set_case_readiness_snapshot(
+        patient_case.case_id,
+        CaseReadinessSnapshot(safety_cleared=True),
+    )
+
+    readiness = service.evaluate_handoff_readiness(patient_case.case_id)
+
+    assert readiness.is_ready_for_doctor is False
+    assert readiness.shared_status == SharedCaseStatusCode.SAFETY_REVIEW_REQUIRED
+    assert {reason.code.value for reason in readiness.blocking_reasons} >= {
+        "case_status_not_ready",
+    }
