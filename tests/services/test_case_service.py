@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from app.schemas.case import CaseStatus, CaseTransitionError
+from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus, CaseTransitionError
 from app.services.case_service import CaseService
 
 
@@ -171,3 +171,174 @@ def test_transition_case_uses_monotonic_clock_values_without_mutating_original()
 
     assert original_case.status == CaseStatus.DRAFT
     assert transitioned_case.updated_at == original_case.updated_at + timedelta(minutes=1)
+
+
+def test_get_case_core_records_returns_case_and_empty_downstream_references() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_empty")
+    patient_case = service.create_case()
+
+    aggregate = service.get_case_core_records(patient_case.case_id)
+
+    assert aggregate.patient_case.case_id == patient_case.case_id
+    assert aggregate.patient_case.status == CaseStatus.DRAFT
+    assert aggregate.patient_profile is None
+    assert aggregate.consent is None
+    assert aggregate.documents == ()
+    assert aggregate.extractions == ()
+    assert aggregate.summaries == ()
+    assert aggregate.audit_events == ()
+
+
+def test_attach_case_record_reference_makes_matching_reference_visible_in_aggregate() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_attach")
+    patient_case = service.create_case()
+    document_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="document_001",
+        created_at=now,
+    )
+
+    service.attach_case_record_reference(document_reference)
+    aggregate = service.get_case_core_records(patient_case.case_id)
+
+    assert aggregate.documents == (document_reference,)
+    assert aggregate.patient_case.case_id == patient_case.case_id
+
+
+def test_attach_case_record_reference_rejects_mismatched_case_id() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_match")
+    patient_case = service.create_case()
+    reference = CaseRecordReference(
+        case_id="case_other",
+        record_kind=CaseRecordKind.SUMMARY,
+        record_id="summary_001",
+        created_at=now,
+    )
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.attach_case_record_reference(reference, case_id=patient_case.case_id)
+
+    error = exc_info.value
+    assert error.code == "case_record_case_id_mismatch"
+    assert error.case_id == patient_case.case_id
+    assert error.to_status == "case_other"
+
+
+def test_attach_case_record_reference_rejects_empty_explicit_case_id() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_empty_target")
+    patient_case = service.create_case()
+    reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="document_001",
+        created_at=now,
+    )
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.attach_case_record_reference(reference, case_id="")
+
+    error = exc_info.value
+    assert error.code == "case_record_case_id_mismatch"
+    assert error.case_id == ""
+
+
+def test_attach_case_record_reference_is_idempotent_for_exact_duplicate_reference() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_duplicate")
+    patient_case = service.create_case()
+    reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="document_001",
+        created_at=now,
+    )
+
+    first_result = service.attach_case_record_reference(reference)
+    second_result = service.attach_case_record_reference(reference)
+    aggregate = service.get_case_core_records(patient_case.case_id)
+
+    assert first_result == reference
+    assert second_result == reference
+    assert aggregate.documents == (reference,)
+
+
+def test_attach_case_record_reference_rejects_conflicting_singleton_reference() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_singleton")
+    patient_case = service.create_case()
+    service.attach_case_record_reference(
+        CaseRecordReference(
+            case_id=patient_case.case_id,
+            record_kind=CaseRecordKind.CONSENT,
+            record_id="consent_001",
+            created_at=now,
+        )
+    )
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.attach_case_record_reference(
+            CaseRecordReference(
+                case_id=patient_case.case_id,
+                record_kind=CaseRecordKind.CONSENT,
+                record_id="consent_002",
+                created_at=now,
+            )
+        )
+
+    error = exc_info.value
+    assert error.code == "case_record_duplicate_singleton"
+    assert error.case_id == patient_case.case_id
+
+
+def test_attach_case_record_reference_rejects_deleted_case() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_records_deleted")
+    patient_case = service.create_case()
+    service.transition_case(patient_case.case_id, CaseStatus.DELETION_REQUESTED)
+    service.transition_case(patient_case.case_id, CaseStatus.DELETED)
+    reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.AUDIT,
+        record_id="audit_after_delete",
+        created_at=now,
+    )
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.attach_case_record_reference(reference)
+
+    error = exc_info.value
+    assert error.code == "case_deleted"
+    assert error.case_id == patient_case.case_id
+    assert error.from_status == CaseStatus.DELETED
+
+
+def test_case_core_records_reject_unknown_case_with_domain_error() -> None:
+    service = CaseService(clock=lambda: datetime(2026, 4, 28, 6, 0, tzinfo=UTC))
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.get_case_core_records("case_missing")
+
+    assert exc_info.value.code == "case_not_found"
+    assert exc_info.value.case_id == "case_missing"
+
+
+def test_attach_case_record_reference_rejects_unknown_case_with_domain_error() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now)
+    reference = CaseRecordReference(
+        case_id="case_missing",
+        record_kind=CaseRecordKind.AUDIT,
+        record_id="audit_001",
+        created_at=now,
+    )
+
+    with pytest.raises(CaseTransitionError) as exc_info:
+        service.attach_case_record_reference(reference)
+
+    assert exc_info.value.code == "case_not_found"
+    assert exc_info.value.case_id == "case_missing"
