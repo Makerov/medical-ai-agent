@@ -6,6 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.audit import AuditEventType
 from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus, PatientCase
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.schemas.document import (
+    DocumentUploadMessageKind,
+    DocumentUploadMetadata,
+    DocumentUploadResult,
+)
 from app.schemas.patient import (
     ConsultationGoal,
     PatientIntakeField,
@@ -17,6 +22,7 @@ from app.schemas.patient import (
 from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
 from app.services.consent_service import ConsentService
+from app.services.document_service import DocumentService
 
 
 class PatientIntakeStep(StrEnum):
@@ -74,10 +80,12 @@ class PatientIntakeService:
         *,
         case_service: CaseService,
         consent_service: ConsentService | None = None,
+        document_service: DocumentService | None = None,
         audit_service: AuditService | None = None,
     ) -> None:
         self._case_service = case_service
         self._consent_service = consent_service or ConsentService(case_service=case_service)
+        self._document_service = document_service or DocumentService()
         self._audit_service = audit_service
         self._pre_consent_steps: dict[int, IntakeSessionState] = {}
         self._intake_payloads: dict[str, PatientIntakePayload] = {}
@@ -235,6 +243,68 @@ class PatientIntakeService:
             )
         msg = "Unsupported intake step"
         raise ValueError(msg)
+
+    def handle_document_upload(
+        self,
+        *,
+        telegram_user_id: int,
+        document: DocumentUploadMetadata,
+    ) -> DocumentUploadResult:
+        session = self._pre_consent_steps.get(telegram_user_id)
+        if session is None:
+            return self._reject_document_upload(document=document)
+
+        patient_case = self._case_service.get_case_core_records(session.case_id).patient_case
+        if self._is_terminal_deleted(patient_case.status):
+            self._intake_payloads.pop(patient_case.case_id, None)
+            return self._reject_document_upload(
+                document=document,
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+            )
+
+        if session.intake_step != PatientIntakeStep.INTAKE_COMPLETE:
+            return self._reject_document_upload(
+                document=document,
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+            )
+
+        if patient_case.status in {
+            CaseStatus.DOCUMENTS_UPLOADED,
+            CaseStatus.PROCESSING_DOCUMENTS,
+        }:
+            return DocumentUploadResult(
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                message_kind=DocumentUploadMessageKind.IN_PROGRESS,
+                document_metadata=document,
+                was_duplicate=True,
+            )
+        if patient_case.status != CaseStatus.COLLECTING_INTAKE:
+            return self._reject_document_upload(
+                document=document,
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+            )
+
+        document_record = self._document_service.build_document_reference(
+            case_id=patient_case.case_id,
+            document_metadata=document,
+            created_at=self._case_service.current_time(),
+        )
+        attached_document_record = self._case_service.attach_case_record_reference(document_record)
+        transitioned_case = self._case_service.transition_case(
+            patient_case.case_id,
+            CaseStatus.DOCUMENTS_UPLOADED,
+        )
+        return DocumentUploadResult(
+            case_id=transitioned_case.case_id,
+            case_status=transitioned_case.status,
+            message_kind=DocumentUploadMessageKind.ACCEPTED,
+            document_metadata=document,
+            document_record=attached_document_record,
+        )
 
     def get_current_prompt(
         self,
@@ -416,6 +486,20 @@ class PatientIntakeService:
     @staticmethod
     def _is_terminal_deleted(case_status: CaseStatus) -> bool:
         return case_status in {CaseStatus.DELETION_REQUESTED, CaseStatus.DELETED}
+
+    def _reject_document_upload(
+        self,
+        *,
+        document: DocumentUploadMetadata,
+        case_id: str | None = None,
+        case_status: CaseStatus | None = None,
+    ) -> DocumentUploadResult:
+        return DocumentUploadResult(
+            case_id=case_id,
+            case_status=case_status,
+            message_kind=DocumentUploadMessageKind.REJECTED,
+            document_metadata=document,
+        )
 
     def _capture_patient_profile(
         self,

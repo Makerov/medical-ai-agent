@@ -25,6 +25,11 @@ from app.schemas.case import (
     generate_case_id,
 )
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.schemas.document import (
+    DocumentUploadMessageKind,
+    DocumentUploadMetadata,
+    DocumentUploadResult,
+)
 from app.schemas.patient import (
     ConsultationGoal,
     ConsultationGoalCaptureResult,
@@ -57,6 +62,9 @@ __all__ = [
     "ConsentOutcome",
     "ConsultationGoal",
     "ConsultationGoalCaptureResult",
+    "DocumentUploadMessageKind",
+    "DocumentUploadMetadata",
+    "DocumentUploadResult",
     "PatientIntakeCaptureResult",
     "PatientIntakeField",
     "PatientIntakeMessageKind",
