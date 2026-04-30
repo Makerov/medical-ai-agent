@@ -27,6 +27,7 @@ from app.bots.messages import (
     PATIENT_PROFILE_PROMPT_MESSAGE,
     PATIENT_STATUS_DELETED_MESSAGE,
     PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
+    PATIENT_STATUS_PROCESSING_RETRY_MESSAGE,
     render_ai_boundary_message,
     render_case_deletion_result_message,
     render_document_upload_message,
@@ -669,7 +670,7 @@ def test_handle_patient_status_returns_recovery_action_for_processing_failure() 
     message.answer.assert_awaited_once()
     reply = message.answer.await_args.args[0]
     assert "Часть данных пока не прочиталась." in reply
-    assert "Отправьте документы еще раз" in reply
+    assert "Загрузите более четкое изображение или PDF" in reply
     assert "extraction_failed" not in reply
     assert "processing_documents" not in reply
 
@@ -774,9 +775,37 @@ def test_render_patient_status_message_hides_internal_status_names() -> None:
 
     message = render_patient_status_message(status_view)
 
-    assert "Отправьте документы еще раз" in message
+    assert "Загрузите более четкое изображение или PDF" in message
     assert "extraction_failed" not in message
     assert "processing_pending" not in message
+
+
+def test_render_patient_status_message_shows_retry_copy_for_partial_extraction() -> None:
+    status_view = SharedStatusView(
+        case_id="case_status_partial",
+        lifecycle_status=CaseStatus.PARTIAL_EXTRACTION,
+        patient_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        doctor_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        handoff_readiness=HandoffReadinessResult(
+            case_id="case_status_partial",
+            is_ready_for_doctor=False,
+            shared_status=SharedCaseStatusCode.PROCESSING_PENDING,
+            blocking_reasons=(
+                HandoffBlockingReason(
+                    code=HandoffBlockingReasonCode.EXTRACTIONS_MISSING,
+                    detail="missing",
+                ),
+            ),
+        ),
+    )
+
+    message = render_patient_status_message(status_view)
+
+    assert "более четкое изображение или PDF" in message
+    assert "OCR" not in message
+    assert "confidence" not in message
+    assert "parser" not in message
+    assert PATIENT_STATUS_PROCESSING_RETRY_MESSAGE.split("\n", maxsplit=1)[0] in message
 
 
 def test_render_patient_status_message_shows_deleted_copy_for_deleted_case() -> None:

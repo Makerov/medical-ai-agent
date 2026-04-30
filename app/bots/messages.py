@@ -159,7 +159,7 @@ PATIENT_STATUS_PROCESSING_MESSAGE = (
 
 PATIENT_STATUS_PROCESSING_RETRY_MESSAGE = (
     "Часть данных пока не прочиталась.\n"
-    "Отправьте документы еще раз, более четко."
+    "Загрузите более четкое изображение или PDF."
 )
 
 PATIENT_STATUS_SUMMARY_RETRY_MESSAGE = (

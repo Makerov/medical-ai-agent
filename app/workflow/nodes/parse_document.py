@@ -1,3 +1,4 @@
+from app.core.settings import Settings, get_settings
 from app.integrations.ocr_client import OCRClient, OCRClientError
 from app.schemas.case import (
     CaseRecordKind,
@@ -39,9 +40,11 @@ class ParseDocumentNode:
         *,
         case_service: CaseService,
         ocr_client: OCRClient | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self._case_service = case_service
         self._ocr_client = ocr_client or OCRClient()
+        self._settings = settings or get_settings()
 
     def parse_document(
         self,
@@ -107,6 +110,13 @@ class ParseDocumentNode:
                 is_recoverable_failure=False,
             )
 
+        existing_extraction = self._find_existing_extraction(case_id, extraction_record_id)
+        if existing_extraction is not None:
+            return self._build_result_from_extraction(
+                existing_extraction,
+                was_duplicate=True,
+            )
+
         if patient_case.status not in self._SUCCESS_STATES:
             return self._build_failure_result(
                 case_id=case_id,
@@ -116,13 +126,6 @@ class ParseDocumentNode:
                 failure_code="processing_state_unavailable",
                 failure_message="Document processing is not available for the current case state.",
                 is_recoverable_failure=True,
-            )
-
-        existing_extraction = self._find_existing_extraction(case_id, extraction_record_id)
-        if existing_extraction is not None:
-            return self._build_result_from_extraction(
-                existing_extraction,
-                was_duplicate=True,
             )
 
         if patient_case.status == CaseStatus.DOCUMENTS_UPLOADED:
@@ -159,12 +162,31 @@ class ParseDocumentNode:
                 extracted_at=extraction.extracted_at,
                 provider_name=extraction.provider_name,
             )
+            quality_case_status: CaseStatus | None = None
+            if self._is_low_quality_extraction(extraction_record):
+                quality_case_status = self._mark_partial_extraction(case_id=case_id)
+                if quality_case_status != CaseStatus.PARTIAL_EXTRACTION:
+                    return self._build_failure_result(
+                        case_id=case_id,
+                        case_status=quality_case_status,
+                        document=document,
+                        source_document_reference=source_document_reference,
+                        failure_code="case_transition_failed",
+                        failure_message="Не удалось обработать документ.",
+                        is_recoverable_failure=True,
+                    )
             attached_extraction_record = self._case_service.attach_case_extraction_record(
                 extraction_record,
             )
             attached_extraction_reference = self._case_service.attach_case_record_reference(
                 extraction_reference,
             )
+            if quality_case_status is not None:
+                return self._build_result_from_extraction(
+                    attached_extraction_record,
+                    extraction_reference=attached_extraction_reference,
+                    case_status=quality_case_status,
+                )
         except OCRClientError:
             failed_case = self._mark_processing_failed(case_id=case_id)
             return self._build_failure_result(
@@ -217,6 +239,14 @@ class ParseDocumentNode:
     def _build_extraction_record_id(source_document_reference: CaseRecordReference) -> str:
         return f"extraction:{source_document_reference.record_id}"
 
+    def _is_low_quality_extraction(self, extraction_record: CaseExtractionRecord) -> bool:
+        if extraction_record.confidence < self._settings.document_extraction_min_confidence:
+            return True
+        return (
+            len(extraction_record.extracted_text)
+            < self._settings.document_extraction_min_text_length
+        )
+
     def _find_existing_extraction(
         self,
         case_id: str,
@@ -233,6 +263,7 @@ class ParseDocumentNode:
         *,
         was_duplicate: bool = False,
         extraction_reference: CaseRecordReference | None = None,
+        case_status: CaseStatus | None = None,
     ) -> DocumentProcessingResult:
         normalized_extraction_reference = (
             extraction_reference or extraction_record.extraction_reference
@@ -240,7 +271,8 @@ class ParseDocumentNode:
         return DocumentProcessingResult(
             case_id=extraction_record.case_id,
             case_status=(
-                self._case_service.get_case_core_records(extraction_record.case_id)
+                case_status
+                or self._case_service.get_case_core_records(extraction_record.case_id)
                 .patient_case.status
             ),
             source_document=extraction_record.source_document,
@@ -272,6 +304,26 @@ class ParseDocumentNode:
                     CaseStatus.EXTRACTION_FAILED,
                 )
                 return failed_case.status
+        except CaseTransitionError:
+            return self._case_service.get_case_core_records(case_id).patient_case.status
+        return current_status
+
+    def _mark_partial_extraction(self, *, case_id: str) -> CaseStatus:
+        current_status = self._case_service.get_case_core_records(case_id).patient_case.status
+        try:
+            if current_status == CaseStatus.PROCESSING_DOCUMENTS:
+                partial_case = self._case_service.transition_case(
+                    case_id,
+                    CaseStatus.PARTIAL_EXTRACTION,
+                )
+                return partial_case.status
+            if current_status == CaseStatus.DOCUMENTS_UPLOADED:
+                self._case_service.transition_case(case_id, CaseStatus.PROCESSING_DOCUMENTS)
+                partial_case = self._case_service.transition_case(
+                    case_id,
+                    CaseStatus.PARTIAL_EXTRACTION,
+                )
+                return partial_case.status
         except CaseTransitionError:
             return self._case_service.get_case_core_records(case_id).patient_case.status
         return current_status
