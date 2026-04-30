@@ -44,6 +44,19 @@ def test_invalid_transition_raises_recoverable_domain_error() -> None:
     assert error.to_status == CaseStatus.READY_FOR_DOCTOR
 
 
+def test_partial_extraction_cannot_move_directly_to_ready_for_summary() -> None:
+    with pytest.raises(CaseTransitionError) as exc_info:
+        assert_case_transition_allowed(
+            "case_123",
+            CaseStatus.PARTIAL_EXTRACTION,
+            CaseStatus.READY_FOR_SUMMARY,
+        )
+
+    error = exc_info.value
+    assert error.from_status == CaseStatus.PARTIAL_EXTRACTION
+    assert error.to_status == CaseStatus.READY_FOR_SUMMARY
+
+
 def test_deleted_status_is_terminal() -> None:
     assert ALLOWED_CASE_TRANSITIONS[CaseStatus.DELETED] == frozenset()
     assert not is_case_transition_allowed(CaseStatus.DELETED, CaseStatus.DRAFT)

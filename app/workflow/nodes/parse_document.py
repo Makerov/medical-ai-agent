@@ -162,14 +162,26 @@ class ParseDocumentNode:
                 extracted_at=extraction.extracted_at,
                 provider_name=extraction.provider_name,
             )
+            quality_case_status: CaseStatus | None = None
+            if self._is_low_quality_extraction(extraction_record):
+                quality_case_status = self._mark_partial_extraction(case_id=case_id)
+                if quality_case_status != CaseStatus.PARTIAL_EXTRACTION:
+                    return self._build_failure_result(
+                        case_id=case_id,
+                        case_status=quality_case_status,
+                        document=document,
+                        source_document_reference=source_document_reference,
+                        failure_code="case_transition_failed",
+                        failure_message="Не удалось обработать документ.",
+                        is_recoverable_failure=True,
+                    )
             attached_extraction_record = self._case_service.attach_case_extraction_record(
                 extraction_record,
             )
             attached_extraction_reference = self._case_service.attach_case_record_reference(
                 extraction_reference,
             )
-            if self._is_low_quality_extraction(attached_extraction_record):
-                quality_case_status = self._mark_partial_extraction(case_id=case_id)
+            if quality_case_status is not None:
                 return self._build_result_from_extraction(
                     attached_extraction_record,
                     extraction_reference=attached_extraction_reference,

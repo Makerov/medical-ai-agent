@@ -173,6 +173,53 @@ def test_parse_document_routes_short_extraction_to_partial_extraction() -> None:
     )
 
 
+def test_parse_document_does_not_attach_low_quality_extraction_when_partial_transition_fails() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_001_fail")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_001_fail",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_001_fail",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=lambda _bytes, _document: ("enough text for partial state", 0.41),
+        clock=lambda: now,
+        provider_name="stub",
+    )
+    node = ParseDocumentNode(
+        case_service=case_service,
+        ocr_client=client,
+        settings=Settings(
+            document_extraction_min_confidence=0.75,
+            document_extraction_min_text_length=16,
+        ),
+    )
+    node._mark_partial_extraction = lambda *, case_id: CaseStatus.READY_FOR_SUMMARY  # type: ignore[method-assign]
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.extraction is None
+    assert result.extraction_reference is None
+    assert result.failure_code == "case_transition_failed"
+    assert result.case_status == CaseStatus.READY_FOR_SUMMARY
+    assert case_service.get_case_core_records(patient_case.case_id).extractions == ()
+    assert (
+        case_service.get_case_core_records(patient_case.case_id).patient_case.status
+        == CaseStatus.PROCESSING_DOCUMENTS
+    )
+
+
 def test_parse_document_is_idempotent_for_repeated_job_execution() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_002")

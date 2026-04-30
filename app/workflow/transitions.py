@@ -41,7 +41,6 @@ ALLOWED_CASE_TRANSITIONS: dict[CaseStatus, frozenset[CaseStatus]] = {
     ),
     CaseStatus.PARTIAL_EXTRACTION: frozenset(
         {
-            CaseStatus.READY_FOR_SUMMARY,
             CaseStatus.DOCUMENTS_UPLOADED,
             CaseStatus.DELETION_REQUESTED,
         }
