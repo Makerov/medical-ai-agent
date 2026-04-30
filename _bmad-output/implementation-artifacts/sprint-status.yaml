@@ -60,7 +60,7 @@ development_status:
   epic-2-retrospective: optional
   epic-3: in-progress
   3-1-document-upload-в-active-case: done
-  3-2-supported-file-validation-и-recoverable-rejection: review
+  3-2-supported-file-validation-и-recoverable-rejection: done
   3-3-text-extraction-из-pdf-image-documents: backlog
   3-4-extraction-quality-detection-и-retry-flow: backlog
   3-5-structured-medical-indicator-extraction: backlog
