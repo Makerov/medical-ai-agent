@@ -17,6 +17,9 @@ from app.bots.messages import (
     PATIENT_CONSENT_DECLINED_MESSAGE,
     PATIENT_CONSENT_PROMPT_MESSAGE,
     PATIENT_DELETION_CANCELLED_MESSAGE,
+    PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE,
+    PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE,
+    PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE,
     PATIENT_GOAL_INVALID_MESSAGE,
     PATIENT_GOAL_SAVED_MESSAGE,
     PATIENT_INTAKE_FAILED_MESSAGE,
@@ -27,6 +30,7 @@ from app.bots.messages import (
     PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
     render_ai_boundary_message,
     render_case_deletion_result_message,
+    render_document_upload_message,
     render_patient_status_message,
 )
 from app.bots.patient_bot import (
@@ -37,11 +41,14 @@ from app.bots.patient_bot import (
     handle_case_deletion_request,
     handle_consent_accept,
     handle_consent_decline,
+    handle_document_upload,
     handle_patient_message,
     handle_patient_start,
     handle_patient_status,
 )
 from app.schemas.case import (
+    CaseRecordKind,
+    CaseRecordReference,
     CaseStatus,
     HandoffBlockingReason,
     HandoffBlockingReasonCode,
@@ -50,6 +57,11 @@ from app.schemas.case import (
     SharedStatusView,
 )
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.schemas.document import (
+    DocumentUploadMessageKind,
+    DocumentUploadMetadata,
+    DocumentUploadResult,
+)
 from app.schemas.patient import (
     PatientIntakeField,
     PatientIntakeMessageKind,
@@ -66,9 +78,15 @@ from app.services.patient_intake_service import (
 
 
 class FakeMessage:
-    def __init__(self, user_id: int | None = 123, text: str | None = None) -> None:
+    def __init__(
+        self,
+        user_id: int | None = 123,
+        text: str | None = None,
+        document: object | None = None,
+    ) -> None:
         self.from_user = SimpleNamespace(id=user_id) if user_id is not None else None
         self.text = text
+        self.document = document
         self.answer = AsyncMock()
 
 
@@ -88,6 +106,7 @@ class FakeIntakeService:
         accept_result: ConsentCaptureResult | None = None,
         decline_result: ConsentCaptureResult | None = None,
         message_result: PatientIntakeUpdateResult | None = None,
+        document_result: DocumentUploadResult | None = None,
         deletion_result: object | None = None,
         error: Exception | None = None,
         active_case_id: str | None = None,
@@ -98,6 +117,7 @@ class FakeIntakeService:
         self.accept_result = accept_result
         self.decline_result = decline_result
         self.message_result = message_result
+        self.document_result = document_result
         self.deletion_result = deletion_result
         self.error = error
         self.active_case_id = active_case_id
@@ -108,6 +128,7 @@ class FakeIntakeService:
         self.accept_calls: list[tuple[int, str]] = []
         self.decline_calls: list[tuple[int, str]] = []
         self.message_calls: list[tuple[int, str]] = []
+        self.document_calls: list[tuple[int, DocumentUploadMetadata]] = []
         self.prompt_calls: list[tuple[int, str | None]] = []
         self.deletion_calls: list[tuple[int, str]] = []
 
@@ -136,6 +157,18 @@ class FakeIntakeService:
             raise self.error
         assert self.message_result is not None
         return self.message_result
+
+    def handle_document_upload(
+        self,
+        *,
+        telegram_user_id: int,
+        document: DocumentUploadMetadata,
+    ) -> DocumentUploadResult:
+        self.document_calls.append((telegram_user_id, document))
+        if self.error is not None:
+            raise self.error
+        assert self.document_result is not None
+        return self.document_result
 
     def accept_consent(self, *, telegram_user_id: int, case_id: str) -> ConsentCaptureResult:
         self.accept_calls.append((telegram_user_id, case_id))
@@ -232,17 +265,19 @@ def test_handle_patient_start_replies_with_safe_failure_message() -> None:
 def test_build_patient_router_registers_command_start_handler() -> None:
     router = build_patient_router(FakeIntakeService())
 
-    assert len(router.message.handlers) == 5
+    assert len(router.message.handlers) == 6
     start_handler = router.message.handlers[0]
     status_handler = router.message.handlers[1]
     delete_handler = router.message.handlers[2]
     delete_case_handler = router.message.handlers[3]
-    message_handler = router.message.handlers[4]
+    document_handler = router.message.handlers[4]
+    message_handler = router.message.handlers[5]
     assert len(router.callback_query.handlers) == 5
     assert start_handler.callback.__name__ == "start_handler"
     assert status_handler.callback.__name__ == "status_handler"
     assert delete_handler.callback.__name__ == "delete_handler"
     assert delete_case_handler.callback.__name__ == "delete_case_handler"
+    assert document_handler.callback.__name__ == "document_handler"
     assert message_handler.callback.__name__ == "patient_message_handler"
     assert router.callback_query.handlers[0].callback.__name__ == "continue_to_consent_handler"
     assert router.callback_query.handlers[1].callback.__name__ == "consent_accept_handler"
@@ -257,6 +292,78 @@ def test_build_patient_router_registers_command_start_handler() -> None:
         isinstance(filter_.callback, Command)
         for filter_ in status_handler.filters
     )
+
+
+def test_handle_document_upload_replies_with_accepted_message_and_forwards_metadata() -> None:
+    document = SimpleNamespace(
+        file_id="file_001",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+        file_unique_id="unique_001",
+    )
+    message = FakeMessage(document=document)
+    service = FakeIntakeService(
+        document_result=DocumentUploadResult(
+            case_id="case_patient_020",
+            case_status=CaseStatus.DOCUMENTS_UPLOADED,
+            message_kind=DocumentUploadMessageKind.ACCEPTED,
+            document_metadata=DocumentUploadMetadata(
+                file_id="file_001",
+                file_name="scan.pdf",
+                mime_type="application/pdf",
+                file_size=1024,
+                file_unique_id="unique_001",
+            ),
+            document_record=CaseRecordReference(
+                case_id="case_patient_020",
+                record_kind=CaseRecordKind.DOCUMENT,
+                record_id="telegram_document:unique_001",
+                created_at=datetime(2026, 4, 28, 6, 0, tzinfo=UTC),
+            ),
+        )
+    )
+
+    asyncio.run(handle_document_upload(message, service))
+
+    assert service.document_calls == [
+        (
+            123,
+            DocumentUploadMetadata(
+                file_id="file_001",
+                file_name="scan.pdf",
+                mime_type="application/pdf",
+                file_size=1024,
+                file_unique_id="unique_001",
+            ),
+        )
+    ]
+    message.answer.assert_awaited_once_with(PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE)
+
+
+def test_render_document_upload_message_uses_recoverable_copy() -> None:
+    accepted = DocumentUploadResult(
+        case_id="case_patient_021",
+        case_status=CaseStatus.DOCUMENTS_UPLOADED,
+        message_kind=DocumentUploadMessageKind.ACCEPTED,
+        document_metadata=DocumentUploadMetadata(
+            file_id="file_002",
+            file_name="scan.pdf",
+            mime_type="application/pdf",
+            file_size=2048,
+        ),
+    )
+    in_progress = accepted.model_copy(
+        update={"message_kind": DocumentUploadMessageKind.IN_PROGRESS}
+    )
+    rejected = accepted.model_copy(update={"message_kind": DocumentUploadMessageKind.REJECTED})
+
+    assert render_document_upload_message(accepted) == PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
+    assert (
+        render_document_upload_message(in_progress)
+        == PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE
+    )
+    assert render_document_upload_message(rejected) == PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE
 
 
 def test_handle_ai_boundary_continue_answers_callback_and_shows_consent_step() -> None:
