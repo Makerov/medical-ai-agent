@@ -173,7 +173,7 @@ def test_parse_document_routes_short_extraction_to_partial_extraction() -> None:
     )
 
 
-def test_parse_document_does_not_attach_low_quality_extraction_when_partial_transition_fails() -> None:
+def test_parse_document_skips_attach_when_partial_transition_fails() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_001_fail")
     patient_case = case_service.create_case()
