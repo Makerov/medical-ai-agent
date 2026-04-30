@@ -122,8 +122,9 @@ PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE = (
 )
 
 PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE = (
-    "Текущая заявка пока не готова для загрузки документа или уже недоступна.\n"
-    "Нажмите /start, чтобы начать заново."
+    "Сейчас документ принять нельзя.\n"
+    "Если вы еще проходите intake, продолжайте его.\n"
+    "Если заявки нет или она закрыта, нажмите /start."
 )
 
 PATIENT_STATUS_INTRO_LABEL = "Статус заявки"
