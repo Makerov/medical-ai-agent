@@ -281,6 +281,12 @@ class PatientIntakeService:
                 document_metadata=document,
                 was_duplicate=True,
             )
+        if patient_case.status != CaseStatus.COLLECTING_INTAKE:
+            return self._reject_document_upload(
+                document=document,
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+            )
 
         document_record = self._document_service.build_document_reference(
             case_id=patient_case.case_id,
