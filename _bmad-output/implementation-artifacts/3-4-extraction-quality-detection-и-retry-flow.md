@@ -1,6 +1,6 @@
 # Story 3.4: Extraction Quality Detection и Retry Flow
 
-Status: review
+Status: done
 
 ## Story
 
@@ -155,7 +155,7 @@ This repository is a Telegram-first portfolio/demo backend for medical intake. T
 
 ## Story Completion Status
 
-Ready for dev handoff. The developer should implement only the quality gate and retry path, then stop before structured extraction work.
+Done. The quality gate and retry path are implemented, reviewed, fixed, and committed.
 
 ## Tasks/Subtasks
 
@@ -193,3 +193,4 @@ Ready for dev handoff. The developer should implement only the quality gate and 
 ## Change Log
 
 - 2026-04-30: Implemented the OCR quality gate, `PARTIAL_EXTRACTION` retry flow, patient retry copy, and regression tests.
+- 2026-04-30: Closed after code review and follow-up fixes; story marked done.
