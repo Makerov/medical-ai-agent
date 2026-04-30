@@ -5,6 +5,8 @@ from typing import Annotated
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
+TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES = 20_000_000
+
 
 class Settings(BaseSettings):
     app_name: str = "medical-ai-agent"
@@ -14,6 +16,12 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
     doctor_telegram_id_allowlist: Annotated[tuple[int, ...], NoDecode] = ()
+    document_upload_supported_mime_types: Annotated[tuple[str, ...], NoDecode] = (
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+    )
+    document_upload_max_file_size_bytes: int = TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES
     patient_bot_token: str | None = None
     debug_admin_static_token: str | None = None
 
@@ -33,6 +41,44 @@ class Settings(BaseSettings):
             return tuple(int(item) for item in value)
         msg = "DOCTOR_TELEGRAM_ID_ALLOWLIST must be a comma-separated list of integers"
         raise ValueError(msg)
+
+    @field_validator("document_upload_supported_mime_types", mode="before")
+    @classmethod
+    def parse_document_upload_supported_mime_types(
+        cls,
+        value: object,
+    ) -> tuple[str, ...]:
+        if value in (None, ""):
+            msg = "DOCUMENT_UPLOAD_SUPPORTED_MIME_TYPES must not be empty"
+            raise ValueError(msg)
+        if isinstance(value, str):
+            raw_items = [item.strip().lower() for item in value.split(",")]
+        elif isinstance(value, list | tuple | set):
+            raw_items = [str(item).strip().lower() for item in value]
+        else:
+            msg = (
+                "DOCUMENT_UPLOAD_SUPPORTED_MIME_TYPES must be a comma-separated list of strings"
+            )
+            raise ValueError(msg)
+        normalized = tuple(dict.fromkeys(item for item in raw_items if item))
+        if not normalized:
+            msg = "DOCUMENT_UPLOAD_SUPPORTED_MIME_TYPES must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("document_upload_max_file_size_bytes")
+    @classmethod
+    def validate_document_upload_max_file_size_bytes(cls, value: int) -> int:
+        if value <= 0:
+            msg = "DOCUMENT_UPLOAD_MAX_FILE_SIZE_BYTES must be greater than zero"
+            raise ValueError(msg)
+        if value > TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES:
+            msg = (
+                "DOCUMENT_UPLOAD_MAX_FILE_SIZE_BYTES must not exceed the Telegram file download "
+                f"limit of {TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES} bytes"
+            )
+            raise ValueError(msg)
+        return value
 
     @field_validator("debug_admin_static_token", mode="before")
     @classmethod

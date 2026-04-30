@@ -1,6 +1,11 @@
 from app.schemas.case import CaseStatus, SharedCaseStatusCode, SharedStatusView
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
-from app.schemas.document import DocumentUploadMessageKind, DocumentUploadResult
+from app.schemas.document import (
+    DocumentUploadMessageKind,
+    DocumentUploadRejectionReasonCode,
+    DocumentUploadResult,
+    DocumentUploadValidationContext,
+)
 from app.schemas.patient import (
     PatientIntakeMessageKind,
     PatientIntakeUpdateResult,
@@ -120,6 +125,8 @@ PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE = (
     "Документ уже обрабатывается.\n"
     "Пожалуйста, подождите, повторно отправлять не нужно."
 )
+
+PATIENT_DOCUMENT_UPLOAD_ALLOWED_FORMATS = "PDF, JPG и PNG"
 
 PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE = (
     "Сейчас документ принять нельзя.\n"
@@ -250,9 +257,83 @@ def render_document_upload_message(result: DocumentUploadResult) -> str:
         case DocumentUploadMessageKind.IN_PROGRESS:
             return PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE
         case DocumentUploadMessageKind.REJECTED:
-            return PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE
+            return _render_document_upload_rejection_message(result)
     msg = f"Unsupported document upload message kind: {result.message_kind}"
     raise ValueError(msg)
+
+
+def _render_document_upload_rejection_message(result: DocumentUploadResult) -> str:
+    if result.rejection_reason_code is None:
+        return PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE
+    match result.rejection_reason_code:
+        case DocumentUploadRejectionReasonCode.UNSUPPORTED_FILE_TYPE:
+            return (
+                "Этот формат пока не поддерживается.\n"
+                f"Отправьте {_render_document_supported_formats(result.validation_context)} "
+                "и попробуйте еще раз."
+            )
+        case DocumentUploadRejectionReasonCode.INVALID_DOCUMENT:
+            return (
+                "Не смог проверить файл.\n"
+                f"Отправьте {_render_document_supported_formats(result.validation_context)} "
+                "еще раз."
+            )
+        case DocumentUploadRejectionReasonCode.FILE_TOO_LARGE:
+            limit = _render_document_size_limit(result.validation_context)
+            return (
+                "Файл слишком большой.\n"
+                f"Лимит сейчас {limit}.\n"
+                f"Пришлите {_render_document_supported_formats(result.validation_context)} "
+                "меньшего размера."
+            )
+    msg = f"Unsupported document rejection reason code: {result.rejection_reason_code}"
+    raise ValueError(msg)
+
+
+def _render_document_size_limit(
+    validation_context: DocumentUploadValidationContext | None,
+) -> str:
+    max_file_size_bytes = (
+        validation_context.configured_max_file_size_bytes if validation_context else None
+    )
+    if not isinstance(max_file_size_bytes, int) or max_file_size_bytes <= 0:
+        return "установленный лимит"
+    limit_in_mb = max_file_size_bytes / 1_000_000
+    if limit_in_mb.is_integer():
+        return f"{int(limit_in_mb)} МБ"
+    return f"{limit_in_mb:.1f}".rstrip("0").rstrip(".") + " МБ"
+
+
+def _render_document_supported_formats(
+    validation_context: DocumentUploadValidationContext | None,
+) -> str:
+    supported_mime_types = (
+        validation_context.supported_mime_types if validation_context else ()
+    )
+    if not supported_mime_types:
+        return PATIENT_DOCUMENT_UPLOAD_ALLOWED_FORMATS
+
+    labels = [_render_document_mime_label(mime_type) for mime_type in supported_mime_types]
+    unique_labels: list[str] = []
+    for label in labels:
+        if label not in unique_labels:
+            unique_labels.append(label)
+    if len(unique_labels) == 1:
+        return unique_labels[0]
+    if len(unique_labels) == 2:
+        return f"{unique_labels[0]} и {unique_labels[1]}"
+    return f"{', '.join(unique_labels[:-1])} и {unique_labels[-1]}"
+
+
+def _render_document_mime_label(mime_type: str) -> str:
+    match mime_type.lower():
+        case "application/pdf":
+            return "PDF"
+        case "image/jpeg" | "image/jpg":
+            return "JPG"
+        case "image/png":
+            return "PNG"
+    return mime_type.upper()
 
 
 def render_patient_status_message(status_view: SharedStatusView) -> str:

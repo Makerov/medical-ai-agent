@@ -99,6 +99,36 @@ def test_settings_parse_patient_bot_token(monkeypatch) -> None:
     assert settings.patient_bot_token == "demo-patient-token"
 
 
+def test_settings_parse_document_upload_supported_mime_types(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv(
+        "DOCUMENT_UPLOAD_SUPPORTED_MIME_TYPES",
+        "application/pdf, image/jpeg, image/png",
+    )
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.document_upload_supported_mime_types == (
+        "application/pdf",
+        "image/jpeg",
+        "image/png",
+    )
+
+
+def test_settings_reject_document_upload_max_file_size_above_telegram_cap(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("DOCUMENT_UPLOAD_MAX_FILE_SIZE_BYTES", "20000001")
+
+    try:
+        with pytest.raises(ValidationError, match="DOCUMENT_UPLOAD_MAX_FILE_SIZE_BYTES"):
+            get_settings()
+    finally:
+        get_settings.cache_clear()
+
+
 def test_settings_reject_empty_artifact_root_dir(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("ARTIFACT_ROOT_DIR", "   ")
