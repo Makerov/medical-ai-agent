@@ -48,7 +48,7 @@ def test_process_case_worker_processes_case_without_touching_tg_boundary() -> No
 
     client = OCRClient(
         document_bytes_fetcher=lambda _: b"raw document bytes",
-        document_parser=lambda _bytes, _document: ("worker text", 0.73),
+        document_parser=lambda _bytes, _document: ("worker text", 0.83),
         clock=lambda: now,
     )
     worker = ProcessCaseWorker(
@@ -64,4 +64,3 @@ def test_process_case_worker_processes_case_without_touching_tg_boundary() -> No
     assert case_service.get_case_core_records(patient_case.case_id).extractions == (
         result.extraction_reference,
     )
-
