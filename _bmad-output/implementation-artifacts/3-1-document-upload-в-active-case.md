@@ -1,6 +1,6 @@
 # Story 3.1: Document Upload в Active Case
 
-Status: review
+Status: done
 
 ## Story
 
@@ -217,3 +217,9 @@ GPT-5 Codex
 ## Change Log
 
 - 2026-04-30: Implemented document upload boundary for active cases, including metadata normalization, case linkage, patient copy, routing, and regression tests.
+- 2026-04-30: Addressed review findings by preventing orphan upload records on stale cases and clarifying the rejection copy for mid-intake users.
+
+### Review Findings
+
+- [x] [Review][Patch] Stale upload window can orphan a document record [app/services/patient_intake_service.py:285] — fixed by rejecting stale case statuses before attachment.
+- [x] [Review][Patch] Rejection copy tells mid-intake users to restart unnecessarily [app/bots/messages.py:124] — fixed by replacing the restart wording with guidance that distinguishes active intake from closed or missing requests.
