@@ -42,13 +42,17 @@ class DocumentService:
         document_metadata: DocumentUploadMetadata,
         created_at: datetime,
     ) -> CaseRecordReference:
-        record_id = document_metadata.file_unique_id or document_metadata.file_id
+        record_id = DocumentService.build_document_identity_key(document_metadata)
         return CaseRecordReference(
             case_id=case_id,
             record_kind=CaseRecordKind.DOCUMENT,
             record_id=f"telegram_document:{record_id}",
             created_at=created_at,
         )
+
+    @staticmethod
+    def build_document_identity_key(document_metadata: DocumentUploadMetadata) -> str:
+        return document_metadata.file_unique_id or document_metadata.file_id
 
     def validate_document_upload(
         self,

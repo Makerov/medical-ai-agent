@@ -30,6 +30,11 @@ from app.schemas.document import (
     DocumentUploadMetadata,
     DocumentUploadResult,
 )
+from app.schemas.extraction import (
+    CaseExtractionRecord,
+    DocumentProcessingResult,
+    OCRTextExtractionResult,
+)
 from app.schemas.patient import (
     ConsultationGoal,
     ConsultationGoalCaptureResult,
@@ -65,6 +70,9 @@ __all__ = [
     "DocumentUploadMessageKind",
     "DocumentUploadMetadata",
     "DocumentUploadResult",
+    "CaseExtractionRecord",
+    "DocumentProcessingResult",
+    "OCRTextExtractionResult",
     "PatientIntakeCaptureResult",
     "PatientIntakeField",
     "PatientIntakeMessageKind",
