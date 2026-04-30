@@ -26,14 +26,17 @@ from app.bots.messages import (
     render_case_deletion_result_message,
     render_consent_result_message,
     render_consent_step_message,
+    render_document_upload_message,
     render_patient_intake_message,
     render_patient_status_message,
 )
 from app.core.settings import Settings, get_settings
 from app.schemas.case import CaseStatus
+from app.schemas.document import DocumentUploadMetadata
 from app.schemas.patient import PatientIntakeMessageKind
 from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
+from app.services.document_service import DocumentService
 from app.services.patient_intake_service import PatientIntakeService
 
 
@@ -62,6 +65,19 @@ def build_patient_intake_service(
         artifact_root_dir=settings.artifact_root_dir,
     )
     return PatientIntakeService(case_service=case_service, audit_service=audit_service)
+
+
+def _build_document_metadata(message: Message) -> DocumentUploadMetadata:
+    document = message.document
+    if document is None:
+        raise ValueError("Document payload is missing")
+    return DocumentService.normalize_document_metadata(
+        file_id=document.file_id,
+        file_name=document.file_name,
+        mime_type=document.mime_type,
+        file_size=document.file_size,
+        file_unique_id=document.file_unique_id,
+    )
 
 
 def _is_deleted_case_status(case_status: CaseStatus) -> bool:
@@ -279,6 +295,26 @@ async def handle_patient_message(
     )
 
 
+async def handle_document_upload(
+    message: MessageResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = message.from_user.id if getattr(message, "from_user", None) else None
+        if telegram_user_id is None:
+            raise ValueError
+        document_metadata = _build_document_metadata(message)  # type: ignore[arg-type]
+        upload_result = intake_service.handle_document_upload(
+            telegram_user_id=telegram_user_id,
+            document=document_metadata,
+        )
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await message.answer(render_document_upload_message(upload_result))
+
+
 async def handle_patient_status(
     message: MessageResponder,
     intake_service: PatientIntakeService,
@@ -321,6 +357,10 @@ def build_patient_router(
     @router.message(Command("delete-case"))
     async def delete_case_handler(message: Message) -> None:
         await handle_case_deletion_request(message, intake_service)
+
+    @router.message(lambda message: bool(getattr(message, "document", None)))
+    async def document_handler(message: Message) -> None:
+        await handle_document_upload(message, intake_service)
 
     @router.callback_query(lambda callback: callback.data == AI_BOUNDARY_CONTINUE_CALLBACK)
     async def continue_to_consent_handler(callback: CallbackQuery) -> None:
