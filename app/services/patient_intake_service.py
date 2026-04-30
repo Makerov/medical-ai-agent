@@ -3,6 +3,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.audit import AuditEventType
 from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus, PatientCase
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.schemas.patient import (
@@ -13,6 +14,7 @@ from app.schemas.patient import (
     PatientIntakeUpdateResult,
     PatientProfile,
 )
+from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
 from app.services.consent_service import ConsentService
 
@@ -49,6 +51,15 @@ class PreConsentGateResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
 
+class CaseDeletionResult(BaseModel):
+    case_id: str = Field(min_length=1)
+    case_status: CaseStatus
+    was_duplicate: bool = False
+    audit_event_id: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+
 @dataclass(frozen=True)
 class IntakeSessionState:
     case_id: str
@@ -63,9 +74,11 @@ class PatientIntakeService:
         *,
         case_service: CaseService,
         consent_service: ConsentService | None = None,
+        audit_service: AuditService | None = None,
     ) -> None:
         self._case_service = case_service
         self._consent_service = consent_service or ConsentService(case_service=case_service)
+        self._audit_service = audit_service
         self._pre_consent_steps: dict[int, IntakeSessionState] = {}
         self._intake_payloads: dict[str, PatientIntakePayload] = {}
 
@@ -177,6 +190,14 @@ class PatientIntakeService:
     ) -> PatientIntakeUpdateResult:
         session = self._require_pre_consent_session(telegram_user_id)
         patient_case = self._case_service.get_case_core_records(session.case_id).patient_case
+        if self._is_terminal_deleted(patient_case.status):
+            self._intake_payloads.pop(patient_case.case_id, None)
+            return self._build_update_result(
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                active_step=session.active_step.value,
+                message_kind=PatientIntakeMessageKind.CASE_DELETED,
+            )
         if session.intake_step is None:
             if session.active_step == PatientIntakeStep.CONSENT_CAPTURED:
                 return self._build_update_result(
@@ -226,6 +247,13 @@ class PatientIntakeService:
             msg = "Prompt request does not match active intake session"
             raise ValueError(msg)
         patient_case = self._case_service.get_case_core_records(session.case_id).patient_case
+        if self._is_terminal_deleted(patient_case.status):
+            return self._build_update_result(
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                active_step=session.active_step.value,
+                message_kind=PatientIntakeMessageKind.CASE_DELETED,
+            )
         if session.intake_step == PatientIntakeStep.AWAITING_PROFILE:
             return self._build_update_result(
                 case_id=patient_case.case_id,
@@ -261,6 +289,65 @@ class PatientIntakeService:
             case_status=patient_case.status,
             active_step=session.active_step.value,
             message_kind=PatientIntakeMessageKind.CONSENT_REQUIRED,
+        )
+
+    def request_case_deletion(
+        self,
+        *,
+        telegram_user_id: int,
+        case_id: str,
+    ) -> CaseDeletionResult:
+        session = self._require_matching_pre_consent_session(
+            telegram_user_id=telegram_user_id,
+            case_id=case_id,
+        )
+        patient_case = self._case_service.get_case_core_records(case_id).patient_case
+        if patient_case.status == CaseStatus.DELETED:
+            self._intake_payloads.pop(case_id, None)
+            return CaseDeletionResult(
+                case_id=case_id,
+                case_status=patient_case.status,
+                was_duplicate=True,
+            )
+        if patient_case.status == CaseStatus.DELETION_REQUESTED:
+            deleted_case = self._case_service.transition_case(case_id, CaseStatus.DELETED)
+            self._intake_payloads.pop(case_id, None)
+            return CaseDeletionResult(
+                case_id=deleted_case.case_id,
+                case_status=deleted_case.status,
+                was_duplicate=True,
+            )
+        if self._audit_service is None:
+            msg = "Audit service is required to delete a case"
+            raise RuntimeError(msg)
+
+        requested_case = self._case_service.transition_case(case_id, CaseStatus.DELETION_REQUESTED)
+        audit_event = self._audit_service.record_event(
+            case_id=case_id,
+            event_type=AuditEventType.CASE_STATUS_CHANGED,
+            metadata={
+                "from_status": patient_case.status.value,
+                "to_status": CaseStatus.DELETION_REQUESTED.value,
+                "request_source": "patient_bot",
+                "telegram_user_id": telegram_user_id,
+            },
+        )
+        deleted_case = self._case_service.transition_case(
+            requested_case.case_id,
+            CaseStatus.DELETED,
+        )
+        self._intake_payloads.pop(case_id, None)
+        self._pre_consent_steps[telegram_user_id] = IntakeSessionState(
+            case_id=deleted_case.case_id,
+            active_step=session.active_step,
+            intake_step=session.intake_step,
+            last_consent_outcome=session.last_consent_outcome,
+        )
+        return CaseDeletionResult(
+            case_id=deleted_case.case_id,
+            case_status=deleted_case.status,
+            was_duplicate=False,
+            audit_event_id=audit_event.event_id,
         )
 
     @staticmethod
@@ -325,6 +412,10 @@ class PatientIntakeService:
             active_step=active_step,
             reminder_kind=PreConsentReminderKind.CONSENT_REQUIRED,
         )
+
+    @staticmethod
+    def _is_terminal_deleted(case_status: CaseStatus) -> bool:
+        return case_status in {CaseStatus.DELETION_REQUESTED, CaseStatus.DELETED}
 
     def _capture_patient_profile(
         self,
