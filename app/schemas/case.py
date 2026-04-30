@@ -50,6 +50,7 @@ class CaseRecordKind(StrEnum):
     CONSENT = "consent"
     DOCUMENT = "document"
     EXTRACTION = "extraction"
+    INDICATOR = "indicator"
     SUMMARY = "summary"
     AUDIT = "audit"
 
@@ -102,6 +103,7 @@ class CaseCoreRecords(BaseModel):
     consent: CaseRecordReference | None = None
     documents: tuple[CaseRecordReference, ...] = ()
     extractions: tuple[CaseRecordReference, ...] = ()
+    indicators: tuple[CaseRecordReference, ...] = ()
     summaries: tuple[CaseRecordReference, ...] = ()
     audit_events: tuple[CaseRecordReference, ...] = ()
 
@@ -115,6 +117,7 @@ class CaseCoreRecords(BaseModel):
             (CaseRecordKind.CONSENT, self._as_tuple(self.consent)),
             (CaseRecordKind.DOCUMENT, self.documents),
             (CaseRecordKind.EXTRACTION, self.extractions),
+            (CaseRecordKind.INDICATOR, self.indicators),
             (CaseRecordKind.SUMMARY, self.summaries),
             (CaseRecordKind.AUDIT, self.audit_events),
         )

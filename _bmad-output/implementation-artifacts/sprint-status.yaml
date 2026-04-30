@@ -63,7 +63,7 @@ development_status:
   3-2-supported-file-validation-и-recoverable-rejection: done
   3-3-text-extraction-из-pdf-image-documents: done
   3-4-extraction-quality-detection-и-retry-flow: done
-  3-5-structured-medical-indicator-extraction: backlog
+  3-5-structured-medical-indicator-extraction: done
   3-6-uncertainty-marking-и-partial-processing: backlog
   3-7-original-document-references-для-doctor-review: backlog
   epic-3-retrospective: optional

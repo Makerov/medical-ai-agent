@@ -12,6 +12,7 @@ from app.schemas.case import (
 )
 from app.schemas.document import DocumentUploadMetadata
 from app.schemas.extraction import CaseExtractionRecord
+from app.schemas.indicator import CaseIndicatorExtractionRecord, StructuredMedicalIndicator
 from app.services.case_service import CaseService
 
 
@@ -195,6 +196,7 @@ def test_get_case_core_records_returns_case_and_empty_downstream_references() ->
     assert aggregate.consent is None
     assert aggregate.documents == ()
     assert aggregate.extractions == ()
+    assert aggregate.indicators == ()
     assert aggregate.summaries == ()
     assert aggregate.audit_events == ()
 
@@ -316,6 +318,67 @@ def test_attach_case_extraction_record_is_idempotent_and_retrievable() -> None:
     assert first_result == extraction_record
     assert second_result == extraction_record
     assert service.get_case_extraction_records(patient_case.case_id) == (extraction_record,)
+
+
+def test_attach_case_indicator_record_is_idempotent_and_retrievable() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_indicator_001")
+    patient_case = service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_indicator_001",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_indicator_001",
+    )
+    document_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="telegram_document:unique_indicator_001",
+        created_at=now,
+    )
+    raw_extraction_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.EXTRACTION,
+        record_id="extraction:telegram_document:unique_indicator_001",
+        created_at=now,
+    )
+    indicator_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.INDICATOR,
+        record_id="structured_indicator:telegram_document:unique_indicator_001",
+        created_at=now,
+    )
+    indicator = StructuredMedicalIndicator(
+        case_id=patient_case.case_id,
+        name="Hemoglobin",
+        value=13.5,
+        unit="g/dL",
+        confidence=0.82,
+        source_document_reference=document_reference,
+        extracted_at=now,
+        provider_name="stub",
+    )
+    indicator_record = CaseIndicatorExtractionRecord(
+        case_id=patient_case.case_id,
+        source_document=document,
+        source_document_reference=document_reference,
+        raw_extraction_reference=raw_extraction_reference,
+        indicator_reference=indicator_reference,
+        indicators=(indicator,),
+        extracted_at=now,
+        provider_name="stub",
+    )
+
+    first_result = service.attach_case_indicator_record(indicator_record)
+    second_result = service.attach_case_indicator_record(indicator_record)
+
+    assert first_result == indicator_record
+    assert second_result == indicator_record
+    assert service.get_case_indicator_records(patient_case.case_id) == (indicator_record,)
+    assert service.get_case_core_records(patient_case.case_id).indicators == (
+        indicator_reference,
+    )
 
 
 def test_attach_case_record_reference_rejects_conflicting_singleton_reference() -> None:
