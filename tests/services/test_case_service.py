@@ -10,6 +10,8 @@ from app.schemas.case import (
     CaseTransitionError,
     SharedCaseStatusCode,
 )
+from app.schemas.document import DocumentUploadMetadata
+from app.schemas.extraction import CaseExtractionRecord
 from app.services.case_service import CaseService
 
 
@@ -272,6 +274,48 @@ def test_attach_case_record_reference_is_idempotent_for_exact_duplicate_referenc
     assert first_result == reference
     assert second_result == reference
     assert aggregate.documents == (reference,)
+
+
+def test_attach_case_extraction_record_is_idempotent_and_retrievable() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_extraction_001")
+    patient_case = service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_extraction_001",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_extraction_001",
+    )
+    document_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="telegram_document:unique_extraction_001",
+        created_at=now,
+    )
+    extraction_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.EXTRACTION,
+        record_id="extraction:telegram_document:unique_extraction_001",
+        created_at=now,
+    )
+    extraction_record = CaseExtractionRecord(
+        case_id=patient_case.case_id,
+        source_document=document,
+        source_document_reference=document_reference,
+        extraction_reference=extraction_reference,
+        extracted_text="normalized extracted text",
+        confidence=0.82,
+        extracted_at=now,
+        provider_name="stub",
+    )
+
+    first_result = service.attach_case_extraction_record(extraction_record)
+    second_result = service.attach_case_extraction_record(extraction_record)
+
+    assert first_result == extraction_record
+    assert second_result == extraction_record
+    assert service.get_case_extraction_records(patient_case.case_id) == (extraction_record,)
 
 
 def test_attach_case_record_reference_rejects_conflicting_singleton_reference() -> None:
