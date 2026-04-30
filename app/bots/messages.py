@@ -1,4 +1,9 @@
-from app.services.patient_intake_service import PatientIntakeStartResult, PreConsentGateResult
+from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.services.patient_intake_service import (
+    PatientIntakeStartResult,
+    PreConsentGateResult,
+    PreConsentReminderKind,
+)
 
 PATIENT_INTAKE_STARTED_MESSAGE = (
     "Заявка на приём начата.\n\n"
@@ -16,15 +21,33 @@ PATIENT_AI_BOUNDARY_MESSAGE = (
     "Перед отправкой личных данных и документов сначала подтвердите согласие."
 )
 
-PATIENT_CONSENT_PLACEHOLDER_MESSAGE = (
-    "Следующий шаг: подтверждение согласия.\n"
-    "Пока этот шаг не завершен, я не принимаю личные данные и документы."
+PATIENT_CONSENT_PROMPT_MESSAGE = (
+    "Перед отправкой данных нужно ваше согласие.\n\n"
+    "Мы соберем только demo-данные для intake: профиль и жалобы, "
+    "чтобы подготовить материалы для врача.\n"
+    "ИИ не ставит диагноз и не назначает лечение. Медицинское решение остается за врачом.\n\n"
+    "Выберите один вариант ниже."
 )
 
 PATIENT_PRE_CONSENT_REMINDER_MESSAGE = (
     "Сначала нужно подтвердить согласие.\n"
     "До этого шага я не принимаю личные данные и документы.\n\n"
-    "Следующий шаг: подтверждение согласия."
+    "Нажмите кнопку ниже, чтобы подтвердить согласие или отказаться."
+)
+
+PATIENT_CONSENT_ACCEPTED_MESSAGE = (
+    "Согласие принято.\n"
+    "Переходим к следующему шагу intake."
+)
+
+PATIENT_CONSENT_DECLINED_MESSAGE = (
+    "Без согласия я не могу продолжить intake.\n"
+    "Если передумаете, нажмите «Подтвердить согласие»."
+)
+
+PATIENT_POST_CONSENT_WAITING_MESSAGE = (
+    "Согласие уже сохранено.\n"
+    "Следующий шаг intake будет обработан отдельно."
 )
 
 
@@ -44,8 +67,16 @@ def render_ai_boundary_message(result: PatientIntakeStartResult) -> str:
 
 
 def render_consent_step_message(result: PreConsentGateResult) -> str:
-    return PATIENT_CONSENT_PLACEHOLDER_MESSAGE
+    return PATIENT_CONSENT_PROMPT_MESSAGE
 
 
 def render_pre_consent_reminder(result: PreConsentGateResult) -> str:
+    if result.reminder_kind == PreConsentReminderKind.CONSENT_ALREADY_CAPTURED:
+        return PATIENT_POST_CONSENT_WAITING_MESSAGE
     return PATIENT_PRE_CONSENT_REMINDER_MESSAGE
+
+
+def render_consent_result_message(result: ConsentCaptureResult) -> str:
+    if result.outcome == ConsentOutcome.ACCEPTED:
+        return PATIENT_CONSENT_ACCEPTED_MESSAGE
+    return PATIENT_CONSENT_DECLINED_MESSAGE

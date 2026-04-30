@@ -4,20 +4,31 @@ from unittest.mock import AsyncMock
 
 from aiogram.filters.command import CommandStart
 
-from app.bots.keyboards import AI_BOUNDARY_CONTINUE_CALLBACK
+from app.bots.keyboards import (
+    AI_BOUNDARY_CONTINUE_CALLBACK,
+    CONSENT_ACCEPT_CALLBACK_PREFIX,
+    CONSENT_DECLINE_CALLBACK_PREFIX,
+    build_consent_callback_data,
+)
 from app.bots.messages import (
-    PATIENT_CONSENT_PLACEHOLDER_MESSAGE,
+    PATIENT_CONSENT_ACCEPTED_MESSAGE,
+    PATIENT_CONSENT_DECLINED_MESSAGE,
+    PATIENT_CONSENT_PROMPT_MESSAGE,
     PATIENT_INTAKE_FAILED_MESSAGE,
+    PATIENT_POST_CONSENT_WAITING_MESSAGE,
     PATIENT_PRE_CONSENT_REMINDER_MESSAGE,
     render_ai_boundary_message,
 )
 from app.bots.patient_bot import (
     build_patient_router,
     handle_ai_boundary_continue,
+    handle_consent_accept,
+    handle_consent_decline,
     handle_patient_start,
     handle_pre_consent_message,
 )
 from app.schemas.case import CaseStatus
+from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.services.patient_intake_service import (
     PatientIntakeStartResult,
     PatientIntakeStep,
@@ -45,14 +56,20 @@ class FakeIntakeService:
         self,
         result: PatientIntakeStartResult | None = None,
         gate_result: PreConsentGateResult | None = None,
+        accept_result: ConsentCaptureResult | None = None,
+        decline_result: ConsentCaptureResult | None = None,
         error: Exception | None = None,
     ) -> None:
         self.result = result
         self.gate_result = gate_result
+        self.accept_result = accept_result
+        self.decline_result = decline_result
         self.error = error
         self.calls: list[int | None] = []
         self.boundary_calls: list[int] = []
         self.pre_consent_calls: list[int] = []
+        self.accept_calls: list[tuple[int, str]] = []
+        self.decline_calls: list[tuple[int, str]] = []
 
     def start_intake(self, *, telegram_user_id: int | None = None) -> PatientIntakeStartResult:
         self.calls.append(telegram_user_id)
@@ -74,6 +91,20 @@ class FakeIntakeService:
             raise self.error
         assert self.gate_result is not None
         return self.gate_result
+
+    def accept_consent(self, *, telegram_user_id: int, case_id: str) -> ConsentCaptureResult:
+        self.accept_calls.append((telegram_user_id, case_id))
+        if self.error is not None:
+            raise self.error
+        assert self.accept_result is not None
+        return self.accept_result
+
+    def decline_consent(self, *, telegram_user_id: int, case_id: str) -> ConsentCaptureResult:
+        self.decline_calls.append((telegram_user_id, case_id))
+        if self.error is not None:
+            raise self.error
+        assert self.decline_result is not None
+        return self.decline_result
 
 
 def test_handle_patient_start_replies_with_success_message() -> None:
@@ -137,10 +168,12 @@ def test_build_patient_router_registers_command_start_handler() -> None:
     assert len(router.message.handlers) == 2
     start_handler = router.message.handlers[0]
     fallback_handler = router.message.handlers[1]
-    assert len(router.callback_query.handlers) == 1
+    assert len(router.callback_query.handlers) == 3
     assert start_handler.callback.__name__ == "start_handler"
     assert fallback_handler.callback.__name__ == "pre_consent_fallback_handler"
     assert router.callback_query.handlers[0].callback.__name__ == "continue_to_consent_handler"
+    assert router.callback_query.handlers[1].callback.__name__ == "consent_accept_handler"
+    assert router.callback_query.handlers[2].callback.__name__ == "consent_decline_handler"
     assert any(
         isinstance(filter_.callback, CommandStart)
         for filter_ in start_handler.filters
@@ -162,7 +195,67 @@ def test_handle_ai_boundary_continue_answers_callback_and_shows_consent_step() -
 
     assert service.boundary_calls == [123]
     callback.answer.assert_awaited_once_with()
-    callback.message.answer.assert_awaited_once_with(PATIENT_CONSENT_PLACEHOLDER_MESSAGE)
+    callback.message.answer.assert_awaited_once()
+    assert callback.message.answer.await_args.args[0] == PATIENT_CONSENT_PROMPT_MESSAGE
+    reply_markup = callback.message.answer.await_args.kwargs["reply_markup"]
+    assert reply_markup.inline_keyboard[0][0].callback_data == build_consent_callback_data(
+        action="accept",
+        case_id="case_patient_001",
+    )
+    assert reply_markup.inline_keyboard[0][1].callback_data == build_consent_callback_data(
+        action="decline",
+        case_id="case_patient_001",
+    )
+
+
+def test_handle_consent_accept_answers_callback_and_shows_acceptance_message() -> None:
+    callback = FakeCallbackQuery()
+    callback.data = build_consent_callback_data(action="accept", case_id="case_patient_001")
+    service = FakeIntakeService(
+        accept_result=ConsentCaptureResult(
+            case_id="case_patient_001",
+            case_status=CaseStatus.COLLECTING_INTAKE,
+            outcome=ConsentOutcome.ACCEPTED,
+            consent_record=None,
+            was_duplicate=False,
+        )
+    )
+
+    asyncio.run(handle_consent_accept(callback, service))
+
+    assert service.accept_calls == [(123, "case_patient_001")]
+    callback.answer.assert_awaited_once_with()
+    callback.message.answer.assert_awaited_once_with(PATIENT_CONSENT_ACCEPTED_MESSAGE)
+
+
+def test_handle_consent_decline_answers_callback_and_shows_refusal_message() -> None:
+    callback = FakeCallbackQuery()
+    callback.data = build_consent_callback_data(action="decline", case_id="case_patient_001")
+    service = FakeIntakeService(
+        decline_result=ConsentCaptureResult(
+            case_id="case_patient_001",
+            case_status=CaseStatus.AWAITING_CONSENT,
+            outcome=ConsentOutcome.DECLINED,
+            consent_record=None,
+            was_duplicate=False,
+        )
+    )
+
+    asyncio.run(handle_consent_decline(callback, service))
+
+    assert service.decline_calls == [(123, "case_patient_001")]
+    callback.answer.assert_awaited_once_with()
+    callback.message.answer.assert_awaited_once()
+    assert callback.message.answer.await_args.args[0] == PATIENT_CONSENT_DECLINED_MESSAGE
+    reply_markup = callback.message.answer.await_args.kwargs["reply_markup"]
+    assert reply_markup.inline_keyboard[0][0].callback_data == build_consent_callback_data(
+        action="accept",
+        case_id="case_patient_001",
+    )
+    assert reply_markup.inline_keyboard[0][1].callback_data == build_consent_callback_data(
+        action="decline",
+        case_id="case_patient_001",
+    )
 
 
 def test_handle_pre_consent_message_returns_recoverable_reminder() -> None:
@@ -182,4 +275,47 @@ def test_handle_pre_consent_message_returns_recoverable_reminder() -> None:
     message.answer.assert_awaited_once()
     reply = message.answer.await_args.args[0]
     assert reply == PATIENT_PRE_CONSENT_REMINDER_MESSAGE
-    assert "Следующий шаг: подтверждение согласия." in reply
+    assert "Нажмите кнопку ниже" in reply
+    reply_markup = message.answer.await_args.kwargs["reply_markup"]
+    assert reply_markup.inline_keyboard[0][0].callback_data == build_consent_callback_data(
+        action="accept",
+        case_id="case_patient_001",
+    )
+    assert reply_markup.inline_keyboard[0][1].callback_data == build_consent_callback_data(
+        action="decline",
+        case_id="case_patient_001",
+    )
+
+
+def test_handle_pre_consent_message_after_accept_returns_post_consent_waiting_message() -> None:
+    message = FakeMessage()
+    service = FakeIntakeService(
+        gate_result=PreConsentGateResult(
+            case_id="case_patient_001",
+            case_status=CaseStatus.COLLECTING_INTAKE,
+            active_step=PatientIntakeStep.CONSENT_CAPTURED,
+            reminder_kind=PreConsentReminderKind.CONSENT_ALREADY_CAPTURED,
+        )
+    )
+
+    asyncio.run(handle_pre_consent_message(message, service))
+
+    message.answer.assert_awaited_once_with(
+        PATIENT_POST_CONSENT_WAITING_MESSAGE,
+        reply_markup=None,
+    )
+
+
+def test_router_accept_filter_uses_case_bound_callback_payload() -> None:
+    router = build_patient_router(FakeIntakeService())
+
+    accept_filter = router.callback_query.handlers[1].filters[0].callback
+    decline_filter = router.callback_query.handlers[2].filters[0].callback
+
+    assert accept_filter(
+        SimpleNamespace(data=f"{CONSENT_ACCEPT_CALLBACK_PREFIX}:case_patient_001")
+    )
+    assert not accept_filter(SimpleNamespace(data="patient_intake:accept_consent"))
+    assert decline_filter(
+        SimpleNamespace(data=f"{CONSENT_DECLINE_CALLBACK_PREFIX}:case_patient_001")
+    )

@@ -4,16 +4,24 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.filters import CommandStart
 from aiogram.types import CallbackQuery, Message
 
-from app.bots.keyboards import AI_BOUNDARY_CONTINUE_CALLBACK, build_ai_boundary_keyboard
+from app.bots.keyboards import (
+    AI_BOUNDARY_CONTINUE_CALLBACK,
+    CONSENT_ACCEPT_CALLBACK_PREFIX,
+    CONSENT_DECLINE_CALLBACK_PREFIX,
+    build_ai_boundary_keyboard,
+    build_consent_keyboard,
+    extract_case_id_from_consent_callback,
+)
 from app.bots.messages import (
     PATIENT_INTAKE_FAILED_MESSAGE,
     render_ai_boundary_message,
+    render_consent_result_message,
     render_consent_step_message,
     render_pre_consent_reminder,
 )
 from app.core.settings import Settings, get_settings
 from app.services.case_service import CaseService
-from app.services.patient_intake_service import PatientIntakeService
+from app.services.patient_intake_service import PatientIntakeService, PatientIntakeStep
 
 
 class MessageResponder(Protocol):
@@ -67,7 +75,61 @@ async def handle_ai_boundary_continue(
 
     await callback.answer()
     if callback.message is not None:
-        await callback.message.answer(render_consent_step_message(gate_result))
+        await callback.message.answer(
+            render_consent_step_message(gate_result),
+            reply_markup=build_consent_keyboard(case_id=gate_result.case_id),
+        )
+
+
+async def handle_consent_accept(
+    callback: CallbackResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = callback.from_user.id if getattr(callback, "from_user", None) else None
+        case_id = extract_case_id_from_consent_callback(getattr(callback, "data", None))
+        if telegram_user_id is None or case_id is None:
+            raise ValueError
+        capture_result = intake_service.accept_consent(
+            telegram_user_id=telegram_user_id,
+            case_id=case_id,
+        )
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await callback.answer()
+    if callback.message is not None:
+        await callback.message.answer(render_consent_result_message(capture_result))
+
+
+async def handle_consent_decline(
+    callback: CallbackResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = callback.from_user.id if getattr(callback, "from_user", None) else None
+        case_id = extract_case_id_from_consent_callback(getattr(callback, "data", None))
+        if telegram_user_id is None or case_id is None:
+            raise ValueError
+        capture_result = intake_service.decline_consent(
+            telegram_user_id=telegram_user_id,
+            case_id=case_id,
+        )
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await callback.answer()
+    if callback.message is not None:
+        await callback.message.answer(
+            render_consent_result_message(capture_result),
+            reply_markup=build_consent_keyboard(case_id=capture_result.case_id),
+        )
 
 
 async def handle_pre_consent_message(
@@ -83,7 +145,15 @@ async def handle_pre_consent_message(
         await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
         return
 
-    await message.answer(render_pre_consent_reminder(gate_result))
+    reply_markup = (
+        build_consent_keyboard(case_id=gate_result.case_id)
+        if gate_result.active_step == PatientIntakeStep.AWAITING_CONSENT
+        else None
+    )
+    await message.answer(
+        render_pre_consent_reminder(gate_result),
+        reply_markup=reply_markup,
+    )
 
 
 def build_patient_router(intake_service: PatientIntakeService | None = None) -> Router:
@@ -97,6 +167,20 @@ def build_patient_router(intake_service: PatientIntakeService | None = None) -> 
     @router.callback_query(lambda callback: callback.data == AI_BOUNDARY_CONTINUE_CALLBACK)
     async def continue_to_consent_handler(callback: CallbackQuery) -> None:
         await handle_ai_boundary_continue(callback, intake_service)
+
+    @router.callback_query(
+        lambda callback: bool(callback.data)
+        and callback.data.startswith(f"{CONSENT_ACCEPT_CALLBACK_PREFIX}:")
+    )
+    async def consent_accept_handler(callback: CallbackQuery) -> None:
+        await handle_consent_accept(callback, intake_service)
+
+    @router.callback_query(
+        lambda callback: bool(callback.data)
+        and callback.data.startswith(f"{CONSENT_DECLINE_CALLBACK_PREFIX}:")
+    )
+    async def consent_decline_handler(callback: CallbackQuery) -> None:
+        await handle_consent_decline(callback, intake_service)
 
     @router.message()
     async def pre_consent_fallback_handler(message: Message) -> None:
