@@ -170,6 +170,9 @@ class CaseService:
             handoff_readiness=handoff_readiness,
         )
 
+    def current_time(self) -> datetime:
+        return self._clock()
+
     def transition_case(self, case_id: str, to_status: CaseStatus | str) -> PatientCase:
         normalized_to_status = self._normalize_status(case_id, to_status)
         current_case = self._get_existing_case(case_id, to_status=normalized_to_status)
