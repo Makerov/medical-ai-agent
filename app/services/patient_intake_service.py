@@ -9,7 +9,9 @@ from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.schemas.document import (
     DocumentUploadMessageKind,
     DocumentUploadMetadata,
+    DocumentUploadRejectionReasonCode,
     DocumentUploadResult,
+    DocumentUploadValidationContext,
 )
 from app.schemas.patient import (
     ConsultationGoal,
@@ -288,6 +290,16 @@ class PatientIntakeService:
                 case_status=patient_case.status,
             )
 
+        validation_result = self._document_service.validate_document_upload(document)
+        if not validation_result.is_accepted:
+            return self._reject_document_upload(
+                document=document,
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                rejection_reason_code=validation_result.rejection_reason_code,
+                validation_context=validation_result.validation_context,
+            )
+
         document_record = self._document_service.build_document_reference(
             case_id=patient_case.case_id,
             document_metadata=document,
@@ -493,12 +505,16 @@ class PatientIntakeService:
         document: DocumentUploadMetadata,
         case_id: str | None = None,
         case_status: CaseStatus | None = None,
+        rejection_reason_code: DocumentUploadRejectionReasonCode | None = None,
+        validation_context: DocumentUploadValidationContext | None = None,
     ) -> DocumentUploadResult:
         return DocumentUploadResult(
             case_id=case_id,
             case_status=case_status,
             message_kind=DocumentUploadMessageKind.REJECTED,
             document_metadata=document,
+            rejection_reason_code=rejection_reason_code,
+            validation_context=validation_context,
         )
 
     def _capture_patient_profile(
