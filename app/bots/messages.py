@@ -1,5 +1,6 @@
 from app.schemas.case import CaseStatus, SharedCaseStatusCode, SharedStatusView
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.schemas.document import DocumentUploadMessageKind, DocumentUploadResult
 from app.schemas.patient import (
     PatientIntakeMessageKind,
     PatientIntakeUpdateResult,
@@ -102,14 +103,27 @@ PATIENT_GOAL_INVALID_MESSAGE = (
 
 PATIENT_GOAL_SAVED_MESSAGE = (
     "Цель сохранена.\n"
-    "Следом будет шаг с загрузкой документов.\n"
-    "Пока ничего загружать не нужно: я отдельно пришлю инструкцию."
+    "Следующий шаг - отправьте медицинский документ файлом в этот чат."
 )
 
 PATIENT_NEXT_STEP_PENDING_MESSAGE = (
     "Профиль и цель уже сохранены.\n"
-    "Следом будет шаг с загрузкой документов.\n"
-    "Пока дождитесь отдельной инструкции и не отправляйте новые текстовые данные."
+    "Следующий шаг - отправьте медицинский документ файлом в этот чат."
+)
+
+PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE = (
+    "Документ принят.\n"
+    "Я привязал его к текущей заявке и отправил в обработку."
+)
+
+PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE = (
+    "Документ уже обрабатывается.\n"
+    "Пожалуйста, подождите, повторно отправлять не нужно."
+)
+
+PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE = (
+    "Текущая заявка пока не готова для загрузки документа или уже недоступна.\n"
+    "Нажмите /start, чтобы начать заново."
 )
 
 PATIENT_STATUS_INTRO_LABEL = "Статус заявки"
@@ -226,6 +240,18 @@ def render_consent_result_message(result: ConsentCaptureResult) -> str:
     if result.outcome == ConsentOutcome.ACCEPTED:
         return PATIENT_CONSENT_ACCEPTED_MESSAGE
     return PATIENT_CONSENT_DECLINED_MESSAGE
+
+
+def render_document_upload_message(result: DocumentUploadResult) -> str:
+    match result.message_kind:
+        case DocumentUploadMessageKind.ACCEPTED:
+            return PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
+        case DocumentUploadMessageKind.IN_PROGRESS:
+            return PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE
+        case DocumentUploadMessageKind.REJECTED:
+            return PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE
+    msg = f"Unsupported document upload message kind: {result.message_kind}"
+    raise ValueError(msg)
 
 
 def render_patient_status_message(status_view: SharedStatusView) -> str:
