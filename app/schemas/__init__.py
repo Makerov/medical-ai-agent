@@ -35,6 +35,11 @@ from app.schemas.extraction import (
     DocumentProcessingResult,
     OCRTextExtractionResult,
 )
+from app.schemas.indicator import (
+    CaseIndicatorExtractionRecord,
+    StructuredIndicatorValue,
+    StructuredMedicalIndicator,
+)
 from app.schemas.patient import (
     ConsultationGoal,
     ConsultationGoalCaptureResult,
@@ -71,6 +76,7 @@ __all__ = [
     "DocumentUploadMetadata",
     "DocumentUploadResult",
     "CaseExtractionRecord",
+    "CaseIndicatorExtractionRecord",
     "DocumentProcessingResult",
     "OCRTextExtractionResult",
     "PatientIntakeCaptureResult",
@@ -80,5 +86,7 @@ __all__ = [
     "PatientIntakeUpdateResult",
     "PatientProfile",
     "PatientCase",
+    "StructuredMedicalIndicator",
+    "StructuredIndicatorValue",
     "generate_case_id",
 ]
