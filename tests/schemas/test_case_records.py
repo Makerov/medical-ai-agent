@@ -82,3 +82,25 @@ def test_case_core_records_rejects_reference_in_wrong_section() -> None:
                 ),
             ),
         )
+
+
+def test_case_core_records_rejects_indicator_reference_in_wrong_section() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+
+    with pytest.raises(ValidationError, match="match aggregate section kind"):
+        CaseCoreRecords(
+            patient_case=PatientCase(
+                case_id="case_001",
+                status=CaseStatus.DRAFT,
+                created_at=now,
+                updated_at=now,
+            ),
+            indicators=(
+                CaseRecordReference(
+                    case_id="case_001",
+                    record_kind=CaseRecordKind.DOCUMENT,
+                    record_id="indicator_001",
+                    created_at=now,
+                ),
+            ),
+        )
