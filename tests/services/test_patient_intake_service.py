@@ -725,3 +725,43 @@ def test_handle_document_upload_returns_in_progress_when_case_already_received_d
     assert second_result.message_kind == DocumentUploadMessageKind.IN_PROGRESS
     assert second_result.was_duplicate is True
     assert len(case_service.get_case_core_records("case_patient_upload_004").documents) == 1
+
+
+def test_handle_document_upload_rejects_stale_active_session_after_upload_window_closed() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_005")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_upload_005")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+    case_service.transition_case("case_patient_upload_005", CaseStatus.DOCUMENTS_UPLOADED)
+    case_service.transition_case("case_patient_upload_005", CaseStatus.PROCESSING_DOCUMENTS)
+    case_service.transition_case("case_patient_upload_005", CaseStatus.READY_FOR_SUMMARY)
+
+    result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=DocumentUploadMetadata(
+            file_id="file_005",
+            file_name="scan.pdf",
+            mime_type="application/pdf",
+            file_size=1024,
+        ),
+    )
+
+    assert result.case_id == "case_patient_upload_005"
+    assert result.case_status == CaseStatus.READY_FOR_SUMMARY
+    assert result.message_kind == DocumentUploadMessageKind.REJECTED
+    assert result.document_record is None
+    assert case_service.get_case_core_records("case_patient_upload_005").documents == ()
+    assert (
+        case_service.get_shared_status_view("case_patient_upload_005").lifecycle_status
+        == CaseStatus.READY_FOR_SUMMARY
+    )
