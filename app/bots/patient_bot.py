@@ -6,23 +6,33 @@ from aiogram.types import CallbackQuery, Message
 
 from app.bots.keyboards import (
     AI_BOUNDARY_CONTINUE_CALLBACK,
+    CASE_DELETE_CANCEL_CALLBACK_PREFIX,
+    CASE_DELETE_CONFIRM_CALLBACK_PREFIX,
     CONSENT_ACCEPT_CALLBACK_PREFIX,
     CONSENT_DECLINE_CALLBACK_PREFIX,
     build_ai_boundary_keyboard,
+    build_case_deletion_keyboard,
     build_consent_keyboard,
+    extract_case_id_from_case_deletion_callback,
     extract_case_id_from_consent_callback,
 )
 from app.bots.messages import (
     PATIENT_INTAKE_FAILED_MESSAGE,
+    PATIENT_STATUS_DELETED_MESSAGE,
     PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
     render_ai_boundary_message,
+    render_case_deletion_cancelled_message,
+    render_case_deletion_confirmation_message,
+    render_case_deletion_result_message,
     render_consent_result_message,
     render_consent_step_message,
     render_patient_intake_message,
     render_patient_status_message,
 )
 from app.core.settings import Settings, get_settings
+from app.schemas.case import CaseStatus
 from app.schemas.patient import PatientIntakeMessageKind
+from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import PatientIntakeService
 
@@ -40,8 +50,22 @@ class CallbackResponder(Protocol):
     async def answer(self, text: str | None = None, **kwargs: object) -> object: ...
 
 
-def build_patient_intake_service(case_service: CaseService | None = None) -> PatientIntakeService:
-    return PatientIntakeService(case_service=case_service or CaseService())
+def build_patient_intake_service(
+    settings: Settings | None = None,
+    case_service: CaseService | None = None,
+    audit_service: AuditService | None = None,
+) -> PatientIntakeService:
+    settings = settings or get_settings()
+    case_service = case_service or CaseService()
+    audit_service = audit_service or AuditService(
+        case_service=case_service,
+        artifact_root_dir=settings.artifact_root_dir,
+    )
+    return PatientIntakeService(case_service=case_service, audit_service=audit_service)
+
+
+def _is_deleted_case_status(case_status: CaseStatus) -> bool:
+    return case_status in {CaseStatus.DELETION_REQUESTED, CaseStatus.DELETED}
 
 
 async def handle_patient_start(
@@ -93,6 +117,14 @@ async def handle_consent_accept(
         case_id = extract_case_id_from_consent_callback(getattr(callback, "data", None))
         if telegram_user_id is None or case_id is None:
             raise ValueError
+        case_service = getattr(intake_service, "case_service", None)
+        if case_service is not None:
+            case_status = case_service.get_case_core_records(case_id).patient_case.status
+            if _is_deleted_case_status(case_status):
+                await callback.answer()
+                if callback.message is not None:
+                    await callback.message.answer(PATIENT_STATUS_DELETED_MESSAGE)
+                return
         capture_result = intake_service.accept_consent(
             telegram_user_id=telegram_user_id,
             case_id=case_id,
@@ -122,6 +154,14 @@ async def handle_consent_decline(
         case_id = extract_case_id_from_consent_callback(getattr(callback, "data", None))
         if telegram_user_id is None or case_id is None:
             raise ValueError
+        case_service = getattr(intake_service, "case_service", None)
+        if case_service is not None:
+            case_status = case_service.get_case_core_records(case_id).patient_case.status
+            if _is_deleted_case_status(case_status):
+                await callback.answer()
+                if callback.message is not None:
+                    await callback.message.answer(PATIENT_STATUS_DELETED_MESSAGE)
+                return
         capture_result = intake_service.decline_consent(
             telegram_user_id=telegram_user_id,
             case_id=case_id,
@@ -138,6 +178,78 @@ async def handle_consent_decline(
             render_consent_result_message(capture_result),
             reply_markup=build_consent_keyboard(case_id=capture_result.case_id),
         )
+
+
+async def handle_case_deletion_request(
+    message: MessageResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = message.from_user.id if getattr(message, "from_user", None) else None
+        if telegram_user_id is None:
+            raise ValueError
+        case_id = intake_service.get_active_case_id(telegram_user_id)
+        if case_id is None:
+            await message.answer(PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE)
+            return
+        case_status = intake_service.case_service.get_case_core_records(case_id).patient_case.status
+        if _is_deleted_case_status(case_status):
+            await message.answer(PATIENT_STATUS_DELETED_MESSAGE)
+            return
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await message.answer(
+        render_case_deletion_confirmation_message(case_id),
+        reply_markup=build_case_deletion_keyboard(case_id=case_id),
+    )
+
+
+async def handle_case_deletion_confirm(
+    callback: CallbackResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = callback.from_user.id if getattr(callback, "from_user", None) else None
+        case_id = extract_case_id_from_case_deletion_callback(getattr(callback, "data", None))
+        if telegram_user_id is None or case_id is None:
+            raise ValueError
+        deletion_result = intake_service.request_case_deletion(
+            telegram_user_id=telegram_user_id,
+            case_id=case_id,
+        )
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await callback.answer()
+    if callback.message is not None:
+        await callback.message.answer(
+            render_case_deletion_result_message(was_duplicate=deletion_result.was_duplicate)
+        )
+
+
+async def handle_case_deletion_cancel(
+    callback: CallbackResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        _telegram_user_id = callback.from_user.id if getattr(callback, "from_user", None) else None
+        case_id = extract_case_id_from_case_deletion_callback(getattr(callback, "data", None))
+        if _telegram_user_id is None or case_id is None:
+            raise ValueError
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await callback.answer()
+    if callback.message is not None:
+        await callback.message.answer(render_case_deletion_cancelled_message())
 
 
 async def handle_patient_message(
@@ -187,8 +299,11 @@ async def handle_patient_status(
     await message.answer(render_patient_status_message(status_view))
 
 
-def build_patient_router(intake_service: PatientIntakeService | None = None) -> Router:
-    intake_service = intake_service or build_patient_intake_service()
+def build_patient_router(
+    intake_service: PatientIntakeService | None = None,
+    settings: Settings | None = None,
+) -> Router:
+    intake_service = intake_service or build_patient_intake_service(settings=settings)
     router = Router()
 
     @router.message(CommandStart())
@@ -198,6 +313,14 @@ def build_patient_router(intake_service: PatientIntakeService | None = None) -> 
     @router.message(Command("status"))
     async def status_handler(message: Message) -> None:
         await handle_patient_status(message, intake_service)
+
+    @router.message(Command("delete"))
+    async def delete_handler(message: Message) -> None:
+        await handle_case_deletion_request(message, intake_service)
+
+    @router.message(Command("delete-case"))
+    async def delete_case_handler(message: Message) -> None:
+        await handle_case_deletion_request(message, intake_service)
 
     @router.callback_query(lambda callback: callback.data == AI_BOUNDARY_CONTINUE_CALLBACK)
     async def continue_to_consent_handler(callback: CallbackQuery) -> None:
@@ -217,6 +340,20 @@ def build_patient_router(intake_service: PatientIntakeService | None = None) -> 
     async def consent_decline_handler(callback: CallbackQuery) -> None:
         await handle_consent_decline(callback, intake_service)
 
+    @router.callback_query(
+        lambda callback: bool(callback.data)
+        and callback.data.startswith(f"{CASE_DELETE_CONFIRM_CALLBACK_PREFIX}:")
+    )
+    async def case_delete_confirm_handler(callback: CallbackQuery) -> None:
+        await handle_case_deletion_confirm(callback, intake_service)
+
+    @router.callback_query(
+        lambda callback: bool(callback.data)
+        and callback.data.startswith(f"{CASE_DELETE_CANCEL_CALLBACK_PREFIX}:")
+    )
+    async def case_delete_cancel_handler(callback: CallbackQuery) -> None:
+        await handle_case_deletion_cancel(callback, intake_service)
+
     @router.message()
     async def patient_message_handler(message: Message) -> None:
         await handle_patient_message(message, intake_service)
@@ -224,9 +361,12 @@ def build_patient_router(intake_service: PatientIntakeService | None = None) -> 
     return router
 
 
-def build_patient_dispatcher(intake_service: PatientIntakeService | None = None) -> Dispatcher:
+def build_patient_dispatcher(
+    intake_service: PatientIntakeService | None = None,
+    settings: Settings | None = None,
+) -> Dispatcher:
     dispatcher = Dispatcher()
-    dispatcher.include_router(build_patient_router(intake_service))
+    dispatcher.include_router(build_patient_router(intake_service, settings=settings))
     return dispatcher
 
 
@@ -241,7 +381,7 @@ def build_patient_bot(settings: Settings | None = None) -> Bot:
 async def run_patient_bot(settings: Settings | None = None) -> None:
     settings = settings or get_settings()
     bot = build_patient_bot(settings)
-    dispatcher = build_patient_dispatcher()
+    dispatcher = build_patient_dispatcher(settings=settings)
     await dispatcher.start_polling(bot)
 
 
