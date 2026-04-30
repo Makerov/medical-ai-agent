@@ -19,7 +19,6 @@ from app.bots.messages import (
     PATIENT_DELETION_CANCELLED_MESSAGE,
     PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE,
     PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE,
-    PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE,
     PATIENT_GOAL_INVALID_MESSAGE,
     PATIENT_GOAL_SAVED_MESSAGE,
     PATIENT_INTAKE_FAILED_MESSAGE,
@@ -60,7 +59,9 @@ from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.schemas.document import (
     DocumentUploadMessageKind,
     DocumentUploadMetadata,
+    DocumentUploadRejectionReasonCode,
     DocumentUploadResult,
+    DocumentUploadValidationContext,
 )
 from app.schemas.patient import (
     PatientIntakeField,
@@ -341,6 +342,55 @@ def test_handle_document_upload_replies_with_accepted_message_and_forwards_metad
     message.answer.assert_awaited_once_with(PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE)
 
 
+def test_handle_document_upload_replies_with_reason_specific_rejection_message() -> None:
+    document = SimpleNamespace(
+        file_id="file_002",
+        file_name="scan.gif",
+        mime_type="image/gif",
+        file_size=1024,
+        file_unique_id="unique_002",
+    )
+    message = FakeMessage(document=document)
+    service = FakeIntakeService(
+        document_result=DocumentUploadResult(
+            case_id="case_patient_022",
+            case_status=CaseStatus.COLLECTING_INTAKE,
+            message_kind=DocumentUploadMessageKind.REJECTED,
+            document_metadata=DocumentUploadMetadata(
+                file_id="file_002",
+                file_name="scan.gif",
+                mime_type="image/gif",
+                file_size=1024,
+                file_unique_id="unique_002",
+            ),
+            rejection_reason_code=DocumentUploadRejectionReasonCode.FILE_TOO_LARGE,
+            validation_context=DocumentUploadValidationContext(
+                supported_mime_types=("application/pdf", "image/jpeg", "image/png"),
+                configured_max_file_size_bytes=20_000_000,
+            ),
+        )
+    )
+
+    asyncio.run(handle_document_upload(message, service))
+
+    assert service.document_calls == [
+        (
+            123,
+            DocumentUploadMetadata(
+                file_id="file_002",
+                file_name="scan.gif",
+                mime_type="image/gif",
+                file_size=1024,
+                file_unique_id="unique_002",
+            ),
+        )
+    ]
+    reply = message.answer.await_args.args[0]
+    assert "Файл слишком большой" in reply
+    assert "20 МБ" in reply
+    assert "PDF, JPG и PNG" in reply
+
+
 def test_render_document_upload_message_uses_recoverable_copy() -> None:
     accepted = DocumentUploadResult(
         case_id="case_patient_021",
@@ -356,14 +406,50 @@ def test_render_document_upload_message_uses_recoverable_copy() -> None:
     in_progress = accepted.model_copy(
         update={"message_kind": DocumentUploadMessageKind.IN_PROGRESS}
     )
-    rejected = accepted.model_copy(update={"message_kind": DocumentUploadMessageKind.REJECTED})
+    unsupported = accepted.model_copy(
+        update={
+            "message_kind": DocumentUploadMessageKind.REJECTED,
+            "rejection_reason_code": DocumentUploadRejectionReasonCode.UNSUPPORTED_FILE_TYPE,
+            "validation_context": DocumentUploadValidationContext(
+                supported_mime_types=("application/pdf", "image/jpeg", "image/png"),
+                configured_max_file_size_bytes=20_000_000,
+            ),
+        }
+    )
+    oversized = accepted.model_copy(
+        update={
+            "message_kind": DocumentUploadMessageKind.REJECTED,
+            "rejection_reason_code": DocumentUploadRejectionReasonCode.FILE_TOO_LARGE,
+            "validation_context": DocumentUploadValidationContext(
+                supported_mime_types=("application/pdf", "image/jpeg", "image/png"),
+                configured_max_file_size_bytes=20_000_000,
+            ),
+        }
+    )
+    invalid = accepted.model_copy(
+        update={
+            "message_kind": DocumentUploadMessageKind.REJECTED,
+            "rejection_reason_code": DocumentUploadRejectionReasonCode.INVALID_DOCUMENT,
+            "validation_context": DocumentUploadValidationContext(
+                supported_mime_types=("application/pdf", "image/jpeg", "image/png"),
+                configured_max_file_size_bytes=20_000_000,
+            ),
+        }
+    )
 
     assert render_document_upload_message(accepted) == PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
     assert (
         render_document_upload_message(in_progress)
         == PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE
     )
-    assert render_document_upload_message(rejected) == PATIENT_DOCUMENT_UPLOAD_REJECTED_MESSAGE
+    unsupported_message = render_document_upload_message(unsupported)
+    oversized_message = render_document_upload_message(oversized)
+    invalid_message = render_document_upload_message(invalid)
+    assert "не поддерживается" in unsupported_message
+    assert "PDF, JPG и PNG" in unsupported_message
+    assert "Файл слишком большой" in oversized_message
+    assert "20 МБ" in oversized_message
+    assert "не смог проверить файл".lower() in invalid_message.lower()
 
 
 def test_handle_ai_boundary_continue_answers_callback_and_shows_consent_step() -> None:
