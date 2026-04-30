@@ -6,6 +6,7 @@ import pytest
 from app.schemas.audit import AuditEventType
 from app.schemas.case import CaseRecordKind, CaseStatus
 from app.schemas.consent import ConsentOutcome
+from app.schemas.document import DocumentUploadMessageKind, DocumentUploadMetadata
 from app.schemas.patient import PatientIntakeField, PatientIntakeMessageKind
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import (
@@ -559,3 +560,168 @@ def test_handle_patient_message_after_completion_returns_next_step_pending_for_n
     assert result.was_duplicate is True
     assert result.target_field is None
     assert result.active_step == PatientIntakeStep.INTAKE_COMPLETE.value
+
+
+def test_handle_document_upload_transitions_completed_intake_case_to_documents_uploaded() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_001")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_upload_001")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+
+    document = DocumentUploadMetadata(
+        file_id="file_001",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+        file_unique_id="unique_001",
+    )
+    result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=document,
+    )
+
+    assert result.case_id == "case_patient_upload_001"
+    assert result.case_status == CaseStatus.DOCUMENTS_UPLOADED
+    assert result.message_kind == DocumentUploadMessageKind.ACCEPTED
+    assert result.document_metadata == document
+    assert result.document_record is not None
+    assert result.document_record.case_id == "case_patient_upload_001"
+    assert result.document_record.record_kind == CaseRecordKind.DOCUMENT
+    assert result.document_record.record_id == "telegram_document:unique_001"
+    assert case_service.get_case_core_records("case_patient_upload_001").documents == (
+        result.document_record,
+    )
+    assert (
+        case_service.get_shared_status_view("case_patient_upload_001").lifecycle_status
+        == CaseStatus.DOCUMENTS_UPLOADED
+    )
+
+
+def test_handle_document_upload_rejects_when_intake_is_not_complete() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_002")
+    intake_service = PatientIntakeService(case_service=case_service)
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=DocumentUploadMetadata(
+            file_id="file_002",
+            file_name="scan.pdf",
+            mime_type="application/pdf",
+            file_size=1024,
+        ),
+    )
+
+    assert result.case_id == start_result.case_id
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == DocumentUploadMessageKind.REJECTED
+    assert result.document_record is None
+    assert case_service.get_case_core_records(start_result.case_id).documents == ()
+    assert (
+        case_service.get_shared_status_view(start_result.case_id).lifecycle_status
+        == CaseStatus.COLLECTING_INTAKE
+    )
+
+
+def test_handle_document_upload_rejects_deleted_case_without_creating_new_one() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_003")
+    audit_service = RecordingAuditService(case_service=case_service)
+    intake_service = PatientIntakeService(
+        case_service=case_service,
+        audit_service=audit_service,
+    )
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id=start_result.case_id)
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+    intake_service.request_case_deletion(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=DocumentUploadMetadata(
+            file_id="file_003",
+            file_name="scan.pdf",
+            mime_type="application/pdf",
+            file_size=1024,
+        ),
+    )
+
+    assert result.case_id == start_result.case_id
+    assert result.case_status == CaseStatus.DELETED
+    assert result.message_kind == DocumentUploadMessageKind.REJECTED
+    assert result.document_record is None
+    assert case_service.get_case_core_records(start_result.case_id).documents == ()
+    assert case_service.get_shared_status_view(start_result.case_id).lifecycle_status == (
+        CaseStatus.DELETED
+    )
+
+
+def test_handle_document_upload_returns_in_progress_when_case_already_received_documents() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_004")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_upload_004")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+    first_result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=DocumentUploadMetadata(
+            file_id="file_004",
+            file_name="scan.pdf",
+            mime_type="application/pdf",
+            file_size=1024,
+            file_unique_id="unique_004",
+        ),
+    )
+
+    second_result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=DocumentUploadMetadata(
+            file_id="file_004b",
+            file_name="scan-2.pdf",
+            mime_type="application/pdf",
+            file_size=2048,
+            file_unique_id="unique_004b",
+        ),
+    )
+
+    assert first_result.message_kind == DocumentUploadMessageKind.ACCEPTED
+    assert second_result.case_status == CaseStatus.DOCUMENTS_UPLOADED
+    assert second_result.message_kind == DocumentUploadMessageKind.IN_PROGRESS
+    assert second_result.was_duplicate is True
+    assert len(case_service.get_case_core_records("case_patient_upload_004").documents) == 1
