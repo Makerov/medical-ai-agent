@@ -60,6 +60,21 @@ PATIENT_POST_CONSENT_WAITING_MESSAGE = (
     "Следующий шаг intake будет обработан отдельно."
 )
 
+PATIENT_DELETION_CONFIRMATION_MESSAGE = (
+    "Запросить удаление demo case?\n\n"
+    "Материалы станут недоступны в patient flow. Действие необратимо."
+)
+
+PATIENT_DELETION_ACCEPTED_MESSAGE = (
+    "Заявка удалена.\n"
+    "Связанные материалы больше недоступны в patient flow."
+)
+
+PATIENT_DELETION_CANCELLED_MESSAGE = (
+    "Удаление отменено.\n"
+    "Заявка остается доступной."
+)
+
 PATIENT_PROFILE_PROMPT_MESSAGE = (
     "Теперь укажите базовые данные профиля.\n"
     "Отправьте одним сообщением: ФИО и возраст, например: «Иван Петров, 34»."
@@ -145,6 +160,16 @@ PATIENT_STATUS_CLOSED_MESSAGE = (
     "Если хотите начать заново, нажмите /start."
 )
 
+PATIENT_STATUS_DELETED_MESSAGE = (
+    "Заявка удалена.\n"
+    "Эта demo case больше недоступна в patient flow."
+)
+
+PATIENT_INTAKE_DELETED_MESSAGE = (
+    "Эта заявка уже удалена.\n"
+    "Чтобы начать заново, нажмите /start."
+)
+
 
 def render_patient_intake_started(result: PatientIntakeStartResult) -> str:
     return (
@@ -177,6 +202,8 @@ def render_patient_intake_message(result: PatientIntakeUpdateResult) -> str:
             return PATIENT_PRE_CONSENT_REMINDER_MESSAGE
         case PatientIntakeMessageKind.CONSENT_ALREADY_CAPTURED:
             return PATIENT_POST_CONSENT_WAITING_MESSAGE
+        case PatientIntakeMessageKind.CASE_DELETED:
+            return PATIENT_INTAKE_DELETED_MESSAGE
         case PatientIntakeMessageKind.PROFILE_PROMPT:
             return PATIENT_PROFILE_PROMPT_MESSAGE
         case PatientIntakeMessageKind.PROFILE_INVALID:
@@ -210,6 +237,8 @@ def render_patient_status_message(status_view: SharedStatusView) -> str:
 
 
 def _render_patient_status_lines(status_view: SharedStatusView) -> tuple[str, str]:
+    if status_view.lifecycle_status in {CaseStatus.DELETED, CaseStatus.DELETION_REQUESTED}:
+        return PATIENT_STATUS_DELETED_MESSAGE.split("\n", maxsplit=1)
     match status_view.patient_status:
         case SharedCaseStatusCode.INTAKE_REQUIRED:
             return _render_intake_status_lines(status_view.lifecycle_status)
@@ -245,3 +274,20 @@ def _render_processing_status_lines(case_status: CaseStatus) -> tuple[str, str]:
         case CaseStatus.PROCESSING_DOCUMENTS | CaseStatus.DOCUMENTS_UPLOADED:
             return PATIENT_STATUS_PROCESSING_MESSAGE.split("\n", maxsplit=1)
     return PATIENT_STATUS_PROCESSING_MESSAGE.split("\n", maxsplit=1)
+
+
+def render_case_deletion_confirmation_message(case_id: str) -> str:
+    return (
+        f"{PATIENT_DELETION_CONFIRMATION_MESSAGE}\n\n"
+        f"Номер заявки: {case_id}"
+    )
+
+
+def render_case_deletion_result_message(*, was_duplicate: bool) -> str:
+    if was_duplicate:
+        return PATIENT_STATUS_DELETED_MESSAGE
+    return PATIENT_DELETION_ACCEPTED_MESSAGE
+
+
+def render_case_deletion_cancelled_message() -> str:
+    return PATIENT_DELETION_CANCELLED_MESSAGE
