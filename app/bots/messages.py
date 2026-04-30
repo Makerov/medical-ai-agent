@@ -1,3 +1,4 @@
+from app.schemas.case import CaseStatus, SharedCaseStatusCode, SharedStatusView
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.schemas.patient import (
     PatientIntakeMessageKind,
@@ -17,6 +18,11 @@ PATIENT_INTAKE_STARTED_MESSAGE = (
 PATIENT_INTAKE_FAILED_MESSAGE = (
     "Не удалось начать заявку прямо сейчас.\n"
     "Попробуйте еще раз через несколько минут."
+)
+
+PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE = (
+    "Активная заявка не найдена.\n"
+    "Нажмите /start, чтобы начать новую или продолжить текущую."
 )
 
 PATIENT_AI_BOUNDARY_MESSAGE = (
@@ -91,6 +97,54 @@ PATIENT_NEXT_STEP_PENDING_MESSAGE = (
     "Пока дождитесь отдельной инструкции и не отправляйте новые текстовые данные."
 )
 
+PATIENT_STATUS_INTRO_LABEL = "Статус заявки"
+PATIENT_STATUS_NEXT_STEP_LABEL = "Следующий шаг"
+
+PATIENT_STATUS_DRAFT_MESSAGE = (
+    "Заявка еще не начата.\n"
+    "Нажмите /start, чтобы пройти согласие и запустить intake."
+)
+
+PATIENT_STATUS_AWAITING_CONSENT_MESSAGE = (
+    "Ждем ваше согласие.\n"
+    "Подтвердите согласие в чате, затем продолжайте intake."
+)
+
+PATIENT_STATUS_COLLECTING_INTAKE_MESSAGE = (
+    "Собираем данные для заявки.\n"
+    "Отправьте профиль и цель консультации в этом чате."
+)
+
+PATIENT_STATUS_PROCESSING_MESSAGE = (
+    "Материалы обрабатываются.\n"
+    "Сейчас ничего отправлять не нужно, дождитесь обновления."
+)
+
+PATIENT_STATUS_PROCESSING_RETRY_MESSAGE = (
+    "Часть данных пока не прочиталась.\n"
+    "Отправьте документы еще раз, более четко."
+)
+
+PATIENT_STATUS_SUMMARY_RETRY_MESSAGE = (
+    "Черновик для врача еще не готов.\n"
+    "Подождите повторной обработки, я обновлю статус позже."
+)
+
+PATIENT_STATUS_SAFETY_REVIEW_MESSAGE = (
+    "Нужна дополнительная проверка перед передачей врачу.\n"
+    "Дождитесь обновления, повторно ничего отправлять не нужно."
+)
+
+PATIENT_STATUS_READY_FOR_DOCTOR_MESSAGE = (
+    "Заявка готова для врача.\n"
+    "Следующий шаг - дождаться ответа врача."
+)
+
+PATIENT_STATUS_CLOSED_MESSAGE = (
+    "Заявка закрыта.\n"
+    "Если хотите начать заново, нажмите /start."
+)
+
 
 def render_patient_intake_started(result: PatientIntakeStartResult) -> str:
     return (
@@ -145,3 +199,49 @@ def render_consent_result_message(result: ConsentCaptureResult) -> str:
     if result.outcome == ConsentOutcome.ACCEPTED:
         return PATIENT_CONSENT_ACCEPTED_MESSAGE
     return PATIENT_CONSENT_DECLINED_MESSAGE
+
+
+def render_patient_status_message(status_view: SharedStatusView) -> str:
+    status_line, next_step_line = _render_patient_status_lines(status_view)
+    return (
+        f"{PATIENT_STATUS_INTRO_LABEL}: {status_line}\n"
+        f"{PATIENT_STATUS_NEXT_STEP_LABEL}: {next_step_line}"
+    )
+
+
+def _render_patient_status_lines(status_view: SharedStatusView) -> tuple[str, str]:
+    match status_view.patient_status:
+        case SharedCaseStatusCode.INTAKE_REQUIRED:
+            return _render_intake_status_lines(status_view.lifecycle_status)
+        case SharedCaseStatusCode.PROCESSING_PENDING:
+            return _render_processing_status_lines(status_view.lifecycle_status)
+        case SharedCaseStatusCode.SAFETY_REVIEW_REQUIRED:
+            return PATIENT_STATUS_SAFETY_REVIEW_MESSAGE.split("\n", maxsplit=1)
+        case SharedCaseStatusCode.READY_FOR_DOCTOR:
+            return PATIENT_STATUS_READY_FOR_DOCTOR_MESSAGE.split("\n", maxsplit=1)
+        case SharedCaseStatusCode.CASE_CLOSED:
+            return PATIENT_STATUS_CLOSED_MESSAGE.split("\n", maxsplit=1)
+    msg = f"Unsupported shared status code: {status_view.patient_status}"
+    raise ValueError(msg)
+
+
+def _render_intake_status_lines(case_status: CaseStatus) -> tuple[str, str]:
+    match case_status:
+        case CaseStatus.DRAFT:
+            return PATIENT_STATUS_DRAFT_MESSAGE.split("\n", maxsplit=1)
+        case CaseStatus.AWAITING_CONSENT:
+            return PATIENT_STATUS_AWAITING_CONSENT_MESSAGE.split("\n", maxsplit=1)
+        case CaseStatus.COLLECTING_INTAKE:
+            return PATIENT_STATUS_COLLECTING_INTAKE_MESSAGE.split("\n", maxsplit=1)
+    return PATIENT_STATUS_COLLECTING_INTAKE_MESSAGE.split("\n", maxsplit=1)
+
+
+def _render_processing_status_lines(case_status: CaseStatus) -> tuple[str, str]:
+    match case_status:
+        case CaseStatus.EXTRACTION_FAILED | CaseStatus.PARTIAL_EXTRACTION:
+            return PATIENT_STATUS_PROCESSING_RETRY_MESSAGE.split("\n", maxsplit=1)
+        case CaseStatus.SUMMARY_FAILED:
+            return PATIENT_STATUS_SUMMARY_RETRY_MESSAGE.split("\n", maxsplit=1)
+        case CaseStatus.PROCESSING_DOCUMENTS | CaseStatus.DOCUMENTS_UPLOADED:
+            return PATIENT_STATUS_PROCESSING_MESSAGE.split("\n", maxsplit=1)
+    return PATIENT_STATUS_PROCESSING_MESSAGE.split("\n", maxsplit=1)

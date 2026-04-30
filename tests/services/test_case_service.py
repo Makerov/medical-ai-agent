@@ -447,6 +447,31 @@ def test_transition_to_ready_for_doctor_uses_shared_status_view() -> None:
     assert shared_status_view.handoff_readiness.is_ready_for_doctor is True
 
 
+def test_get_shared_status_view_maps_processing_failure_to_patient_recoverable_status() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_shared_processing")
+    patient_case = service.create_case()
+
+    for status in (
+        CaseStatus.AWAITING_CONSENT,
+        CaseStatus.COLLECTING_INTAKE,
+        CaseStatus.DOCUMENTS_UPLOADED,
+        CaseStatus.PROCESSING_DOCUMENTS,
+        CaseStatus.EXTRACTION_FAILED,
+    ):
+        service.transition_case(patient_case.case_id, status)
+
+    shared_status_view = service.get_shared_status_view(patient_case.case_id)
+
+    assert shared_status_view.lifecycle_status == CaseStatus.EXTRACTION_FAILED
+    assert shared_status_view.patient_status == SharedCaseStatusCode.PROCESSING_PENDING
+    assert shared_status_view.doctor_status == SharedCaseStatusCode.PROCESSING_PENDING
+    assert (
+        shared_status_view.handoff_readiness.shared_status
+        == SharedCaseStatusCode.PROCESSING_PENDING
+    )
+
+
 def test_transition_to_ready_for_doctor_blocks_without_safety_clearance() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     service = CaseService(

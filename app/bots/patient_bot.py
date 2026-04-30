@@ -1,7 +1,7 @@
 from typing import Protocol
 
 from aiogram import Bot, Dispatcher, Router
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from app.bots.keyboards import (
@@ -14,10 +14,12 @@ from app.bots.keyboards import (
 )
 from app.bots.messages import (
     PATIENT_INTAKE_FAILED_MESSAGE,
+    PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
     render_ai_boundary_message,
     render_consent_result_message,
     render_consent_step_message,
     render_patient_intake_message,
+    render_patient_status_message,
 )
 from app.core.settings import Settings, get_settings
 from app.schemas.patient import PatientIntakeMessageKind
@@ -165,6 +167,26 @@ async def handle_patient_message(
     )
 
 
+async def handle_patient_status(
+    message: MessageResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = message.from_user.id if getattr(message, "from_user", None) else None
+        if telegram_user_id is None:
+            raise ValueError
+        case_id = intake_service.get_active_case_id(telegram_user_id)
+        if case_id is None:
+            await message.answer(PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE)
+            return
+        status_view = intake_service.case_service.get_shared_status_view(case_id)
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await message.answer(PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE)
+        return
+
+    await message.answer(render_patient_status_message(status_view))
+
+
 def build_patient_router(intake_service: PatientIntakeService | None = None) -> Router:
     intake_service = intake_service or build_patient_intake_service()
     router = Router()
@@ -172,6 +194,10 @@ def build_patient_router(intake_service: PatientIntakeService | None = None) -> 
     @router.message(CommandStart())
     async def start_handler(message: Message) -> None:
         await handle_patient_start(message, intake_service)
+
+    @router.message(Command("status"))
+    async def status_handler(message: Message) -> None:
+        await handle_patient_status(message, intake_service)
 
     @router.callback_query(lambda callback: callback.data == AI_BOUNDARY_CONTINUE_CALLBACK)
     async def continue_to_consent_handler(callback: CallbackQuery) -> None:

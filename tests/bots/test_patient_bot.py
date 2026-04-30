@@ -1,8 +1,9 @@
 import asyncio
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-from aiogram.filters.command import CommandStart
+from aiogram.filters.command import Command, CommandStart
 
 from app.bots.keyboards import (
     AI_BOUNDARY_CONTINUE_CALLBACK,
@@ -20,7 +21,9 @@ from app.bots.messages import (
     PATIENT_NEXT_STEP_PENDING_MESSAGE,
     PATIENT_PRE_CONSENT_REMINDER_MESSAGE,
     PATIENT_PROFILE_PROMPT_MESSAGE,
+    PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
     render_ai_boundary_message,
+    render_patient_status_message,
 )
 from app.bots.patient_bot import (
     build_patient_router,
@@ -29,15 +32,25 @@ from app.bots.patient_bot import (
     handle_consent_decline,
     handle_patient_message,
     handle_patient_start,
+    handle_patient_status,
 )
-from app.schemas.case import CaseStatus
+from app.schemas.case import (
+    CaseStatus,
+    HandoffBlockingReason,
+    HandoffBlockingReasonCode,
+    HandoffReadinessResult,
+    SharedCaseStatusCode,
+    SharedStatusView,
+)
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.schemas.patient import (
     PatientIntakeField,
     PatientIntakeMessageKind,
     PatientIntakeUpdateResult,
 )
+from app.services.case_service import CaseService
 from app.services.patient_intake_service import (
+    PatientIntakeService,
     PatientIntakeStartResult,
     PatientIntakeStep,
     PreConsentGateResult,
@@ -69,6 +82,8 @@ class FakeIntakeService:
         decline_result: ConsentCaptureResult | None = None,
         message_result: PatientIntakeUpdateResult | None = None,
         error: Exception | None = None,
+        active_case_id: str | None = None,
+        case_service: object | None = None,
     ) -> None:
         self.result = result
         self.gate_result = gate_result
@@ -76,6 +91,8 @@ class FakeIntakeService:
         self.decline_result = decline_result
         self.message_result = message_result
         self.error = error
+        self.active_case_id = active_case_id
+        self.case_service = case_service
         self.prompt_result = message_result
         self.calls: list[int | None] = []
         self.boundary_calls: list[int] = []
@@ -128,6 +145,9 @@ class FakeIntakeService:
             raise self.error
         assert self.prompt_result is not None
         return self.prompt_result
+
+    def get_active_case_id(self, telegram_user_id: int) -> str | None:
+        return self.active_case_id
 
     def decline_consent(self, *, telegram_user_id: int, case_id: str) -> ConsentCaptureResult:
         self.decline_calls.append((telegram_user_id, case_id))
@@ -195,11 +215,13 @@ def test_handle_patient_start_replies_with_safe_failure_message() -> None:
 def test_build_patient_router_registers_command_start_handler() -> None:
     router = build_patient_router(FakeIntakeService())
 
-    assert len(router.message.handlers) == 2
+    assert len(router.message.handlers) == 3
     start_handler = router.message.handlers[0]
-    message_handler = router.message.handlers[1]
+    status_handler = router.message.handlers[1]
+    message_handler = router.message.handlers[2]
     assert len(router.callback_query.handlers) == 3
     assert start_handler.callback.__name__ == "start_handler"
+    assert status_handler.callback.__name__ == "status_handler"
     assert message_handler.callback.__name__ == "patient_message_handler"
     assert router.callback_query.handlers[0].callback.__name__ == "continue_to_consent_handler"
     assert router.callback_query.handlers[1].callback.__name__ == "consent_accept_handler"
@@ -207,6 +229,10 @@ def test_build_patient_router_registers_command_start_handler() -> None:
     assert any(
         isinstance(filter_.callback, CommandStart)
         for filter_ in start_handler.filters
+    )
+    assert any(
+        isinstance(filter_.callback, Command)
+        for filter_ in status_handler.filters
     )
 
 
@@ -390,6 +416,57 @@ def test_handle_patient_message_can_render_goal_validation_error() -> None:
     message.answer.assert_awaited_once_with(PATIENT_GOAL_INVALID_MESSAGE, reply_markup=None)
 
 
+def test_handle_patient_status_replies_with_patient_facing_status_message() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_status_001")
+    intake_service = PatientIntakeService(case_service=case_service)
+    start_result = intake_service.start_intake(telegram_user_id=123)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123)
+    intake_service.accept_consent(telegram_user_id=123, case_id=start_result.case_id)
+    message = FakeMessage(text="/status")
+
+    asyncio.run(handle_patient_status(message, intake_service))
+
+    message.answer.assert_awaited_once()
+    reply = message.answer.await_args.args[0]
+    assert "Статус заявки:" in reply
+    assert "Собираем данные для заявки." in reply
+    assert "Отправьте профиль и цель консультации" in reply
+    assert "awaiting_consent" not in reply
+    assert "collecting_intake" not in reply
+
+
+def test_handle_patient_status_returns_recovery_action_for_processing_failure() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_status_002")
+    intake_service = PatientIntakeService(case_service=case_service)
+    start_result = intake_service.start_intake(telegram_user_id=123)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123)
+    intake_service.accept_consent(telegram_user_id=123, case_id=start_result.case_id)
+    case_service.transition_case(start_result.case_id, CaseStatus.DOCUMENTS_UPLOADED)
+    case_service.transition_case(start_result.case_id, CaseStatus.PROCESSING_DOCUMENTS)
+    case_service.transition_case(start_result.case_id, CaseStatus.EXTRACTION_FAILED)
+    message = FakeMessage(text="/status")
+
+    asyncio.run(handle_patient_status(message, intake_service))
+
+    message.answer.assert_awaited_once()
+    reply = message.answer.await_args.args[0]
+    assert "Часть данных пока не прочиталась." in reply
+    assert "Отправьте документы еще раз" in reply
+    assert "extraction_failed" not in reply
+    assert "processing_documents" not in reply
+
+
+def test_handle_patient_status_without_active_case_returns_recoverable_prompt() -> None:
+    message = FakeMessage(text="/status")
+    service = FakeIntakeService(active_case_id=None, case_service=CaseService())
+
+    asyncio.run(handle_patient_status(message, service))
+
+    message.answer.assert_awaited_once_with(PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE)
+
+
 def test_router_accept_filter_uses_case_bound_callback_payload() -> None:
     router = build_patient_router(FakeIntakeService())
 
@@ -403,3 +480,29 @@ def test_router_accept_filter_uses_case_bound_callback_payload() -> None:
     assert decline_filter(
         SimpleNamespace(data=f"{CONSENT_DECLINE_CALLBACK_PREFIX}:case_patient_001")
     )
+
+
+def test_render_patient_status_message_hides_internal_status_names() -> None:
+    status_view = SharedStatusView(
+        case_id="case_status_003",
+        lifecycle_status=CaseStatus.EXTRACTION_FAILED,
+        patient_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        doctor_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        handoff_readiness=HandoffReadinessResult(
+            case_id="case_status_003",
+            is_ready_for_doctor=False,
+            shared_status=SharedCaseStatusCode.PROCESSING_PENDING,
+            blocking_reasons=(
+                HandoffBlockingReason(
+                    code=HandoffBlockingReasonCode.EXTRACTIONS_MISSING,
+                    detail="missing",
+                ),
+            ),
+        ),
+    )
+
+    message = render_patient_status_message(status_view)
+
+    assert "Отправьте документы еще раз" in message
+    assert "extraction_failed" not in message
+    assert "processing_pending" not in message
