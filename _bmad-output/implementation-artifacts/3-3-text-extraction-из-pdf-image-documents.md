@@ -1,6 +1,6 @@
 # Story 3.3: Text Extraction из PDF/Image Documents
 
-Status: review
+Status: done
 
 ## Story
 
