@@ -25,6 +25,16 @@ from app.schemas.case import (
     generate_case_id,
 )
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.schemas.patient import (
+    ConsultationGoal,
+    ConsultationGoalCaptureResult,
+    PatientIntakeCaptureResult,
+    PatientIntakeField,
+    PatientIntakeMessageKind,
+    PatientIntakePayload,
+    PatientIntakeUpdateResult,
+    PatientProfile,
+)
 
 __all__ = [
     "AuthorizationError",
@@ -45,6 +55,14 @@ __all__ = [
     "CaseTransitionError",
     "ConsentCaptureResult",
     "ConsentOutcome",
+    "ConsultationGoal",
+    "ConsultationGoalCaptureResult",
+    "PatientIntakeCaptureResult",
+    "PatientIntakeField",
+    "PatientIntakeMessageKind",
+    "PatientIntakePayload",
+    "PatientIntakeUpdateResult",
+    "PatientProfile",
     "PatientCase",
     "generate_case_id",
 ]
