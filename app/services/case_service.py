@@ -19,6 +19,7 @@ from app.schemas.case import (
     utc_now,
 )
 from app.schemas.extraction import CaseExtractionRecord
+from app.schemas.indicator import CaseIndicatorExtractionRecord
 from app.workflow.transitions import assert_case_transition_allowed
 
 Clock = Callable[[], datetime]
@@ -66,6 +67,7 @@ class CaseService:
         self._cases: dict[str, PatientCase] = {}
         self._record_references: dict[str, list[CaseRecordReference]] = {}
         self._extraction_records: dict[str, list[CaseExtractionRecord]] = {}
+        self._indicator_records: dict[str, list[CaseIndicatorExtractionRecord]] = {}
         self._readiness_snapshots: dict[str, CaseReadinessSnapshot] = {}
 
     def create_case(self) -> PatientCase:
@@ -142,6 +144,7 @@ class CaseService:
             consent=self._single_reference(references, CaseRecordKind.CONSENT),
             documents=self._references_by_kind(references, CaseRecordKind.DOCUMENT),
             extractions=self._references_by_kind(references, CaseRecordKind.EXTRACTION),
+            indicators=self._references_by_kind(references, CaseRecordKind.INDICATOR),
             summaries=self._references_by_kind(references, CaseRecordKind.SUMMARY),
             audit_events=self._references_by_kind(references, CaseRecordKind.AUDIT),
         )
@@ -174,6 +177,37 @@ class CaseService:
     def get_case_extraction_records(self, case_id: str) -> tuple[CaseExtractionRecord, ...]:
         self._get_existing_case(case_id)
         return tuple(self._extraction_records.get(case_id, ()))
+
+    def attach_case_indicator_record(
+        self,
+        indicator_record: CaseIndicatorExtractionRecord,
+    ) -> CaseIndicatorExtractionRecord:
+        target_case_id = indicator_record.case_id
+        patient_case = self._get_existing_case(target_case_id)
+        if patient_case.status == CaseStatus.DELETED:
+            raise CaseTransitionError(
+                code="case_deleted",
+                case_id=target_case_id,
+                from_status=patient_case.status,
+                to_status="attach_case_indicator_record",
+            )
+
+        records = self._indicator_records.setdefault(target_case_id, [])
+        existing_record = self._find_indicator_record(
+            records,
+            indicator_record.indicator_reference.record_id,
+        )
+        if existing_record is not None:
+            self.attach_case_record_reference(indicator_record.indicator_reference)
+            return existing_record
+
+        records.append(indicator_record)
+        self.attach_case_record_reference(indicator_record.indicator_reference)
+        return indicator_record
+
+    def get_case_indicator_records(self, case_id: str) -> tuple[CaseIndicatorExtractionRecord, ...]:
+        self._get_existing_case(case_id)
+        return tuple(self._indicator_records.get(case_id, ()))
 
     def set_case_readiness_snapshot(
         self,
@@ -466,5 +500,15 @@ class CaseService:
     ) -> CaseExtractionRecord | None:
         for record in records:
             if record.extraction_reference.record_id == extraction_reference_id:
+                return record
+        return None
+
+    @staticmethod
+    def _find_indicator_record(
+        records: list[CaseIndicatorExtractionRecord],
+        indicator_reference_id: str,
+    ) -> CaseIndicatorExtractionRecord | None:
+        for record in records:
+            if record.indicator_reference.record_id == indicator_reference_id:
                 return record
         return None
