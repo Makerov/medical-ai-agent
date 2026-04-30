@@ -13,6 +13,7 @@ class PatientIntakeField(StrEnum):
 class PatientIntakeMessageKind(StrEnum):
     CONSENT_REQUIRED = "consent_required"
     CONSENT_ALREADY_CAPTURED = "consent_already_captured"
+    CASE_DELETED = "case_deleted"
     PROFILE_PROMPT = "profile_prompt"
     PROFILE_INVALID = "profile_invalid"
     PROFILE_SAVED = "profile_saved"
