@@ -9,25 +9,32 @@ from app.bots.keyboards import (
     AI_BOUNDARY_CONTINUE_CALLBACK,
     CONSENT_ACCEPT_CALLBACK_PREFIX,
     CONSENT_DECLINE_CALLBACK_PREFIX,
+    build_case_deletion_callback_data,
     build_consent_callback_data,
 )
 from app.bots.messages import (
     PATIENT_CONSENT_ACCEPTED_MESSAGE,
     PATIENT_CONSENT_DECLINED_MESSAGE,
     PATIENT_CONSENT_PROMPT_MESSAGE,
+    PATIENT_DELETION_CANCELLED_MESSAGE,
     PATIENT_GOAL_INVALID_MESSAGE,
     PATIENT_GOAL_SAVED_MESSAGE,
     PATIENT_INTAKE_FAILED_MESSAGE,
     PATIENT_NEXT_STEP_PENDING_MESSAGE,
     PATIENT_PRE_CONSENT_REMINDER_MESSAGE,
     PATIENT_PROFILE_PROMPT_MESSAGE,
+    PATIENT_STATUS_DELETED_MESSAGE,
     PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
     render_ai_boundary_message,
+    render_case_deletion_result_message,
     render_patient_status_message,
 )
 from app.bots.patient_bot import (
     build_patient_router,
     handle_ai_boundary_continue,
+    handle_case_deletion_cancel,
+    handle_case_deletion_confirm,
+    handle_case_deletion_request,
     handle_consent_accept,
     handle_consent_decline,
     handle_patient_message,
@@ -81,6 +88,7 @@ class FakeIntakeService:
         accept_result: ConsentCaptureResult | None = None,
         decline_result: ConsentCaptureResult | None = None,
         message_result: PatientIntakeUpdateResult | None = None,
+        deletion_result: object | None = None,
         error: Exception | None = None,
         active_case_id: str | None = None,
         case_service: object | None = None,
@@ -90,6 +98,7 @@ class FakeIntakeService:
         self.accept_result = accept_result
         self.decline_result = decline_result
         self.message_result = message_result
+        self.deletion_result = deletion_result
         self.error = error
         self.active_case_id = active_case_id
         self.case_service = case_service
@@ -100,6 +109,7 @@ class FakeIntakeService:
         self.decline_calls: list[tuple[int, str]] = []
         self.message_calls: list[tuple[int, str]] = []
         self.prompt_calls: list[tuple[int, str | None]] = []
+        self.deletion_calls: list[tuple[int, str]] = []
 
     def start_intake(self, *, telegram_user_id: int | None = None) -> PatientIntakeStartResult:
         self.calls.append(telegram_user_id)
@@ -155,6 +165,13 @@ class FakeIntakeService:
             raise self.error
         assert self.decline_result is not None
         return self.decline_result
+
+    def request_case_deletion(self, *, telegram_user_id: int, case_id: str) -> object:
+        self.deletion_calls.append((telegram_user_id, case_id))
+        if self.error is not None:
+            raise self.error
+        assert self.deletion_result is not None
+        return self.deletion_result
 
 
 def test_handle_patient_start_replies_with_success_message() -> None:
@@ -215,17 +232,23 @@ def test_handle_patient_start_replies_with_safe_failure_message() -> None:
 def test_build_patient_router_registers_command_start_handler() -> None:
     router = build_patient_router(FakeIntakeService())
 
-    assert len(router.message.handlers) == 3
+    assert len(router.message.handlers) == 5
     start_handler = router.message.handlers[0]
     status_handler = router.message.handlers[1]
-    message_handler = router.message.handlers[2]
-    assert len(router.callback_query.handlers) == 3
+    delete_handler = router.message.handlers[2]
+    delete_case_handler = router.message.handlers[3]
+    message_handler = router.message.handlers[4]
+    assert len(router.callback_query.handlers) == 5
     assert start_handler.callback.__name__ == "start_handler"
     assert status_handler.callback.__name__ == "status_handler"
+    assert delete_handler.callback.__name__ == "delete_handler"
+    assert delete_case_handler.callback.__name__ == "delete_case_handler"
     assert message_handler.callback.__name__ == "patient_message_handler"
     assert router.callback_query.handlers[0].callback.__name__ == "continue_to_consent_handler"
     assert router.callback_query.handlers[1].callback.__name__ == "consent_accept_handler"
     assert router.callback_query.handlers[2].callback.__name__ == "consent_decline_handler"
+    assert router.callback_query.handlers[3].callback.__name__ == "case_delete_confirm_handler"
+    assert router.callback_query.handlers[4].callback.__name__ == "case_delete_cancel_handler"
     assert any(
         isinstance(filter_.callback, CommandStart)
         for filter_ in start_handler.filters
@@ -467,6 +490,61 @@ def test_handle_patient_status_without_active_case_returns_recoverable_prompt() 
     message.answer.assert_awaited_once_with(PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE)
 
 
+def test_handle_case_deletion_request_replies_with_confirmation_keyboard() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_delete_001")
+    patient_case = case_service.create_case()
+    case_service.transition_case(patient_case.case_id, CaseStatus.AWAITING_CONSENT)
+    message = FakeMessage(text="/delete")
+    service = FakeIntakeService(
+        active_case_id=patient_case.case_id,
+        case_service=case_service,
+    )
+
+    asyncio.run(handle_case_deletion_request(message, service))
+
+    message.answer.assert_awaited_once()
+    reply = message.answer.await_args.args[0]
+    reply_markup = message.answer.await_args.kwargs["reply_markup"]
+    assert "Запросить удаление demo case?" in reply
+    assert patient_case.case_id in reply
+    assert reply_markup.inline_keyboard[0][0].callback_data == build_case_deletion_callback_data(
+        action="confirm",
+        case_id=patient_case.case_id,
+    )
+    assert reply_markup.inline_keyboard[0][1].callback_data == build_case_deletion_callback_data(
+        action="cancel",
+        case_id=patient_case.case_id,
+    )
+
+
+def test_handle_case_deletion_confirm_calls_service_and_reports_deletion() -> None:
+    callback = FakeCallbackQuery()
+    callback.data = build_case_deletion_callback_data(action="confirm", case_id="case_delete_002")
+    service = FakeIntakeService(
+        deletion_result=SimpleNamespace(case_id="case_delete_002", was_duplicate=False),
+    )
+
+    asyncio.run(handle_case_deletion_confirm(callback, service))
+
+    assert service.deletion_calls == [(123, "case_delete_002")]
+    callback.answer.assert_awaited_once_with()
+    callback.message.answer.assert_awaited_once_with(
+        render_case_deletion_result_message(was_duplicate=False)
+    )
+
+
+def test_handle_case_deletion_cancel_reports_cancellation_message() -> None:
+    callback = FakeCallbackQuery()
+    callback.data = build_case_deletion_callback_data(action="cancel", case_id="case_delete_003")
+    service = FakeIntakeService()
+
+    asyncio.run(handle_case_deletion_cancel(callback, service))
+
+    callback.answer.assert_awaited_once_with()
+    callback.message.answer.assert_awaited_once_with(PATIENT_DELETION_CANCELLED_MESSAGE)
+
+
 def test_router_accept_filter_uses_case_bound_callback_payload() -> None:
     router = build_patient_router(FakeIntakeService())
 
@@ -506,3 +584,24 @@ def test_render_patient_status_message_hides_internal_status_names() -> None:
     assert "Отправьте документы еще раз" in message
     assert "extraction_failed" not in message
     assert "processing_pending" not in message
+
+
+def test_render_patient_status_message_shows_deleted_copy_for_deleted_case() -> None:
+    status_view = SharedStatusView(
+        case_id="case_status_deleted",
+        lifecycle_status=CaseStatus.DELETED,
+        patient_status=SharedCaseStatusCode.CASE_CLOSED,
+        doctor_status=SharedCaseStatusCode.CASE_CLOSED,
+        handoff_readiness=HandoffReadinessResult(
+            case_id="case_status_deleted",
+            is_ready_for_doctor=False,
+            shared_status=SharedCaseStatusCode.CASE_CLOSED,
+            blocking_reasons=(),
+        ),
+    )
+
+    message = render_patient_status_message(status_view)
+
+    assert PATIENT_STATUS_DELETED_MESSAGE.split("\n", maxsplit=1)[0] in message
+    assert "case_closed" not in message
+    assert "deleted" not in message
