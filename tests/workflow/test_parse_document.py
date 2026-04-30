@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+from app.core.settings import Settings
 from app.integrations.ocr_client import OCRClient
 from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus
 from app.schemas.document import DocumentUploadMetadata
@@ -78,6 +79,100 @@ def test_parse_document_transitions_case_and_attaches_extraction_reference() -> 
     )
 
 
+def test_parse_document_routes_low_confidence_extraction_to_partial_extraction() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_001_low")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_001_low",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_001_low",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=lambda _bytes, _document: ("enough text for partial state", 0.41),
+        clock=lambda: now,
+        provider_name="stub",
+    )
+    node = ParseDocumentNode(
+        case_service=case_service,
+        ocr_client=client,
+        settings=Settings(
+            document_extraction_min_confidence=0.75,
+            document_extraction_min_text_length=16,
+        ),
+    )
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.case_id == patient_case.case_id
+    assert result.case_status == CaseStatus.PARTIAL_EXTRACTION
+    assert result.was_duplicate is False
+    assert result.extraction is not None
+    assert result.extraction_reference is not None
+    assert case_service.get_case_core_records(patient_case.case_id).extractions == (
+        result.extraction_reference,
+    )
+    assert (
+        case_service.get_case_core_records(patient_case.case_id).patient_case.status
+        == CaseStatus.PARTIAL_EXTRACTION
+    )
+
+
+def test_parse_document_routes_short_extraction_to_partial_extraction() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_001_short")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_001_short",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_001_short",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=lambda _bytes, _document: ("short", 0.96),
+        clock=lambda: now,
+        provider_name="stub",
+    )
+    node = ParseDocumentNode(
+        case_service=case_service,
+        ocr_client=client,
+        settings=Settings(
+            document_extraction_min_confidence=0.75,
+            document_extraction_min_text_length=16,
+        ),
+    )
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.case_status == CaseStatus.PARTIAL_EXTRACTION
+    assert result.extraction is not None
+    assert result.extraction.extracted_text == "short"
+    assert result.extraction.confidence == 0.96
+    assert (
+        case_service.get_case_core_records(patient_case.case_id).patient_case.status
+        == CaseStatus.PARTIAL_EXTRACTION
+    )
+
+
 def test_parse_document_is_idempotent_for_repeated_job_execution() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_002")
@@ -112,6 +207,58 @@ def test_parse_document_is_idempotent_for_repeated_job_execution() -> None:
     assert (
         case_service.get_case_core_records(patient_case.case_id).patient_case.status
         == CaseStatus.PROCESSING_DOCUMENTS
+    )
+
+
+def test_parse_document_is_idempotent_for_repeated_partial_extraction_execution() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_002_partial")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_002_partial",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_002_partial",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    parser_calls: list[tuple[bytes, DocumentUploadMetadata]] = []
+
+    def parser(document_bytes: bytes, payload: DocumentUploadMetadata) -> tuple[str, float]:
+        parser_calls.append((document_bytes, payload))
+        return ("enough text for partial state", 0.42)
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=parser,
+        clock=lambda: now,
+    )
+    node = ParseDocumentNode(
+        case_service=case_service,
+        ocr_client=client,
+        settings=Settings(
+            document_extraction_min_confidence=0.75,
+            document_extraction_min_text_length=16,
+        ),
+    )
+
+    first_result = node.parse_document(case_id=patient_case.case_id, document=document)
+    second_result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert first_result.case_status == CaseStatus.PARTIAL_EXTRACTION
+    assert second_result.case_status == CaseStatus.PARTIAL_EXTRACTION
+    assert second_result.was_duplicate is True
+    assert len(parser_calls) == 1
+    assert len(case_service.get_case_extraction_records(patient_case.case_id)) == 1
+    assert (
+        case_service.get_case_core_records(patient_case.case_id).patient_case.status
+        == CaseStatus.PARTIAL_EXTRACTION
     )
 
 
