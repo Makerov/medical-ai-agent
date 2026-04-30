@@ -69,6 +69,16 @@ class PatientIntakeService:
         self._pre_consent_steps: dict[int, IntakeSessionState] = {}
         self._intake_payloads: dict[str, PatientIntakePayload] = {}
 
+    @property
+    def case_service(self) -> CaseService:
+        return self._case_service
+
+    def get_active_case_id(self, telegram_user_id: int) -> str | None:
+        session = self._pre_consent_steps.get(telegram_user_id)
+        if session is None:
+            return None
+        return session.case_id
+
     def start_intake(self, *, telegram_user_id: int | None = None) -> PatientIntakeStartResult:
         if telegram_user_id is not None:
             active_session = self._pre_consent_steps.get(telegram_user_id)
