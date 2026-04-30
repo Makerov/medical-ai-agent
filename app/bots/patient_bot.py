@@ -17,11 +17,12 @@ from app.bots.messages import (
     render_ai_boundary_message,
     render_consent_result_message,
     render_consent_step_message,
-    render_pre_consent_reminder,
+    render_patient_intake_message,
 )
 from app.core.settings import Settings, get_settings
+from app.schemas.patient import PatientIntakeMessageKind
 from app.services.case_service import CaseService
-from app.services.patient_intake_service import PatientIntakeService, PatientIntakeStep
+from app.services.patient_intake_service import PatientIntakeService
 
 
 class MessageResponder(Protocol):
@@ -94,6 +95,10 @@ async def handle_consent_accept(
             telegram_user_id=telegram_user_id,
             case_id=case_id,
         )
+        prompt_result = intake_service.get_current_prompt(
+            telegram_user_id=telegram_user_id,
+            case_id=case_id,
+        )
     except Exception:  # noqa: BLE001 - recoverable adapter boundary
         await callback.answer()
         if callback.message is not None:
@@ -103,6 +108,7 @@ async def handle_consent_accept(
     await callback.answer()
     if callback.message is not None:
         await callback.message.answer(render_consent_result_message(capture_result))
+        await callback.message.answer(render_patient_intake_message(prompt_result))
 
 
 async def handle_consent_decline(
@@ -132,7 +138,7 @@ async def handle_consent_decline(
         )
 
 
-async def handle_pre_consent_message(
+async def handle_patient_message(
     message: MessageResponder,
     intake_service: PatientIntakeService,
 ) -> None:
@@ -140,18 +146,21 @@ async def handle_pre_consent_message(
         telegram_user_id = message.from_user.id if getattr(message, "from_user", None) else None
         if telegram_user_id is None:
             raise ValueError
-        gate_result = intake_service.handle_pre_consent_input(telegram_user_id=telegram_user_id)
+        update_result = intake_service.handle_patient_message(
+            telegram_user_id=telegram_user_id,
+            text=getattr(message, "text", "") or "",
+        )
     except Exception:  # noqa: BLE001 - recoverable adapter boundary
         await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
         return
 
     reply_markup = (
-        build_consent_keyboard(case_id=gate_result.case_id)
-        if gate_result.active_step == PatientIntakeStep.AWAITING_CONSENT
+        build_consent_keyboard(case_id=update_result.case_id)
+        if update_result.message_kind == PatientIntakeMessageKind.CONSENT_REQUIRED
         else None
     )
     await message.answer(
-        render_pre_consent_reminder(gate_result),
+        render_patient_intake_message(update_result),
         reply_markup=reply_markup,
     )
 
@@ -183,8 +192,8 @@ def build_patient_router(intake_service: PatientIntakeService | None = None) -> 
         await handle_consent_decline(callback, intake_service)
 
     @router.message()
-    async def pre_consent_fallback_handler(message: Message) -> None:
-        await handle_pre_consent_message(message, intake_service)
+    async def patient_message_handler(message: Message) -> None:
+        await handle_patient_message(message, intake_service)
 
     return router
 

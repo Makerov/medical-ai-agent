@@ -1,4 +1,8 @@
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
+from app.schemas.patient import (
+    PatientIntakeMessageKind,
+    PatientIntakeUpdateResult,
+)
 from app.services.patient_intake_service import (
     PatientIntakeStartResult,
     PreConsentGateResult,
@@ -37,7 +41,7 @@ PATIENT_PRE_CONSENT_REMINDER_MESSAGE = (
 
 PATIENT_CONSENT_ACCEPTED_MESSAGE = (
     "Согласие принято.\n"
-    "Переходим к следующему шагу intake."
+    "Переходим к сбору данных для intake."
 )
 
 PATIENT_CONSENT_DECLINED_MESSAGE = (
@@ -48,6 +52,43 @@ PATIENT_CONSENT_DECLINED_MESSAGE = (
 PATIENT_POST_CONSENT_WAITING_MESSAGE = (
     "Согласие уже сохранено.\n"
     "Следующий шаг intake будет обработан отдельно."
+)
+
+PATIENT_PROFILE_PROMPT_MESSAGE = (
+    "Теперь укажите базовые данные профиля.\n"
+    "Отправьте одним сообщением: ФИО и возраст, например: «Иван Петров, 34»."
+)
+
+PATIENT_PROFILE_INVALID_MESSAGE = (
+    "Не смог распознать профиль.\n"
+    "Пришлите только: ФИО и возраст, например: «Иван Петров, 34»."
+)
+
+PATIENT_PROFILE_SAVED_MESSAGE = (
+    "Профиль сохранен.\n"
+    "Теперь пришлите цель консультации."
+)
+
+PATIENT_GOAL_PROMPT_MESSAGE = (
+    "Теперь укажите цель консультации или check-up запроса.\n"
+    "Можно коротко, одним сообщением."
+)
+
+PATIENT_GOAL_INVALID_MESSAGE = (
+    "Не смог распознать цель.\n"
+    "Пришлите коротко и по делу: цель консультации или check-up запроса."
+)
+
+PATIENT_GOAL_SAVED_MESSAGE = (
+    "Цель сохранена.\n"
+    "Следом будет шаг с загрузкой документов.\n"
+    "Пока ничего загружать не нужно: я отдельно пришлю инструкцию."
+)
+
+PATIENT_NEXT_STEP_PENDING_MESSAGE = (
+    "Профиль и цель уже сохранены.\n"
+    "Следом будет шаг с загрузкой документов.\n"
+    "Пока дождитесь отдельной инструкции и не отправляйте новые текстовые данные."
 )
 
 
@@ -74,6 +115,30 @@ def render_pre_consent_reminder(result: PreConsentGateResult) -> str:
     if result.reminder_kind == PreConsentReminderKind.CONSENT_ALREADY_CAPTURED:
         return PATIENT_POST_CONSENT_WAITING_MESSAGE
     return PATIENT_PRE_CONSENT_REMINDER_MESSAGE
+
+
+def render_patient_intake_message(result: PatientIntakeUpdateResult) -> str:
+    match result.message_kind:
+        case PatientIntakeMessageKind.CONSENT_REQUIRED:
+            return PATIENT_PRE_CONSENT_REMINDER_MESSAGE
+        case PatientIntakeMessageKind.CONSENT_ALREADY_CAPTURED:
+            return PATIENT_POST_CONSENT_WAITING_MESSAGE
+        case PatientIntakeMessageKind.PROFILE_PROMPT:
+            return PATIENT_PROFILE_PROMPT_MESSAGE
+        case PatientIntakeMessageKind.PROFILE_INVALID:
+            return PATIENT_PROFILE_INVALID_MESSAGE
+        case PatientIntakeMessageKind.PROFILE_SAVED:
+            return PATIENT_PROFILE_SAVED_MESSAGE
+        case PatientIntakeMessageKind.GOAL_PROMPT:
+            return PATIENT_GOAL_PROMPT_MESSAGE
+        case PatientIntakeMessageKind.GOAL_INVALID:
+            return PATIENT_GOAL_INVALID_MESSAGE
+        case PatientIntakeMessageKind.GOAL_SAVED:
+            return PATIENT_GOAL_SAVED_MESSAGE
+        case PatientIntakeMessageKind.NEXT_STEP_PENDING:
+            return PATIENT_NEXT_STEP_PENDING_MESSAGE
+    msg = f"Unsupported patient intake message kind: {result.message_kind}"
+    raise ValueError(msg)
 
 
 def render_consent_result_message(result: ConsentCaptureResult) -> str:

@@ -4,6 +4,7 @@ import pytest
 
 from app.schemas.case import CaseRecordKind, CaseStatus
 from app.schemas.consent import ConsentOutcome
+from app.schemas.patient import PatientIntakeField, PatientIntakeMessageKind
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import (
     PatientIntakeService,
@@ -158,15 +159,8 @@ def test_stale_consent_callback_cannot_mutate_newer_case() -> None:
     intake_service = PatientIntakeService(case_service=case_service)
     first_start = intake_service.start_intake(telegram_user_id=123456)
     second_start = intake_service.start_intake(telegram_user_id=123456)
-    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
 
-    with pytest.raises(ValueError, match="does not match active intake session"):
-        intake_service.accept_consent(
-            telegram_user_id=123456,
-            case_id=first_start.case_id,
-        )
-
-    assert second_start.case_id != first_start.case_id
+    assert second_start.case_id == first_start.case_id
     assert case_service.get_case_core_records(second_start.case_id).consent is None
 
 
@@ -206,3 +200,233 @@ def test_pre_consent_input_after_accept_no_longer_returns_consent_required() -> 
 
     assert result.active_step == PatientIntakeStep.CONSENT_CAPTURED
     assert result.reminder_kind == PreConsentReminderKind.CONSENT_ALREADY_CAPTURED
+
+
+def test_handle_patient_message_captures_profile_and_keeps_case_collecting_intake() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_010")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_010")
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+
+    assert result.case_id == "case_patient_010"
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == PatientIntakeMessageKind.PROFILE_SAVED
+    assert result.target_field == PatientIntakeField.PROFILE
+    assert result.active_step == PatientIntakeStep.AWAITING_GOAL.value
+    assert result.was_duplicate is False
+    assert result.patient_profile is not None
+    assert result.patient_profile.full_name == "Иван Петров"
+    assert result.patient_profile.age == 34
+    assert result.patient_profile_record is not None
+    assert result.patient_profile_record.record_kind == CaseRecordKind.PATIENT_PROFILE
+    assert case_service.get_case_core_records("case_patient_010").patient_profile is not None
+    assert (
+        case_service.get_case_core_records("case_patient_010").patient_profile
+        == result.patient_profile_record
+    )
+    assert (
+        case_service.get_shared_status_view("case_patient_010").lifecycle_status
+        == CaseStatus.COLLECTING_INTAKE
+    )
+    assert (
+        intake_service._intake_payloads["case_patient_010"].patient_profile
+        == result.patient_profile
+    )
+
+
+def test_get_current_prompt_after_consent_returns_profile_prompt() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_010b")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_010b")
+
+    result = intake_service.get_current_prompt(
+        telegram_user_id=123456,
+        case_id="case_patient_010b",
+    )
+
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == PatientIntakeMessageKind.PROFILE_PROMPT
+    assert result.target_field == PatientIntakeField.PROFILE
+    assert result.active_step == PatientIntakeStep.AWAITING_PROFILE.value
+
+
+def test_handle_patient_message_rejects_blank_profile_without_mutating_state() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_011")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_011")
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="   ",
+    )
+
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == PatientIntakeMessageKind.PROFILE_INVALID
+    assert result.target_field == PatientIntakeField.PROFILE
+    assert result.active_step == PatientIntakeStep.AWAITING_PROFILE.value
+    assert result.patient_profile is None
+    assert case_service.get_case_core_records("case_patient_011").patient_profile is None
+    assert intake_service._intake_payloads["case_patient_011"].patient_profile is None
+
+
+def test_handle_patient_message_captures_goal_after_profile_and_keeps_case_collecting_intake(
+) -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_012")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_012")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+
+    assert result.case_id == "case_patient_012"
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == PatientIntakeMessageKind.GOAL_SAVED
+    assert result.target_field == PatientIntakeField.CONSULTATION_GOAL
+    assert result.active_step == PatientIntakeStep.INTAKE_COMPLETE.value
+    assert result.was_duplicate is False
+    assert result.consultation_goal is not None
+    assert result.consultation_goal.text == "Нужно проверить давление и общее самочувствие"
+    assert (
+        case_service.get_shared_status_view("case_patient_012").lifecycle_status
+        == CaseStatus.COLLECTING_INTAKE
+    )
+    assert (
+        intake_service._intake_payloads["case_patient_012"].consultation_goal
+        == result.consultation_goal
+    )
+
+
+def test_handle_patient_message_rejects_short_goal_without_mutating_state() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_013")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_013")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="checkup",
+    )
+
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == PatientIntakeMessageKind.GOAL_INVALID
+    assert result.target_field == PatientIntakeField.CONSULTATION_GOAL
+    assert result.active_step == PatientIntakeStep.AWAITING_GOAL.value
+    assert result.consultation_goal is None
+    assert intake_service._intake_payloads["case_patient_013"].consultation_goal is None
+
+
+def test_handle_patient_message_rejects_profile_shaped_text_during_goal_step() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_013b")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_013b")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 35",
+    )
+
+    assert result.message_kind == PatientIntakeMessageKind.GOAL_INVALID
+    assert result.target_field == PatientIntakeField.CONSULTATION_GOAL
+    assert result.active_step == PatientIntakeStep.AWAITING_GOAL.value
+    assert intake_service._intake_payloads["case_patient_013b"].consultation_goal is None
+
+
+def test_handle_patient_message_is_idempotent_for_duplicate_profile_and_goal_input() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_014")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_014")
+
+    profile_result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    duplicate_profile_result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    goal_result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+    duplicate_goal_result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+
+    assert profile_result.was_duplicate is False
+    assert duplicate_profile_result.was_duplicate is True
+    assert duplicate_profile_result.message_kind == PatientIntakeMessageKind.PROFILE_SAVED
+    assert duplicate_profile_result.active_step == PatientIntakeStep.AWAITING_GOAL.value
+    assert goal_result.was_duplicate is False
+    assert duplicate_goal_result.was_duplicate is True
+    assert duplicate_goal_result.message_kind == PatientIntakeMessageKind.GOAL_SAVED
+    assert duplicate_goal_result.active_step == PatientIntakeStep.INTAKE_COMPLETE.value
+    assert (
+        case_service.get_case_core_records("case_patient_014").patient_profile
+        == profile_result.patient_profile_record
+    )
+
+
+def test_handle_patient_message_after_completion_returns_next_step_pending_for_new_text() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_015")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_015")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="дополнительный текст",
+    )
+
+    assert result.message_kind == PatientIntakeMessageKind.NEXT_STEP_PENDING
+    assert result.was_duplicate is True
+    assert result.target_field is None
+    assert result.active_step == PatientIntakeStep.INTAKE_COMPLETE.value

@@ -54,7 +54,7 @@ development_status:
   2-1-старт-patient-intake-через-patient-bot: done
   2-2-ai-boundary-explanation-перед-consent: done
   2-3-explicit-consent-capture: done
-  2-4-сбор-patient-profile-и-consultation-goal: backlog
+  2-4-сбор-patient-profile-и-consultation-goal: done
   2-5-patient-facing-case-status: backlog
   2-6-demo-case-deletion-request: backlog
   epic-2-retrospective: optional
