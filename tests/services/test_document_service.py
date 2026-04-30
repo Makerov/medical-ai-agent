@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from app.core.settings import Settings
 from app.schemas.document import (
     DocumentUploadMetadata,
@@ -113,3 +115,31 @@ def test_validate_document_upload_rejects_invalid_metadata() -> None:
     assert result.rejection_reason_code == DocumentUploadRejectionReasonCode.INVALID_DOCUMENT
     assert result.validation_context is not None
     assert result.validation_context.mime_type is None
+
+
+def test_build_document_reference_falls_back_to_file_id_when_unique_id_is_missing() -> None:
+    service = DocumentService(
+        settings=Settings(
+            document_upload_supported_mime_types=(
+                "application/pdf",
+                "image/jpeg",
+                "image/png",
+            ),
+            document_upload_max_file_size_bytes=20_000_000,
+        )
+    )
+    document = DocumentUploadMetadata(
+        file_id="file_005",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+        file_unique_id=None,
+    )
+
+    reference = service.build_document_reference(
+        case_id="case_005",
+        document_metadata=document,
+        created_at=datetime(2026, 4, 28, 6, 0, tzinfo=UTC),
+    )
+
+    assert reference.record_id == "telegram_document:file_005"
