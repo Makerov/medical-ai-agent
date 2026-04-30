@@ -3,6 +3,8 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 AI_BOUNDARY_CONTINUE_CALLBACK = "patient_intake:continue_to_consent"
 CONSENT_ACCEPT_CALLBACK_PREFIX = "patient_intake:accept_consent"
 CONSENT_DECLINE_CALLBACK_PREFIX = "patient_intake:decline_consent"
+CASE_DELETE_CONFIRM_CALLBACK_PREFIX = "patient_intake:confirm_delete"
+CASE_DELETE_CANCEL_CALLBACK_PREFIX = "patient_intake:cancel_delete"
 
 
 def build_ai_boundary_keyboard() -> InlineKeyboardMarkup:
@@ -38,6 +40,26 @@ def extract_case_id_from_consent_callback(data: str | None) -> str | None:
     return None
 
 
+def build_case_deletion_callback_data(*, action: str, case_id: str) -> str:
+    if action == "confirm":
+        return f"{CASE_DELETE_CONFIRM_CALLBACK_PREFIX}:{case_id}"
+    if action == "cancel":
+        return f"{CASE_DELETE_CANCEL_CALLBACK_PREFIX}:{case_id}"
+    msg = "Unsupported case deletion callback action"
+    raise ValueError(msg)
+
+
+def extract_case_id_from_case_deletion_callback(data: str | None) -> str | None:
+    if data is None:
+        return None
+    for prefix in (CASE_DELETE_CONFIRM_CALLBACK_PREFIX, CASE_DELETE_CANCEL_CALLBACK_PREFIX):
+        if not data.startswith(f"{prefix}:"):
+            continue
+        case_id = data.removeprefix(f"{prefix}:")
+        return case_id or None
+    return None
+
+
 def build_consent_keyboard(*, case_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -53,6 +75,29 @@ def build_consent_keyboard(*, case_id: str) -> InlineKeyboardMarkup:
                     text="Отказаться",
                     callback_data=build_consent_callback_data(
                         action="decline",
+                        case_id=case_id,
+                    ),
+                ),
+            ]
+        ]
+    )
+
+
+def build_case_deletion_keyboard(*, case_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Удалить заявку",
+                    callback_data=build_case_deletion_callback_data(
+                        action="confirm",
+                        case_id=case_id,
+                    ),
+                ),
+                InlineKeyboardButton(
+                    text="Отмена",
+                    callback_data=build_case_deletion_callback_data(
+                        action="cancel",
                         case_id=case_id,
                     ),
                 ),

@@ -472,6 +472,21 @@ def test_get_shared_status_view_maps_processing_failure_to_patient_recoverable_s
     )
 
 
+def test_get_shared_status_view_maps_deleted_case_to_closed_status() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_shared_deleted")
+    patient_case = service.create_case()
+    service.transition_case(patient_case.case_id, CaseStatus.DELETION_REQUESTED)
+    service.transition_case(patient_case.case_id, CaseStatus.DELETED)
+
+    shared_status_view = service.get_shared_status_view(patient_case.case_id)
+
+    assert shared_status_view.lifecycle_status == CaseStatus.DELETED
+    assert shared_status_view.patient_status == SharedCaseStatusCode.CASE_CLOSED
+    assert shared_status_view.doctor_status == SharedCaseStatusCode.CASE_CLOSED
+    assert shared_status_view.handoff_readiness.shared_status == SharedCaseStatusCode.CASE_CLOSED
+
+
 def test_transition_to_ready_for_doctor_blocks_without_safety_clearance() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     service = CaseService(

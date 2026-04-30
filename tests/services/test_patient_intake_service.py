@@ -1,7 +1,9 @@
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 
+from app.schemas.audit import AuditEventType
 from app.schemas.case import CaseRecordKind, CaseStatus
 from app.schemas.consent import ConsentOutcome
 from app.schemas.patient import PatientIntakeField, PatientIntakeMessageKind
@@ -11,6 +13,31 @@ from app.services.patient_intake_service import (
     PatientIntakeStep,
     PreConsentReminderKind,
 )
+
+
+class RecordingAuditService:
+    def __init__(self, case_service: CaseService) -> None:
+        self.case_service = case_service
+        self.recorded: list[tuple[str, AuditEventType, dict[str, object], CaseStatus]] = []
+
+    def record_event(
+        self,
+        *,
+        case_id: str,
+        event_type: AuditEventType,
+        metadata: dict[str, object] | None = None,
+        event_id: str | None = None,
+        created_at: object | None = None,
+    ) -> object:
+        self.recorded.append(
+            (
+                case_id,
+                event_type,
+                dict(metadata or {}),
+                self.case_service.get_case_core_records(case_id).patient_case.status,
+            )
+        )
+        return SimpleNamespace(event_id=event_id or "audit_case_deletion")
 
 
 def test_start_intake_creates_case_and_moves_it_to_awaiting_consent() -> None:
@@ -183,6 +210,108 @@ def test_duplicate_decline_is_idempotent_for_same_case() -> None:
     assert first_result.outcome == ConsentOutcome.DECLINED
     assert second_result.outcome == ConsentOutcome.DECLINED
     assert second_result.was_duplicate is True
+
+
+def test_request_case_deletion_records_audit_before_final_delete_and_is_idempotent() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_008d")
+    audit_service = RecordingAuditService(case_service=case_service)
+    intake_service = PatientIntakeService(
+        case_service=case_service,
+        audit_service=audit_service,
+    )
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    first_result = intake_service.request_case_deletion(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+    second_result = intake_service.request_case_deletion(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    assert first_result.case_id == start_result.case_id
+    assert first_result.case_status == CaseStatus.DELETED
+    assert first_result.was_duplicate is False
+    assert first_result.audit_event_id == "audit_case_deletion"
+    assert second_result.case_status == CaseStatus.DELETED
+    assert second_result.was_duplicate is True
+    assert case_service.get_case_core_records(start_result.case_id).patient_case.status == (
+        CaseStatus.DELETED
+    )
+    assert len(audit_service.recorded) == 1
+    (
+        recorded_case_id,
+        recorded_event_type,
+        recorded_metadata,
+        recorded_status,
+    ) = audit_service.recorded[0]
+    assert recorded_case_id == start_result.case_id
+    assert recorded_event_type == AuditEventType.CASE_STATUS_CHANGED
+    assert recorded_metadata["from_status"] == CaseStatus.COLLECTING_INTAKE.value
+    assert recorded_metadata["to_status"] == CaseStatus.DELETION_REQUESTED.value
+    assert recorded_metadata["request_source"] == "patient_bot"
+    assert recorded_metadata["telegram_user_id"] == 123456
+    assert recorded_status == CaseStatus.DELETION_REQUESTED
+
+
+def test_request_case_deletion_rejects_unbound_telegram_user() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_008e")
+    audit_service = RecordingAuditService(case_service=case_service)
+    intake_service = PatientIntakeService(
+        case_service=case_service,
+        audit_service=audit_service,
+    )
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    with pytest.raises(ValueError, match="pre-consent intake session"):
+        intake_service.request_case_deletion(
+            telegram_user_id=999999,
+            case_id=start_result.case_id,
+        )
+
+
+def test_handle_patient_message_after_deletion_returns_terminal_message() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_deleted")
+    audit_service = RecordingAuditService(case_service=case_service)
+    intake_service = PatientIntakeService(
+        case_service=case_service,
+        audit_service=audit_service,
+    )
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+    intake_service.request_case_deletion(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    result = intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+
+    assert result.case_status == CaseStatus.DELETED
+    assert result.message_kind == PatientIntakeMessageKind.CASE_DELETED
+    assert result.active_step == PatientIntakeStep.CONSENT_CAPTURED.value
+    assert result.was_duplicate is False
+    assert intake_service._intake_payloads.get(start_result.case_id) is None
 
 
 def test_pre_consent_input_after_accept_no_longer_returns_consent_required() -> None:
