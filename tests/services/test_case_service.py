@@ -472,6 +472,22 @@ def test_get_shared_status_view_maps_processing_failure_to_patient_recoverable_s
     )
 
 
+def test_get_shared_status_view_maps_documents_uploaded_to_processing_pending_status() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_shared_documents")
+    patient_case = service.create_case()
+
+    service.transition_case(patient_case.case_id, CaseStatus.AWAITING_CONSENT)
+    service.transition_case(patient_case.case_id, CaseStatus.COLLECTING_INTAKE)
+    service.transition_case(patient_case.case_id, CaseStatus.DOCUMENTS_UPLOADED)
+
+    shared_status_view = service.get_shared_status_view(patient_case.case_id)
+
+    assert shared_status_view.lifecycle_status == CaseStatus.DOCUMENTS_UPLOADED
+    assert shared_status_view.patient_status == SharedCaseStatusCode.PROCESSING_PENDING
+    assert shared_status_view.doctor_status == SharedCaseStatusCode.PROCESSING_PENDING
+
+
 def test_get_shared_status_view_maps_deleted_case_to_closed_status() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     service = CaseService(clock=lambda: now, id_generator=lambda: "case_shared_deleted")
