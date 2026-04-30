@@ -64,7 +64,12 @@ def build_patient_intake_service(
         case_service=case_service,
         artifact_root_dir=settings.artifact_root_dir,
     )
-    return PatientIntakeService(case_service=case_service, audit_service=audit_service)
+    document_service = DocumentService(settings=settings)
+    return PatientIntakeService(
+        case_service=case_service,
+        audit_service=audit_service,
+        document_service=document_service,
+    )
 
 
 def _build_document_metadata(message: Message) -> DocumentUploadMetadata:
