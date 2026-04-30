@@ -1,6 +1,6 @@
 # Story 3.5: Structured Medical Indicator Extraction
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,21 +10,21 @@ Status: review
 
 ## Acceptance Criteria
 
-1. **Дано** document text прошел minimum quality threshold из Story 3.4  
-   **Когда** `extraction_service` обрабатывает OCR text  
-   **Тогда** система создает structured indicators с `name`, typed `value`, `unit`, `source_document_reference` и `confidence`  
-   **И** output валидируется через typed schema до persistence или downstream use  
+1. **Дано** document text прошел minimum quality threshold из Story 3.4
+   **Когда** `extraction_service` обрабатывает OCR text
+   **Тогда** система создает structured indicators с `name`, typed `value`, `unit`, `source_document_reference` и `confidence`
+   **И** output валидируется через typed schema до persistence или downstream use
    **И** structured extraction не переиспользует raw OCR record как замену indicator record.
 
-2. **Дано** extraction output неполный или не проходит schema validation  
-   **Когда** workflow обрабатывает результат  
-   **Тогда** invalid fields отклоняются, а valid subset сохраняется только если он остается schema-safe  
-   **И** case не переходит к следующему reliable processing step с невалидными данными  
+2. **Дано** extraction output неполный или не проходит schema validation
+   **Когда** workflow обрабатывает результат
+   **Тогда** invalid fields отклоняются, а valid subset сохраняется только если он остается schema-safe
+   **И** case не переходит к следующему reliable processing step с невалидными данными
    **И** raw validation errors не попадают в patient-facing или doctor-facing copy.
 
-3. **Дано** один и тот же `case_id` и тот же source document reference обрабатываются повторно  
-   **Когда** extraction runs again  
-   **Тогда** structured indicator results остаются idempotent  
+3. **Дано** один и тот же `case_id` и тот же source document reference обрабатываются повторно
+   **Когда** extraction runs again
+   **Тогда** structured indicator results остаются idempotent
    **И** duplicate indicator records или duplicate case references не создаются.
 
 ## Tasks / Subtasks
