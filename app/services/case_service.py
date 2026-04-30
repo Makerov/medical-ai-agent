@@ -18,6 +18,7 @@ from app.schemas.case import (
     generate_case_id,
     utc_now,
 )
+from app.schemas.extraction import CaseExtractionRecord
 from app.workflow.transitions import assert_case_transition_allowed
 
 Clock = Callable[[], datetime]
@@ -64,6 +65,7 @@ class CaseService:
         self._id_generator = id_generator
         self._cases: dict[str, PatientCase] = {}
         self._record_references: dict[str, list[CaseRecordReference]] = {}
+        self._extraction_records: dict[str, list[CaseExtractionRecord]] = {}
         self._readiness_snapshots: dict[str, CaseReadinessSnapshot] = {}
 
     def create_case(self) -> PatientCase:
@@ -143,6 +145,35 @@ class CaseService:
             summaries=self._references_by_kind(references, CaseRecordKind.SUMMARY),
             audit_events=self._references_by_kind(references, CaseRecordKind.AUDIT),
         )
+
+    def attach_case_extraction_record(
+        self,
+        extraction_record: CaseExtractionRecord,
+    ) -> CaseExtractionRecord:
+        target_case_id = extraction_record.case_id
+        patient_case = self._get_existing_case(target_case_id)
+        if patient_case.status == CaseStatus.DELETED:
+            raise CaseTransitionError(
+                code="case_deleted",
+                case_id=target_case_id,
+                from_status=patient_case.status,
+                to_status="attach_case_extraction_record",
+            )
+
+        records = self._extraction_records.setdefault(target_case_id, [])
+        existing_record = self._find_extraction_record(
+            records,
+            extraction_record.extraction_reference.record_id,
+        )
+        if existing_record is not None:
+            return existing_record
+
+        records.append(extraction_record)
+        return extraction_record
+
+    def get_case_extraction_records(self, case_id: str) -> tuple[CaseExtractionRecord, ...]:
+        self._get_existing_case(case_id)
+        return tuple(self._extraction_records.get(case_id, ()))
 
     def set_case_readiness_snapshot(
         self,
@@ -426,4 +457,14 @@ class CaseService:
         for reference in references:
             if reference.record_kind == record_kind and reference.record_id == record_id:
                 return reference
+        return None
+
+    @staticmethod
+    def _find_extraction_record(
+        records: list[CaseExtractionRecord],
+        extraction_reference_id: str,
+    ) -> CaseExtractionRecord | None:
+        for record in records:
+            if record.extraction_reference.record_id == extraction_reference_id:
+                return record
         return None
