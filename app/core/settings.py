@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES = 20_000_000
@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     debug: bool = False
     log_level: str = "INFO"
     doctor_telegram_id_allowlist: Annotated[tuple[int, ...], NoDecode] = ()
+    document_extraction_min_confidence: float = Field(
+        default=0.75,
+        ge=0.0,
+        le=1.0,
+    )
+    document_extraction_min_text_length: int = Field(default=8, gt=0)
     document_upload_supported_mime_types: Annotated[tuple[str, ...], NoDecode] = (
         "application/pdf",
         "image/jpeg",
