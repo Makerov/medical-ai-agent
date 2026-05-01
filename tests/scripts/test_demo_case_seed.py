@@ -36,6 +36,9 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         "source_references": Path("case_demo_happy_path/export/demo/source-references.json"),
         "shared_status": Path("case_demo_happy_path/export/demo/shared-status.json"),
         "processing_result": Path("case_demo_happy_path/export/demo/processing-result.json"),
+        "structured_extraction_examples": Path(
+            "case_demo_happy_path/export/demo/structured-extraction-examples.json"
+        ),
         "summary_draft": Path("case_demo_happy_path/summary/demo/summary-draft.json"),
     }
     assert set(result.artifacts) == set(expected_relative_paths)
@@ -49,6 +52,13 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         settings.artifact_root_dir / expected_relative_paths["shared_status"]
     ).read_text(encoding="utf-8")
     assert '"case_id": "case_demo_happy_path"' in shared_status_json
+
+    structured_examples_json = (
+        settings.artifact_root_dir
+        / expected_relative_paths["structured_extraction_examples"]
+    ).read_text(encoding="utf-8")
+    assert '"data_classification": "synthetic_anonymized_demo"' in structured_examples_json
+    assert '"uncertainty_reason": "missing_unit"' in structured_examples_json
 
 
 def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:
