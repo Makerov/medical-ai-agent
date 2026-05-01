@@ -37,6 +37,7 @@ class SummaryService:
             applicability_decisions=applicability_decisions,
         )
         questions_for_doctor = self._build_questions_for_doctor(
+            grounded_summary=grounded_summary,
             patient_goal_context=patient_goal_context,
             uncertainty_markers=uncertainty_markers,
             possible_deviations=possible_deviations,
@@ -159,11 +160,26 @@ class SummaryService:
     def _build_questions_for_doctor(
         self,
         *,
+        grounded_summary: GroundedSummaryContract,
         patient_goal_context: str | None,
         uncertainty_markers: Sequence[DoctorFacingUncertaintyMarker],
         possible_deviations: Sequence[DoctorFacingDeviationMarker],
     ) -> tuple[DoctorFacingQuestion, ...]:
         questions: list[DoctorFacingQuestion] = []
+        if grounded_summary.grounded_facts:
+            questions.append(
+                DoctorFacingQuestion(
+                    question_id="question:fact_context",
+                    text=(
+                        "Which extracted facts need more clinical context before they can be "
+                        "used confidently in review?"
+                    ),
+                    focus="missing_context",
+                    citation_keys=tuple(
+                        fact.citation_key for fact in grounded_summary.grounded_facts[:3]
+                    ),
+                )
+            )
         if patient_goal_context is None:
             questions.append(
                 DoctorFacingQuestion(
