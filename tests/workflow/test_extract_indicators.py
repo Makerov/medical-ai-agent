@@ -69,7 +69,7 @@ def test_extract_indicators_node_processes_successful_document_result() -> None:
         document=document,
         now=now,
         case_status=CaseStatus.PROCESSING_DOCUMENTS,
-        extracted_text="Hemoglobin: 13.5 g/dL",
+        extracted_text="Hemoglobin: 13.5 g/dL\nGlucose: 5.6",
     )
 
     indicator_record = node.extract_indicators(processing_result=processing_result)
@@ -77,6 +77,7 @@ def test_extract_indicators_node_processes_successful_document_result() -> None:
     assert indicator_record is not None
     assert indicator_record.case_id == patient_case.case_id
     assert indicator_record.indicators[0].name == "Hemoglobin"
+    assert indicator_record.uncertain_indicators[0].name == "Glucose"
     assert case_service.get_case_core_records(patient_case.case_id).indicators == (
         indicator_record.indicator_reference,
     )
