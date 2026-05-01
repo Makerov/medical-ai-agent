@@ -14,6 +14,7 @@ from app.schemas.rag import (
     KnowledgeApplicabilityDecision,
     SummaryValidationResult,
 )
+from app.services.boundary_copy import HUMAN_REVIEW_STATEMENT, SAFETY_BOUNDARY_STATEMENT
 from app.services.summary_service import SummaryService
 
 
@@ -151,7 +152,8 @@ def test_summary_service_builds_doctor_facing_draft_with_uncertainty_markers() -
 
     assert draft.patient_goal_context == "Understand whether the hemoglobin result needs follow-up."
     assert draft.grounded_summary == grounded_summary
-    assert draft.narrative.startswith("Doctor-facing summary draft.")
+    assert SAFETY_BOUNDARY_STATEMENT in draft.narrative
+    assert HUMAN_REVIEW_STATEMENT in draft.narrative
     assert draft.uncertainty_markers
     assert draft.uncertainty_markers[0].reason == "missing_unit"
     assert draft.questions_for_doctor
@@ -174,6 +176,7 @@ def test_summary_service_keeps_narrative_separate_from_grounded_facts() -> None:
     dumped = draft.model_dump(mode="json")
 
     assert "grounded_summary" in dumped
-    assert dumped["narrative"].startswith("Doctor-facing summary draft.")
+    assert SAFETY_BOUNDARY_STATEMENT in dumped["narrative"]
+    assert HUMAN_REVIEW_STATEMENT in dumped["narrative"]
     assert "questions_for_doctor" in dumped
     assert dumped["questions_for_doctor"][0]["focus"] == "missing_context"
