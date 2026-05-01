@@ -6,6 +6,7 @@ from app.services.case_service import CaseService
 from app.services.consent_service import ConsentService
 from app.services.document_service import DocumentService
 from app.services.extraction_service import ExtractionService
+from app.services.handoff_service import HandoffService
 from app.services.patient_intake_service import PatientIntakeService, PatientIntakeStartResult
 from app.services.rag_service import RAGService
 from app.services.safety_service import SafetyService
@@ -17,6 +18,7 @@ __all__ = [
     "DocumentService",
     "ExtractionService",
     "ConsentService",
+    "HandoffService",
     "RAGService",
     "SummaryService",
     "SafetyService",
