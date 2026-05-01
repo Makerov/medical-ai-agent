@@ -320,6 +320,30 @@ def test_attach_case_extraction_record_is_idempotent_and_retrievable() -> None:
     assert service.get_case_extraction_records(patient_case.case_id) == (extraction_record,)
 
 
+def test_get_case_document_reference_resolves_original_document_identity() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    service = CaseService(clock=lambda: now, id_generator=lambda: "case_document_lookup")
+    patient_case = service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_document_lookup",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_document_lookup",
+    )
+    document_reference = CaseRecordReference(
+        case_id=patient_case.case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="telegram_document:unique_document_lookup",
+        created_at=now,
+    )
+    service.attach_case_record_reference(document_reference)
+
+    resolved_reference = service.get_case_document_reference(patient_case.case_id, document)
+
+    assert resolved_reference == document_reference
+
+
 def test_attach_case_indicator_record_is_idempotent_and_retrievable() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     service = CaseService(clock=lambda: now, id_generator=lambda: "case_indicator_001")
