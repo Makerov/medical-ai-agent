@@ -1,6 +1,6 @@
 # Story 4.1: Curated Knowledge Base Seed и Qdrant Collection
 
-Status: review
+Status: done
 
 ## Story
 
