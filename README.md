@@ -109,3 +109,21 @@ This MVP is a portfolio/demo system. It is not production medical software and i
 Safety boundary: the AI prepares information for a doctor, but does not diagnose or prescribe treatment. A human doctor must review the materials before any medical decision.
 Demo exports also include synthetic safety check examples showing pass, blocked, and corrected outcomes under the same stable `case_id`.
 The demo artifact set also includes synthetic RAG/source provenance examples under `data/artifacts/<case_id>/export/demo/`, showing both grounded and not-grounded retrieval paths with explicit source metadata and summary linkage.
+
+### Minimal eval suite
+
+The portfolio demo also ships a minimal eval suite for the stable seed case.
+
+Run it after generating the demo artifacts:
+
+```bash
+uv run python scripts/run_minimal_eval_suite.py --case-id case_demo_happy_path
+```
+
+The suite checks three typed categories:
+
+- extraction quality: required indicator fields, units, confidence, and source references remain present;
+- groundedness: retrieval evidence stays linked to extracted facts or curated sources;
+- safety: unsupported diagnosis, treatment, and overconfident clinical language remain blocked or corrected.
+
+The default outputs are synthetic or anonymized, case-linked, and deterministic in artifact shape. The suite does not use real patient documents or live model calls for the default fixture set.
