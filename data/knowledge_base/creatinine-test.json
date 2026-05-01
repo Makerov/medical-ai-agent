@@ -1,0 +1,46 @@
+{
+  "knowledge_id": "medlineplus_creatinine_test",
+  "title": "Creatinine test interpretation",
+  "summary": "Creatinine is a kidney function marker, but the interpretation depends on muscle mass, age, diet, and clinical context.",
+  "content": "Creatinine is a waste product removed by the kidneys. Higher-than-expected values can be associated with kidney disease or injury, while lower values may reflect reduced muscle mass or malnutrition. For many cases, eGFR or other kidney tests are more informative than creatinine alone.",
+  "source_metadata": {
+    "source_id": "medlineplus_creatinine_test",
+    "source_title": "Creatinine Test",
+    "source_url": "https://medlineplus.gov/lab-tests/creatinine-test/",
+    "publisher": "MedlinePlus / National Library of Medicine",
+    "source_type": "medical_test_reference",
+    "accessed_at": "2026-05-01",
+    "citation_key": "medlineplus-creatinine-test"
+  },
+  "provenance": {
+    "curation_method": "Manual curation from MedlinePlus medical test guidance.",
+    "evidence_basis": "Kidney function interpretation and creatinine variability by patient context.",
+    "source_reference": "https://medlineplus.gov/lab-tests/creatinine-test/",
+    "curation_notes": "Demo-grade grounding entry for renal interpretation."
+  },
+  "applicability": {
+    "intended_use": "Ground extracted creatinine indicators and explain why kidney interpretation should use patient context and related tests.",
+    "applicable_contexts": [
+      "kidney function review",
+      "renal panel interpretation",
+      "document-grounded summaries"
+    ],
+    "excluded_contexts": [
+      "diagnosis",
+      "treatment recommendation",
+      "pediatric interpretation without source-specific adaptation"
+    ],
+    "population_notes": "Adult-oriented demo content. Muscle mass and age strongly affect interpretation.",
+    "limitations_summary": "Creatinine alone is not sufficient to assess kidney health."
+  },
+  "limitations": [
+    "Creatinine levels vary with muscle mass, diet, age, and activity.",
+    "A normal creatinine value does not exclude early kidney disease.",
+    "Pregnancy-specific or pediatric interpretation requires additional sources."
+  ],
+  "domain_tags": [
+    "nephrology",
+    "kidney",
+    "creatinine"
+  ]
+}
