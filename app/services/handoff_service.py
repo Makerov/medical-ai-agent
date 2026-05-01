@@ -215,6 +215,7 @@ class HandoffService:
             extracted_facts=extracted_facts,
             possible_deviations=summary_draft.possible_deviations,
             uncertainty_markers=summary_draft.uncertainty_markers,
+            questions_for_doctor=summary_draft.questions_for_doctor,
             review_warnings=review_warnings,
         )
         audit_event = self._audit_service.record_event(
