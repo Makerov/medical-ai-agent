@@ -3,9 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.indicator import StructuredIndicatorValue, StructuredMedicalIndicator
+from app.schemas.case import CaseRecordReference
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
     KnowledgeProvenance,
@@ -263,6 +264,65 @@ class GroundedSummaryContract(BaseModel):
     @field_validator("narrative")
     @classmethod
     def normalize_narrative(cls, value: str) -> str:
+        return _normalize_text(value)
+
+
+class RAGProvenanceExample(BaseModel):
+    case_id: str = Field(min_length=1)
+    example_id: str = Field(min_length=1)
+    indicator: RetrievalIndicatorContext
+    retrieval: KnowledgeRetrievalResult
+    applicability_decision: KnowledgeApplicabilityDecision | None = None
+    summary_reference: CaseRecordReference | None = None
+    grounded_summary: GroundedSummaryContract
+    grounded: bool
+    limitation_notes: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("case_id", "example_id", "limitation_notes")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_text(value)
+
+    @model_validator(mode="after")
+    def validate_case_linkage(self) -> "RAGProvenanceExample":
+        if self.indicator.source_context is None:
+            msg = "RAG provenance example indicator must include source context"
+            raise ValueError(msg)
+        if self.case_id != self.indicator.source_context.split(":", maxsplit=1)[0]:
+            msg = "RAG provenance example case_id must align with the indicator source context"
+            raise ValueError(msg)
+        if self.retrieval.indicator != self.indicator:
+            msg = "RAG provenance example retrieval indicator must match the exported indicator"
+            raise ValueError(msg)
+        if self.summary_reference is not None and self.summary_reference.case_id != self.case_id:
+            msg = "Summary reference must remain case-linked"
+            raise ValueError(msg)
+        if self.applicability_decision is not None:
+            if self.applicability_decision.knowledge_id != (
+                self.retrieval.matches[0].knowledge_id if self.retrieval.matches else ""
+            ):
+                msg = "Applicability decision must match the leading retrieval match"
+                raise ValueError(msg)
+        return self
+
+
+class RAGProvenanceExampleSet(BaseModel):
+    case_id: str = Field(min_length=1)
+    data_classification: str = Field(min_length=1)
+    examples: tuple[RAGProvenanceExample, ...]
+    example_note: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("case_id", "data_classification", "example_note")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         return _normalize_text(value)
 
 
