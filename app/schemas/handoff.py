@@ -3,7 +3,12 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.schemas.auth import Capability
-from app.schemas.case import CaseRecordKind, CaseRecordReference, SharedCaseStatusCode
+from app.schemas.case import (
+    CaseRecordKind,
+    CaseRecordReference,
+    DoctorFacingStatusCode,
+    SharedCaseStatusCode,
+)
 from app.schemas.rag import (
     DoctorFacingDeviationMarker,
     DoctorFacingQuestion,
@@ -261,6 +266,8 @@ class DoctorCaseCard(BaseModel):
     case_id: str = Field(min_length=1)
     current_case_status: str = Field(min_length=1)
     shared_status: SharedCaseStatusCode
+    doctor_review_status: DoctorFacingStatusCode = DoctorFacingStatusCode.READY
+    doctor_review_reason: str = Field(min_length=1)
     ai_boundary_label: str = Field(min_length=1)
     patient_goal: str | None = None
     patient_profile_summary: str | None = None
@@ -274,7 +281,7 @@ class DoctorCaseCard(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("case_id", "current_case_status")
+    @field_validator("case_id", "current_case_status", "doctor_review_reason")
     @classmethod
     def normalize_required_text_fields(cls, value: str) -> str:
         normalized = value.strip()
