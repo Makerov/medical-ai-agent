@@ -13,6 +13,8 @@ from app.integrations.ocr_client import OCRClient
 from app.schemas.audit import ArtifactKind
 from app.schemas.case import CaseReadinessSnapshot, CaseRecordKind, CaseRecordReference, CaseStatus
 from app.schemas.document import DocumentUploadMetadata
+from app.schemas.extraction import StructuredExtractionExampleSet
+from app.schemas.indicator import CaseIndicatorExtractionRecord
 from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
 from app.schemas.rag import (
     CitationReference,
@@ -230,6 +232,17 @@ def seed_demo_case(
             relative_path="demo/processing-result.json",
             payload=processing_result.model_dump(mode="json"),
         ),
+        "structured_extraction_examples": _write_json_artifact(
+            audit_service,
+            case_id=fixture["case_id"],
+            artifact_kind=ArtifactKind.EXPORT,
+            relative_path="demo/structured-extraction-examples.json",
+            payload=_build_structured_extraction_examples(
+                case_id=fixture["case_id"],
+                data_classification=str(fixture["data_classification"]),
+                indicator_records=case_service.get_case_indicator_records(fixture["case_id"]),
+            ),
+        ),
         "summary_draft": _write_json_artifact(
             audit_service,
             case_id=fixture["case_id"],
@@ -309,6 +322,34 @@ def _build_grounded_summary(
             grounded_fact_count=len(extracted_facts),
         ),
     )
+
+
+def _build_structured_extraction_examples(
+    *,
+    case_id: str,
+    data_classification: str,
+    indicator_records: tuple[CaseIndicatorExtractionRecord, ...],
+) -> list[dict[str, Any]]:
+    examples: list[StructuredExtractionExampleSet] = []
+    for record in indicator_records:
+        examples.append(
+            StructuredExtractionExampleSet(
+                case_id=case_id,
+                data_classification=data_classification,
+                source_document=record.source_document,
+                source_document_reference=record.source_document_reference,
+                raw_extraction_reference=record.raw_extraction_reference,
+                indicator_reference=record.indicator_reference,
+                indicators=record.indicators,
+                uncertain_indicators=record.uncertain_indicators,
+                extracted_at=record.extracted_at,
+                provider_name=record.provider_name,
+                example_note=(
+                    "Synthetic demo extraction example derived from the stable seed case."
+                ),
+            )
+        )
+    return [example.model_dump(mode="json") for example in examples]
 
 
 def _write_json_artifact(
