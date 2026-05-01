@@ -7,6 +7,7 @@ from app.bots.messages import (
     DOCTOR_CASE_CARD_HEADER,
     DOCTOR_READY_CASE_ACCESS_DENIED_MESSAGE,
     DOCTOR_READY_CASE_NOTIFICATION_HEADER,
+    doctor_case_card_template_text,
     render_doctor_case_card,
     render_doctor_case_card_access_denied_message,
     render_doctor_ready_case_access_denied_message,
@@ -107,6 +108,10 @@ def test_render_doctor_case_card_is_minimal() -> None:
         case_id="case_ready_002",
         current_case_status="ready_for_doctor",
         shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+        ai_boundary_label=(
+            "ИИ подготавливает информацию для врача, но не ставит диагноз "
+            "и не назначает лечение."
+        ),
         patient_goal="Review cough",
         patient_profile_summary="Alex, 34 years old",
         document_list=("document_001",),
@@ -156,6 +161,8 @@ def test_render_doctor_case_card_is_minimal() -> None:
 
     assert DOCTOR_CASE_CARD_HEADER in message
     assert "case_ready_002" in message
+    assert "AI boundary label:" in message
+    assert "не ставит диагноз" in message
     assert "Review cough" in message
     assert "Alex, 34 years old" in message
     assert "document_001" in message
@@ -168,6 +175,20 @@ def test_render_doctor_case_card_is_minimal() -> None:
     assert "Which extracted facts need more clinical context before review?" in message
     assert "Review warnings:" in message
     assert "diagnosis" not in message.lower()
+    assert "treatment instruction" not in message.lower()
+
+
+def test_doctor_case_card_template_text_is_boundary_safe() -> None:
+    template_text = doctor_case_card_template_text()
+    expected_boundary_phrase = (
+        "ИИ подготавливает информацию для врача, но не ставит диагноз и не назначает "
+        "лечение."
+    )
+
+    assert expected_boundary_phrase in template_text
+    assert "Итоговое медицинское решение остается за врачом." in template_text
+    assert "final diagnosis" not in template_text.lower()
+    assert "treatment instruction" not in template_text.lower()
 
 
 def test_render_doctor_case_card_access_denied_message_is_generic() -> None:
@@ -195,6 +216,10 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
             case_id="case_ready_002",
             current_case_status="ready_for_doctor",
             shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+            ai_boundary_label=(
+                "ИИ подготавливает информацию для врача, но не ставит диагноз "
+                "и не назначает лечение."
+            ),
             patient_goal="Review cough",
             patient_profile_summary="Alex, 34 years old",
             document_list=("document_001",),
