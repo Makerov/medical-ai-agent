@@ -143,3 +143,31 @@ def test_build_document_reference_falls_back_to_file_id_when_unique_id_is_missin
     )
 
     assert reference.record_id == "telegram_document:file_005"
+
+
+def test_build_document_reference_prefers_file_unique_id_when_present() -> None:
+    service = DocumentService(
+        settings=Settings(
+            document_upload_supported_mime_types=(
+                "application/pdf",
+                "image/jpeg",
+                "image/png",
+            ),
+            document_upload_max_file_size_bytes=20_000_000,
+        )
+    )
+    document = DocumentUploadMetadata(
+        file_id="file_006",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+        file_unique_id="unique_006",
+    )
+
+    reference = service.build_document_reference(
+        case_id="case_006",
+        document_metadata=document,
+        created_at=datetime(2026, 4, 28, 6, 0, tzinfo=UTC),
+    )
+
+    assert reference.record_id == "telegram_document:unique_006"

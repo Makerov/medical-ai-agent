@@ -65,7 +65,7 @@ development_status:
   3-4-extraction-quality-detection-и-retry-flow: done
   3-5-structured-medical-indicator-extraction: done
   3-6-uncertainty-marking-и-partial-processing: done
-  3-7-original-document-references-для-doctor-review: backlog
+  3-7-original-document-references-для-doctor-review: done
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-curated-knowledge-base-seed-и-qdrant-collection: backlog

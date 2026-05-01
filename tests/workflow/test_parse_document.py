@@ -432,3 +432,38 @@ def test_parse_document_marks_failure_without_exposing_raw_error_details() -> No
         case_service.get_case_core_records(patient_case.case_id).patient_case.status
         == CaseStatus.EXTRACTION_FAILED
     )
+
+
+def test_parse_document_returns_recoverable_failure_when_document_reference_is_missing() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_missing_ref")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_missing_ref",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_missing_ref",
+    )
+    case_service.transition_case(patient_case.case_id, CaseStatus.AWAITING_CONSENT)
+    case_service.transition_case(patient_case.case_id, CaseStatus.COLLECTING_INTAKE)
+    case_service.transition_case(patient_case.case_id, CaseStatus.DOCUMENTS_UPLOADED)
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=lambda _bytes, _document: ("raw extracted text", 0.9),
+        clock=lambda: now,
+    )
+    node = ParseDocumentNode(case_service=case_service, ocr_client=client)
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.is_recoverable_failure is True
+    assert result.failure_code == "source_document_missing"
+    assert result.failure_message == "Document metadata is not linked to this case."
+    assert result.source_document_reference is not None
+    assert result.source_document_reference.record_id == (
+        "telegram_document:unique_parse_missing_ref"
+    )
+    assert result.extraction is None
+    assert case_service.get_case_core_records(patient_case.case_id).extractions == ()

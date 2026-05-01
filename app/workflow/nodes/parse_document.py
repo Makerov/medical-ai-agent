@@ -76,7 +76,6 @@ class ParseDocumentNode:
         try:
             source_document_reference = self._resolve_source_document_reference(
                 case_id=case_id,
-                document_references=records.documents,
                 document=document,
             )
         except CaseTransitionError:
@@ -219,15 +218,14 @@ class ParseDocumentNode:
         self,
         *,
         case_id: str,
-        document_references: tuple[CaseRecordReference, ...],
         document: DocumentUploadMetadata,
     ) -> CaseRecordReference:
+        resolved_reference = self._case_service.get_case_document_reference(case_id, document)
+        if resolved_reference is not None:
+            return resolved_reference
         expected_record_id = (
             f"telegram_document:{DocumentService.build_document_identity_key(document)}"
         )
-        for reference in reversed(document_references):
-            if reference.record_id == expected_record_id:
-                return reference
         raise CaseTransitionError(
             code="source_document_missing",
             case_id=case_id,
