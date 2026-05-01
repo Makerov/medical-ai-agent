@@ -79,11 +79,15 @@ class DemoArtifactExportContract(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_case_linkage(self) -> "DemoArtifactExportContract":
+    def validate_case_linkage(self) -> DemoArtifactExportContract:
         if self.overview.case_id != self.case_id:
             msg = "Demo export overview must be linked to the same case"
             raise ValueError(msg)
-        for artifact in (*self.required_artifacts, *self.optional_artifacts, *self.derived_artifacts):
+        for artifact in (
+            *self.required_artifacts,
+            *self.optional_artifacts,
+            *self.derived_artifacts,
+        ):
             if self.case_id not in artifact.artifact_path:
                 msg = "Demo export artifacts must remain case-scoped"
                 raise ValueError(msg)
