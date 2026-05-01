@@ -89,7 +89,7 @@ development_status:
   epic-6: in-progress
   6-1-reproducible-local-demo-setup: done
   6-2-seed-demo-case-и-end-to-end-happy-path: done
-  6-3-structured-extraction-examples: backlog
+  6-3-structured-extraction-examples: done
   6-4-safety-check-result-examples: backlog
   6-5-rag-и-source-provenance-examples: backlog
   6-6-minimal-eval-suite-for-extraction-groundedness-and-safety: backlog
