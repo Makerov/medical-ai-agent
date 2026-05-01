@@ -759,10 +759,18 @@ def test_render_patient_status_message_hides_internal_status_names() -> None:
         lifecycle_status=CaseStatus.EXTRACTION_FAILED,
         patient_status=SharedCaseStatusCode.PROCESSING_PENDING,
         doctor_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        doctor_review_status="partial",
+        doctor_review_reason=(
+            "Processing is partial and the case needs more work before review."
+        ),
         handoff_readiness=HandoffReadinessResult(
             case_id="case_status_003",
             is_ready_for_doctor=False,
             shared_status=SharedCaseStatusCode.PROCESSING_PENDING,
+            doctor_status="partial",
+            doctor_status_reason=(
+                "Processing is partial and the case needs more work before review."
+            ),
             blocking_reasons=(
                 HandoffBlockingReason(
                     code=HandoffBlockingReasonCode.EXTRACTIONS_MISSING,
@@ -785,10 +793,18 @@ def test_render_patient_status_message_shows_retry_copy_for_partial_extraction()
         lifecycle_status=CaseStatus.PARTIAL_EXTRACTION,
         patient_status=SharedCaseStatusCode.PROCESSING_PENDING,
         doctor_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        doctor_review_status="partial",
+        doctor_review_reason=(
+            "Processing is partial and the case needs more work before review."
+        ),
         handoff_readiness=HandoffReadinessResult(
             case_id="case_status_partial",
             is_ready_for_doctor=False,
             shared_status=SharedCaseStatusCode.PROCESSING_PENDING,
+            doctor_status="partial",
+            doctor_status_reason=(
+                "Processing is partial and the case needs more work before review."
+            ),
             blocking_reasons=(
                 HandoffBlockingReason(
                     code=HandoffBlockingReasonCode.EXTRACTIONS_MISSING,
@@ -813,10 +829,14 @@ def test_render_patient_status_message_shows_deleted_copy_for_deleted_case() -> 
         lifecycle_status=CaseStatus.DELETED,
         patient_status=SharedCaseStatusCode.CASE_CLOSED,
         doctor_status=SharedCaseStatusCode.CASE_CLOSED,
+        doctor_review_status="blocked",
+        doctor_review_reason="Case is deleted and unavailable for doctor review.",
         handoff_readiness=HandoffReadinessResult(
             case_id="case_status_deleted",
             is_ready_for_doctor=False,
             shared_status=SharedCaseStatusCode.CASE_CLOSED,
+            doctor_status="blocked",
+            doctor_status_reason="Case is deleted and unavailable for doctor review.",
             blocking_reasons=(),
         ),
     )
