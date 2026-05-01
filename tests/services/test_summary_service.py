@@ -17,7 +17,11 @@ from app.schemas.rag import (
 from app.services.summary_service import SummaryService
 
 
-def _build_indicator(*, confidence: float = 0.97, uncertain: bool = False) -> StructuredMedicalIndicator:
+def _build_indicator(
+    *,
+    confidence: float = 0.97,
+    uncertain: bool = False,
+) -> StructuredMedicalIndicator:
     now = datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
     return StructuredMedicalIndicator(
         case_id="case_summary_001",
@@ -40,7 +44,7 @@ def _build_indicator(*, confidence: float = 0.97, uncertain: bool = False) -> St
 
 
 def _build_grounded_summary() -> GroundedSummaryContract:
-    entry = KnowledgeSeedEntry(
+    KnowledgeSeedEntry(
         knowledge_id="medlineplus_hemoglobin_test",
         title="Hemoglobin test interpretation",
         summary="Hemoglobin levels help assess anemia risk.",

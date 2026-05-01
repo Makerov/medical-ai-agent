@@ -180,7 +180,11 @@ class SummaryService:
                         "parts of this summary?"
                     ),
                     focus="uncertainty",
-                    citation_keys=tuple(marker.citation_keys[0] for marker in uncertainty_markers if marker.citation_keys),
+                    citation_keys=tuple(
+                        marker.citation_keys[0]
+                        for marker in uncertainty_markers
+                        if marker.citation_keys
+                    ),
                 )
             )
         if possible_deviations:
@@ -192,7 +196,11 @@ class SummaryService:
                         "context, or do they require further review?"
                     ),
                     focus="possible_deviation",
-                    citation_keys=tuple(marker.citation_keys[0] for marker in possible_deviations if marker.citation_keys),
+                    citation_keys=tuple(
+                        marker.citation_keys[0]
+                        for marker in possible_deviations
+                        if marker.citation_keys
+                    ),
                 )
             )
         return tuple(dict.fromkeys(questions))
@@ -209,7 +217,9 @@ class SummaryService:
         if patient_goal_context is not None:
             parts.append(f"Patient goal context: {patient_goal_context}.")
         parts.append(
-            f"Grounded facts: {len(grounded_summary.grounded_facts)}; citations: {len(grounded_summary.citations)}."
+            "Grounded facts: "
+            f"{len(grounded_summary.grounded_facts)}; citations: "
+            f"{len(grounded_summary.citations)}."
         )
         if uncertainty_markers:
             parts.append(f"Uncertainty markers: {len(uncertainty_markers)}.")

@@ -58,11 +58,11 @@ from app.schemas.patient import (
     PatientProfile,
 )
 from app.schemas.rag import (
+    CitationReference,
     DoctorFacingDeviationMarker,
     DoctorFacingQuestion,
     DoctorFacingSummaryDraft,
     DoctorFacingUncertaintyMarker,
-    CitationReference,
     GeneratedNarrativeClaim,
     GroundedFact,
     GroundedSummaryContract,
@@ -72,6 +72,7 @@ from app.schemas.rag import (
     RetrievalIndicatorContext,
     SummaryValidationResult,
 )
+from app.schemas.safety import SafetyCheckResult, SafetyIssue
 
 __all__ = [
     "AuthorizationError",
@@ -127,6 +128,8 @@ __all__ = [
     "StructuredMedicalIndicator",
     "RetrievalIndicatorContext",
     "SummaryValidationResult",
+    "SafetyCheckResult",
+    "SafetyIssue",
     "StructuredIndicatorValue",
     "generate_case_id",
 ]
