@@ -10,6 +10,7 @@ from app.schemas.patient import (
     PatientIntakeMessageKind,
     PatientIntakeUpdateResult,
 )
+from app.services.boundary_copy import SAFETY_BOUNDARY_SENTENCES
 from app.services.patient_intake_service import (
     PatientIntakeStartResult,
     PreConsentGateResult,
@@ -32,8 +33,8 @@ PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE = (
 )
 
 PATIENT_AI_BOUNDARY_MESSAGE = (
-    "ИИ помогает подготовить информацию для врача.\n"
-    "Врач лично проверит материалы и сам сделает медицинские выводы.\n\n"
+    f"{SAFETY_BOUNDARY_SENTENCES[0]}\n"
+    f"{SAFETY_BOUNDARY_SENTENCES[1]}\n\n"
     "Перед отправкой личных данных и документов сначала подтвердите согласие."
 )
 
@@ -41,7 +42,8 @@ PATIENT_CONSENT_PROMPT_MESSAGE = (
     "Перед отправкой данных нужно ваше согласие.\n\n"
     "Мы соберем только demo-данные для intake: профиль и жалобы, "
     "чтобы подготовить материалы для врача.\n"
-    "ИИ не ставит диагноз и не назначает лечение. Медицинское решение остается за врачом.\n\n"
+    f"{SAFETY_BOUNDARY_SENTENCES[0]}\n"
+    f"{SAFETY_BOUNDARY_SENTENCES[1]}\n\n"
     "Выберите один вариант ниже."
 )
 
