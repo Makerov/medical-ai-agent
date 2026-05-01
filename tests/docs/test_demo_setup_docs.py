@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 README_PATH = Path("README.md")
 COMPOSE_PATH = Path("docker-compose.yml")
 
