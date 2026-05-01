@@ -4,6 +4,73 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.schemas.auth import Capability
 from app.schemas.case import SharedCaseStatusCode
+from app.schemas.rag import DoctorFacingDeviationMarker, DoctorFacingUncertaintyMarker
+
+
+class DoctorCaseIndicatorFact(BaseModel):
+    fact_id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+    unit: str | None = None
+    reference_context: str = Field(min_length=1)
+    source_confidence: float = Field(ge=0.0, le=1.0)
+    is_uncertain: bool = False
+    uncertainty_reason: str | None = None
+    missing_fields: tuple[str, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("fact_id", "name", "value", "reference_context")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "Doctor case indicator fact text fields must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("unit", "uncertainty_reason")
+    @classmethod
+    def normalize_optional_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Doctor case indicator fact text fields must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("missing_fields")
+    @classmethod
+    def normalize_missing_fields(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for field_name in value:
+            stripped = field_name.strip()
+            if not stripped:
+                msg = "Doctor case indicator fact missing fields must not be empty"
+                raise ValueError(msg)
+            if stripped in seen:
+                continue
+            normalized.append(stripped)
+            seen.add(stripped)
+        return tuple(normalized)
+
+
+class DoctorCaseReviewWarning(BaseModel):
+    warning_id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("warning_id", "text")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "Doctor case review warning text fields must not be empty"
+            raise ValueError(msg)
+        return normalized
 
 
 class DoctorReadyCaseNotificationStatus(StrEnum):
@@ -106,6 +173,10 @@ class DoctorCaseCard(BaseModel):
     patient_goal: str | None = None
     patient_profile_summary: str | None = None
     document_list: tuple[str, ...] = ()
+    extracted_facts: tuple[DoctorCaseIndicatorFact, ...] = ()
+    possible_deviations: tuple[DoctorFacingDeviationMarker, ...] = ()
+    uncertainty_markers: tuple[DoctorFacingUncertaintyMarker, ...] = ()
+    review_warnings: tuple[DoctorCaseReviewWarning, ...] = ()
 
     model_config = ConfigDict(frozen=True)
 
