@@ -92,6 +92,7 @@ def test_compose_documents_fresh_checkout_api_entrypoint() -> None:
     assert 'api:' in compose
     assert 'postgres:' in compose
     assert 'qdrant:' in compose
+    assert 'image: qdrant/qdrant:v1.17.1' in compose
     assert '"127.0.0.1:8000:8000"' in compose
     assert '"127.0.0.1:5432:5432"' in compose
     assert '"127.0.0.1:6333:6333"' in compose
