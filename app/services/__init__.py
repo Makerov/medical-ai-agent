@@ -8,6 +8,7 @@ from app.services.document_service import DocumentService
 from app.services.extraction_service import ExtractionService
 from app.services.patient_intake_service import PatientIntakeService, PatientIntakeStartResult
 from app.services.rag_service import RAGService
+from app.services.safety_service import SafetyService
 from app.services.summary_service import SummaryService
 
 __all__ = [
@@ -18,6 +19,7 @@ __all__ = [
     "ConsentService",
     "RAGService",
     "SummaryService",
+    "SafetyService",
     "PatientIntakeService",
     "PatientIntakeStartResult",
     "authorize_capability",
