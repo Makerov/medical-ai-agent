@@ -102,6 +102,12 @@ class PatientIntakeService:
             return None
         return session.case_id
 
+    def get_patient_intake_payload(self, case_id: str) -> PatientIntakePayload | None:
+        payload = self._intake_payloads.get(case_id)
+        if payload is None:
+            return None
+        return payload
+
     def start_intake(self, *, telegram_user_id: int | None = None) -> PatientIntakeStartResult:
         if telegram_user_id is not None:
             active_session = self._pre_consent_steps.get(telegram_user_id)
