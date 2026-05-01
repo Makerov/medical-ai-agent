@@ -1,17 +1,22 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from app.integrations.qdrant_client import QdrantVectorStore, build_deterministic_vector
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.knowledge_base import KnowledgeSeedEntry
 from app.schemas.rag import (
+    CitationReference,
+    GeneratedNarrativeClaim,
+    GroundedFact,
+    GroundedSummaryContract,
     KnowledgeApplicabilityDecision,
     KnowledgeRetrievalMatch,
     KnowledgeRetrievalResult,
     RetrievalIndicatorContext,
+    SummaryValidationResult,
 )
 
 
@@ -27,7 +32,7 @@ class RAGService:
         self._vector_store = vector_store
         self._collection_name = collection_name
         self._vector_dimension = vector_dimension
-        self._clock = clock or datetime.utcnow
+        self._clock = clock or (lambda: datetime.now(UTC))
 
     def retrieve_for_indicator(
         self,
@@ -45,10 +50,7 @@ class RAGService:
         )
         matches = tuple(
             match
-            for match in (
-                self._to_match(raw_match)
-                for raw_match in raw_matches
-            )
+            for match in (self._to_match(raw_match) for raw_match in raw_matches)
             if match is not None
         )
         if not matches:
@@ -88,6 +90,91 @@ class RAGService:
             source_metadata=entry.source_metadata,
             provenance=entry.provenance,
             applicability=entry.applicability,
+        )
+
+    def build_summary_contract(
+        self,
+        *,
+        indicators: Sequence[StructuredMedicalIndicator],
+        retrievals: Sequence[KnowledgeRetrievalResult],
+        narrative: str,
+        claims: Sequence[GeneratedNarrativeClaim] = (),
+    ) -> GroundedSummaryContract:
+        grounded_facts: list[GroundedFact] = []
+        citations: list[CitationReference] = []
+        for result in retrievals:
+            indicator = result.indicator
+            citation_key = self._citation_key_for_indicator(indicator)
+            citations.append(
+                CitationReference(
+                    citation_key=citation_key,
+                    label=f"Indicator provenance: {indicator.name}",
+                    source_kind="indicator",
+                    indicator=indicator,
+                )
+            )
+            grounded_facts.append(
+                GroundedFact(
+                    fact_id=f"indicator:{citation_key}",
+                    source_kind="indicator",
+                    indicator=indicator,
+                    citation_key=citation_key,
+                    machine_value=indicator.value,
+                    human_readable_summary=self._build_indicator_fact_summary(indicator),
+                )
+            )
+            for match in result.matches:
+                citations.append(
+                    CitationReference(
+                        citation_key=match.source_metadata.citation_key,
+                        label=match.source_metadata.source_title,
+                        source_kind="knowledge",
+                        source_metadata=match.source_metadata,
+                        provenance=match.provenance,
+                    )
+                )
+                if result.grounded:
+                    grounded_facts.append(
+                        GroundedFact(
+                            fact_id=f"knowledge:{match.knowledge_id}",
+                            source_kind="knowledge",
+                            knowledge_match=match,
+                            citation_key=match.source_metadata.citation_key,
+                            human_readable_summary=match.retrieval_text,
+                        )
+                    )
+
+        citations_by_key = {citation.citation_key: citation for citation in citations}
+        validated_claims: list[GeneratedNarrativeClaim] = []
+        unsupported_claims: list[GeneratedNarrativeClaim] = []
+        for claim in claims:
+            supported = all(key in citations_by_key for key in claim.supported_citation_keys)
+            if supported:
+                validated_claims.append(
+                    claim.model_copy(update={"status": "supported", "rejection_reason": None})
+                )
+                continue
+            downgraded = claim.model_copy(
+                update={
+                    "status": "unsupported",
+                    "rejection_reason": claim.rejection_reason or "claim_lacks_grounded_support",
+                }
+            )
+            validated_claims.append(downgraded)
+            unsupported_claims.append(downgraded)
+
+        validation_status = "valid" if not unsupported_claims else "downgraded"
+        return GroundedSummaryContract(
+            grounded_facts=tuple(grounded_facts),
+            citations=tuple(dict.fromkeys(citations)),
+            narrative=narrative,
+            claims=tuple(validated_claims),
+            validation=SummaryValidationResult(
+                status=validation_status,
+                supported_claims=tuple(claim for claim in validated_claims if claim.is_supported),
+                unsupported_claims=tuple(unsupported_claims),
+                grounded_fact_count=len(grounded_facts),
+            ),
         )
 
     def _build_query_vector(self, context: RetrievalIndicatorContext) -> tuple[float, ...]:
@@ -137,7 +224,9 @@ class RAGService:
             matched_terms=matched_terms,
         )
 
-    def _collect_matched_terms(self, payload: dict[str, Any], *, knowledge_id: str) -> tuple[str, ...]:
+    def _collect_matched_terms(
+        self, payload: dict[str, Any], *, knowledge_id: str
+    ) -> tuple[str, ...]:
         terms: list[str] = []
         for field_name in ("title", "summary", "content", "search_text", "knowledge_id"):
             raw_value = payload.get(field_name)
@@ -206,3 +295,15 @@ class RAGService:
         if value is None:
             return None
         return str(value)
+
+    def _citation_key_for_indicator(self, indicator: RetrievalIndicatorContext) -> str:
+        return f"{indicator.source_context or indicator.name}:{indicator.name}".replace(" ", "_")
+
+    def _build_indicator_fact_summary(self, indicator: RetrievalIndicatorContext) -> str:
+        value = self._format_value(indicator.value)
+        parts = [indicator.name]
+        if value is not None:
+            parts.append(value)
+        if indicator.unit is not None:
+            parts.append(indicator.unit)
+        return " ".join(parts)
