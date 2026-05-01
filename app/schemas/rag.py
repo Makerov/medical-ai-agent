@@ -5,8 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.schemas.indicator import StructuredIndicatorValue, StructuredMedicalIndicator
 from app.schemas.case import CaseRecordReference
+from app.schemas.indicator import StructuredIndicatorValue, StructuredMedicalIndicator
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
     KnowledgeProvenance,
@@ -288,7 +288,7 @@ class RAGProvenanceExample(BaseModel):
         return _normalize_text(value)
 
     @model_validator(mode="after")
-    def validate_case_linkage(self) -> "RAGProvenanceExample":
+    def validate_case_linkage(self) -> RAGProvenanceExample:
         if self.indicator.source_context is None:
             msg = "RAG provenance example indicator must include source context"
             raise ValueError(msg)

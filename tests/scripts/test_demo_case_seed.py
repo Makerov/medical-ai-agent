@@ -1,5 +1,5 @@
-from datetime import UTC, datetime
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.core.settings import Settings
@@ -33,7 +33,9 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         "intake_snapshot": Path("case_demo_happy_path/export/demo/intake-snapshot.json"),
         "extracted_facts": Path("case_demo_happy_path/export/demo/extracted-facts.json"),
         "safety_check_result": Path("case_demo_happy_path/safety/demo/safety-check-result.json"),
-        "safety_check_examples": Path("case_demo_happy_path/safety/demo/safety-check-examples.json"),
+        "safety_check_examples": Path(
+            "case_demo_happy_path/safety/demo/safety-check-examples.json"
+        ),
         "handoff_payload": Path("case_demo_happy_path/export/demo/doctor-handoff.json"),
         "source_references": Path("case_demo_happy_path/export/demo/source-references.json"),
         "shared_status": Path("case_demo_happy_path/export/demo/shared-status.json"),
@@ -41,7 +43,9 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         "structured_extraction_examples": Path(
             "case_demo_happy_path/export/demo/structured-extraction-examples.json"
         ),
-        "rag_provenance_examples": Path("case_demo_happy_path/export/demo/rag-provenance-examples.json"),
+        "rag_provenance_examples": Path(
+            "case_demo_happy_path/export/demo/rag-provenance-examples.json"
+        ),
         "summary_draft": Path("case_demo_happy_path/summary/demo/summary-draft.json"),
         "demo_export_contract": Path("case_demo_happy_path/demo/reviewer-export.json"),
     }
@@ -84,9 +88,16 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         settings.artifact_root_dir / expected_relative_paths["demo_export_contract"]
     ).read_text(encoding="utf-8")
     assert '"case_id": "case_demo_happy_path"' in reviewer_export_json
-    assert '"reviewer_notes": "Synthetic, case-scoped export bundle for reviewer walkthrough without live model calls."' in reviewer_export_json
+    assert (
+        '"reviewer_notes": "Synthetic, case-scoped export bundle for reviewer walkthrough '
+        'without live model calls."'
+        in reviewer_export_json
+    )
     assert '"label": "minimal_eval_suite"' in reviewer_export_json
-    assert '"artifact_path": "case_demo_happy_path/demo/minimal-eval-suite.json"' in reviewer_export_json
+    assert (
+        '"artifact_path": "case_demo_happy_path/demo/minimal-eval-suite.json"'
+        in reviewer_export_json
+    )
 
 
 def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:

@@ -5,7 +5,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 EvalCategory = Literal["extraction", "groundedness", "safety"]
 EvalOutcome = Literal["pass", "fail"]
 
@@ -30,7 +29,13 @@ class EvalCheckResult(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("fixture_id", "case_id", "threshold_signal", "failure_reason", "source_artifact")
+    @field_validator(
+        "fixture_id",
+        "case_id",
+        "threshold_signal",
+        "failure_reason",
+        "source_artifact",
+    )
     @classmethod
     def normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -38,7 +43,7 @@ class EvalCheckResult(BaseModel):
         return _normalize_text(value)
 
     @model_validator(mode="after")
-    def validate_internal_consistency(self) -> "EvalCheckResult":
+    def validate_internal_consistency(self) -> EvalCheckResult:
         if self.outcome == "pass" and self.failure_reason is not None:
             msg = "Passing eval checks must not include a failure reason"
             raise ValueError(msg)
@@ -75,7 +80,7 @@ class EvalSuiteSummary(BaseModel):
         return value
 
     @model_validator(mode="after")
-    def validate_case_linkage(self) -> "EvalSuiteSummary":
+    def validate_case_linkage(self) -> EvalSuiteSummary:
         if not self.results:
             msg = "Eval suite summary must include at least one result"
             raise ValueError(msg)

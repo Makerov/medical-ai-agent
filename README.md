@@ -10,7 +10,17 @@ This repository is intended to be runnable from a fresh checkout without manual 
 
 - Python 3.13
 - `uv`
-- Docker and Docker Compose v2 if you want the containerized path
+- Docker and Docker Compose v2 for the documented fresh-checkout path
+
+### Fresh-checkout bootstrap
+
+The canonical reviewer path is:
+
+1. Copy `.env.example` to `.env`.
+2. Keep the synthetic/anonymized defaults unless you are intentionally exercising optional adapters.
+3. Start the local stack with Docker Compose.
+4. Run the documented bootstrap scripts in order.
+5. Optionally run the minimal eval suite on the stable demo case.
 
 ### Required environment variables
 
@@ -22,43 +32,71 @@ Copy `.env.example` to `.env` and fill the values that apply to your local run:
 - `DEBUG`
 - `LOG_LEVEL`
 - `ARTIFACT_ROOT_DIR`
+- `KNOWLEDGE_BASE_SEED_DIR`
 - `DOCUMENT_UPLOAD_SUPPORTED_MIME_TYPES`
 - `DOCUMENT_UPLOAD_MAX_FILE_SIZE_BYTES`
+- `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `QDRANT_COLLECTION_NAME`
+- `DOCTOR_TELEGRAM_ID_ALLOWLIST`
+- `DEBUG_ADMIN_STATIC_TOKEN`
 - `PATIENT_BOT_TOKEN`
 - `DOCTOR_BOT_TOKEN`
 - `DOCTOR_TELEGRAM_ID`
 - `HF_TOKEN`
 
-For the default local demo, the bot token and HF values can stay empty unless you are exercising the Telegram adapters or model-backed flows.
+For the default local demo, the bot token, allowlist, and HF values can stay empty unless you are exercising the Telegram adapters or model-backed flows. The containerized stack uses the API, PostgreSQL, and Qdrant services defined in `docker-compose.yml`, while host-run scripts use the `.env` file directly.
 
 ### Documented startup paths
 
 Preferred containerized demo:
 
 ```bash
+cp .env.example .env
 uv sync
 docker compose up --build
 ```
 
-Project-aware local backend:
+After the stack is up, run the deterministic bootstrap scripts in this order:
 
 ```bash
-uv sync
-uv run uvicorn app.main:app --reload
+uv run python scripts/setup_qdrant_collections.py
+uv run python scripts/seed_knowledge_base.py
+uv run python scripts/seed_demo_case.py
 ```
 
-If you prefer the console entrypoint defined by the project:
+Optional verification for the prepared demo case:
 
 ```bash
-uv sync
-uv run medical-ai-api
+uv run python scripts/run_minimal_eval_suite.py --case-id case_demo_happy_path
 ```
 
 Expected demo processing time:
 
 - API startup is usually a few seconds on a warm machine.
 - First-run dependency install and image build can take longer, especially on a clean checkout or slower network.
-- Knowledge-base seeding and any document processing work depend on local CPU speed and whether supporting services are already available.
+- Knowledge-base seeding, Qdrant bootstrap, and any document processing work depend on local CPU speed and whether supporting services are already available.
+
+Containerized services and defaults:
+
+- `docker compose` starts the API, PostgreSQL, and Qdrant services together.
+- The API container uses `QDRANT_URL=http://qdrant:6333` on the compose network.
+- PostgreSQL uses the compose-local defaults defined in `docker-compose.yml`; no extra hidden setup is required.
+- Host-run scripts use the `.env` file, so `QDRANT_URL=http://localhost:6333` remains the local default for direct script execution.
+
+If you prefer the console entrypoint defined by the project:
+
+```bash
+uv sync
+uv run uvicorn app.main:app --reload
+```
+
+Or use the packaged API entrypoint:
+
+```bash
+uv sync
+uv run medical-ai-api
+```
 
 ### Demo data
 
@@ -116,6 +154,15 @@ Create a local `.env` file from `.env.example` and fill runtime secrets:
 - `DOCTOR_BOT_TOKEN` - Telegram bot token for the doctor bot.
 - `DOCTOR_TELEGRAM_ID` - Telegram ID allowed to use doctor-facing bot flows.
 - `HF_TOKEN` - Hugging Face token for model access.
+
+The same `.env` file also carries the local demo infrastructure contract:
+
+- `QDRANT_URL`
+- `QDRANT_API_KEY`
+- `QDRANT_COLLECTION_NAME`
+- `KNOWLEDGE_BASE_SEED_DIR`
+- `DOCTOR_TELEGRAM_ID_ALLOWLIST`
+- `DEBUG_ADMIN_STATIC_TOKEN`
 
 Run the local API:
 

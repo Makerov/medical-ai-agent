@@ -10,7 +10,7 @@ from app.integrations.qdrant_client import (
     build_deterministic_vector,
 )
 from app.schemas.knowledge_base import KnowledgeSeedEntry
-from scripts.setup_qdrant_collections import run_setup
+from scripts.setup_qdrant_collections import run_setup, wait_for_qdrant_ready
 
 
 def load_seed_entries(seed_dir: Path) -> tuple[KnowledgeSeedEntry, ...]:
@@ -51,6 +51,7 @@ def seed_knowledge_base(
     vector_size: int,
 ) -> int:
     entries = load_seed_entries(seed_dir)
+    wait_for_qdrant_ready(client=client, collection_name=collection_name)
     run_setup(client=client, collection_name=collection_name, vector_size=vector_size)
     points = build_seed_points(entries, vector_size=vector_size)
     client.upsert_points(collection_name=collection_name, points=points)

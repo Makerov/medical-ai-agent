@@ -86,7 +86,7 @@ development_status:
   5-6-doctor-facing-ai-boundary-labeling: done
   5-7-doctor-case-status-и-problem-cases: done
   epic-5-retrospective: optional
-  epic-6: done
+  epic-6: in-progress
   6-1-reproducible-local-demo-setup: done
   6-2-seed-demo-case-и-end-to-end-happy-path: done
   6-3-structured-extraction-examples: done
@@ -95,4 +95,5 @@ development_status:
   6-6-minimal-eval-suite-for-extraction-groundedness-and-safety: done
   6-7-demo-artifacts-export-by-case-id: done
   6-8-portfolio-readme-architecture-diagram-и-known-limitations: done
+  6-9-full-local-demo-bootstrap-and-verification: done
   epic-6-retrospective: optional
