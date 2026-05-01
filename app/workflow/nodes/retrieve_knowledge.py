@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from app.schemas.indicator import StructuredMedicalIndicator
-from app.schemas.rag import KnowledgeApplicabilityDecision, KnowledgeRetrievalMatch, KnowledgeRetrievalResult
+from app.schemas.rag import (
+    KnowledgeApplicabilityDecision,
+    KnowledgeRetrievalMatch,
+    KnowledgeRetrievalResult,
+)
 from app.services.rag_service import RAGService
 
 
