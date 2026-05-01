@@ -16,16 +16,25 @@ from app.schemas.handoff import (
     DoctorCaseCard,
     DoctorCaseCardDelivery,
     DoctorCaseCardRejection,
+    DoctorCaseIndicatorFact,
+    DoctorCaseReviewWarning,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
     DoctorReadyCaseNotificationStatus,
 )
+from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.patient import PatientProfile
+from app.schemas.rag import (
+    GroundedFact,
+    GroundedSummaryContract,
+    SummaryValidationResult,
+)
 from app.services.access_control_service import authorize_capability
 from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import PatientIntakeService
+from app.services.summary_service import SummaryService
 
 Clock = Callable[[], datetime]
 
@@ -36,12 +45,14 @@ class HandoffService:
         *,
         case_service: CaseService,
         patient_intake_service: PatientIntakeService | None = None,
+        summary_service: SummaryService | None = None,
         audit_service: AuditService | None = None,
         settings: Settings | None = None,
         clock: Clock = utc_now,
     ) -> None:
         self._case_service = case_service
         self._patient_intake_service = patient_intake_service
+        self._summary_service = summary_service or SummaryService()
         self._settings = settings or get_settings()
         self._audit_service = audit_service or AuditService(
             case_service=case_service,
@@ -174,6 +185,20 @@ class HandoffService:
             else None
         )
         core_records = self._case_service.get_case_core_records(case_id)
+        indicator_records = self._case_service.get_case_indicator_records(case_id)
+        extracted_facts = self._build_extracted_facts(indicator_records)
+        grounded_summary = self._build_grounded_summary(case_id, extracted_facts)
+        summary_draft = self._summary_service.build_doctor_facing_summary_draft(
+            grounded_summary=grounded_summary,
+            patient_goal_context=(
+                payload.consultation_goal.text if payload and payload.consultation_goal else None
+            ),
+            indicators=self._flatten_indicators(indicator_records),
+        )
+        review_warnings = self._build_review_warnings(
+            extracted_facts=extracted_facts,
+            uncertainty_markers=summary_draft.uncertainty_markers,
+        )
         card = DoctorCaseCard(
             case_id=case_id,
             current_case_status=view.lifecycle_status.value,
@@ -187,6 +212,10 @@ class HandoffService:
                 else None
             ),
             document_list=tuple(reference.record_id for reference in core_records.documents),
+            extracted_facts=extracted_facts,
+            possible_deviations=summary_draft.possible_deviations,
+            uncertainty_markers=summary_draft.uncertainty_markers,
+            review_warnings=review_warnings,
         )
         audit_event = self._audit_service.record_event(
             case_id=case_id,
@@ -348,3 +377,97 @@ class HandoffService:
         if isinstance(full_name, str) and isinstance(age, int):
             return f"{full_name}, {age} years old"
         return "Patient profile available"
+
+    @staticmethod
+    def _flatten_indicators(
+        indicator_records: tuple,
+    ) -> tuple[StructuredMedicalIndicator, ...]:
+        indicators: list[StructuredMedicalIndicator] = []
+        for record in indicator_records:
+            indicators.extend(record.indicators)
+            indicators.extend(record.uncertain_indicators)
+        return tuple(indicators)
+
+    @staticmethod
+    def _build_extracted_facts(
+        indicator_records: tuple,
+    ) -> tuple[DoctorCaseIndicatorFact, ...]:
+        facts: list[DoctorCaseIndicatorFact] = []
+        for record in indicator_records:
+            for indicator in (*record.indicators, *record.uncertain_indicators):
+                facts.append(
+                    DoctorCaseIndicatorFact(
+                        fact_id=(
+                            f"{indicator.source_document_reference.record_id}:{indicator.name}"
+                        ),
+                        name=indicator.name,
+                        value=str(indicator.value),
+                        unit=indicator.unit,
+                        reference_context=(
+                            f"{indicator.source_document_reference.record_id}"
+                            f" ({indicator.source_document_reference.record_kind.value})"
+                        ),
+                        source_confidence=indicator.confidence,
+                        is_uncertain=indicator.is_uncertain or indicator.confidence < 0.85,
+                        uncertainty_reason=indicator.uncertainty_reason,
+                        missing_fields=indicator.missing_fields,
+                    )
+                )
+        return tuple(facts)
+
+    @staticmethod
+    def _build_grounded_summary(
+        case_id: str,
+        extracted_facts: tuple[DoctorCaseIndicatorFact, ...],
+    ) -> GroundedSummaryContract:
+        grounded_facts = tuple(
+            GroundedFact(
+                fact_id=f"indicator:{fact.fact_id}",
+                source_kind="indicator",
+                citation_key=f"{case_id}:{fact.fact_id}",
+                machine_value=fact.value,
+                human_readable_summary=(
+                    f"{fact.name}: {fact.value}{f' {fact.unit}' if fact.unit else ''}"
+                ),
+            )
+            for fact in extracted_facts
+            if not fact.is_uncertain
+        )
+        return GroundedSummaryContract(
+            grounded_facts=grounded_facts,
+            citations=(),
+            narrative="Extracted facts summary draft.",
+            claims=(),
+            validation=SummaryValidationResult(
+                status="valid" if grounded_facts else "downgraded",
+                supported_claims=(),
+                unsupported_claims=(),
+                grounded_fact_count=len(grounded_facts),
+            ),
+        )
+
+    @staticmethod
+    def _build_review_warnings(
+        *,
+        extracted_facts: tuple[DoctorCaseIndicatorFact, ...],
+        uncertainty_markers: tuple,
+    ) -> tuple[DoctorCaseReviewWarning, ...]:
+        warnings: list[DoctorCaseReviewWarning] = []
+        if any(fact.is_uncertain for fact in extracted_facts):
+            warnings.append(
+                DoctorCaseReviewWarning(
+                    warning_id="warning:uncertain_facts",
+                    text=(
+                        "Some extracted facts are marked uncertain and should be "
+                        "checked before use."
+                    ),
+                )
+            )
+        if uncertainty_markers:
+            warnings.append(
+                DoctorCaseReviewWarning(
+                    warning_id="warning:summary_uncertainty",
+                    text="The review summary contains uncertainty markers tied to extracted data.",
+                )
+            )
+        return tuple(warnings)
