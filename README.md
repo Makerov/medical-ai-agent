@@ -109,6 +109,7 @@ This MVP is a portfolio/demo system. It is not production medical software and i
 Safety boundary: the AI prepares information for a doctor, but does not diagnose or prescribe treatment. A human doctor must review the materials before any medical decision.
 Demo exports also include synthetic safety check examples showing pass, blocked, and corrected outcomes under the same stable `case_id`.
 The demo artifact set also includes synthetic RAG/source provenance examples under `data/artifacts/<case_id>/export/demo/`, showing both grounded and not-grounded retrieval paths with explicit source metadata and summary linkage.
+For reviewer walkthroughs, the seed command also writes a case-scoped bundle to `data/artifacts/<case_id>/demo/reviewer-export.json` that links the extracted facts, provenance, safety result, minimal eval summary, and reviewer-readable case overview without requiring live model calls.
 
 ### Minimal eval suite
 
