@@ -48,7 +48,10 @@ def test_process_case_worker_processes_case_without_touching_tg_boundary() -> No
 
     client = OCRClient(
         document_bytes_fetcher=lambda _: b"raw document bytes",
-        document_parser=lambda _bytes, _document: ("Hemoglobin: 13.5 g/dL", 0.83),
+        document_parser=lambda _bytes, _document: (
+            "Hemoglobin: 13.5 g/dL\nGlucose: 5.6",
+            0.83,
+        ),
         clock=lambda: now,
     )
     worker = ProcessCaseWorker(
@@ -66,3 +69,6 @@ def test_process_case_worker_processes_case_without_touching_tg_boundary() -> No
     )
     assert case_service.get_case_core_records(patient_case.case_id).indicators != ()
     assert len(case_service.get_case_indicator_records(patient_case.case_id)) == 1
+    assert len(
+        case_service.get_case_indicator_records(patient_case.case_id)[0].uncertain_indicators
+    ) == 1

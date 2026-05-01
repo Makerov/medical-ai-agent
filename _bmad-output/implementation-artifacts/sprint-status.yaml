@@ -1,5 +1,5 @@
 # generated: 2026-04-26T15:41:58+0600
-# last_updated: 2026-04-30
+# last_updated: 2026-05-01
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-26T15:41:58+0600
-last_updated: 2026-04-30
+last_updated: 2026-05-01
 project: medical-ai-agent
 project_key: NOKEY
 tracking_system: file-system
@@ -64,7 +64,7 @@ development_status:
   3-3-text-extraction-из-pdf-image-documents: done
   3-4-extraction-quality-detection-и-retry-flow: done
   3-5-structured-medical-indicator-extraction: done
-  3-6-uncertainty-marking-и-partial-processing: backlog
+  3-6-uncertainty-marking-и-partial-processing: done
   3-7-original-document-references-для-doctor-review: backlog
   epic-3-retrospective: optional
   epic-4: backlog
