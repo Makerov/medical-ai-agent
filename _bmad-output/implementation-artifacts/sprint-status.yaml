@@ -82,7 +82,7 @@ development_status:
   5-2-structured-case-card-для-ready-case: done
   5-3-extracted-facts-deviations-и-uncertainty-view: done
   5-4-ai-prepared-questions-для-doctor-follow-up: done
-  5-5-source-document-references-в-doctor-bot: backlog
+  5-5-source-document-references-в-doctor-bot: done
   5-6-doctor-facing-ai-boundary-labeling: backlog
   5-7-doctor-case-status-и-problem-cases: backlog
   epic-5-retrospective: optional
