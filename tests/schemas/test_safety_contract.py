@@ -45,7 +45,9 @@ def test_safety_check_example_set_preserves_case_linked_typed_results() -> None:
                     SafetyIssue(
                         category="diagnosis_language",
                         severity="high",
-                        message="Diagnosis language is not allowed in the doctor-facing summary draft.",
+                        message=(
+                            "Diagnosis language is not allowed in the doctor-facing summary draft."
+                        ),
                         evidence="diagnosis",
                     ),
                 ),
