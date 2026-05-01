@@ -8,6 +8,7 @@ from app.integrations.qdrant_client import QdrantVectorStore, build_deterministi
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.knowledge_base import KnowledgeSeedEntry
 from app.schemas.rag import (
+    KnowledgeApplicabilityDecision,
     KnowledgeRetrievalMatch,
     KnowledgeRetrievalResult,
     RetrievalIndicatorContext,
@@ -66,6 +67,29 @@ class RAGService:
             retrieved_at=self._clock(),
         )
 
+    def assess_applicability(
+        self,
+        *,
+        entry: KnowledgeRetrievalMatch,
+        indicator: StructuredMedicalIndicator,
+    ) -> KnowledgeApplicabilityDecision:
+        context = RetrievalIndicatorContext.from_indicator(indicator)
+        provenance_summary = self._build_provenance_summary(entry)
+        limitations = self._build_limitation_notes(entry)
+
+        decision = self._decide_applicability(entry=entry, indicator=context)
+        return KnowledgeApplicabilityDecision(
+            knowledge_id=entry.knowledge_id,
+            status=decision,
+            reason=self._reason_for_decision(decision=decision, entry=entry, indicator=context),
+            provenance_summary=provenance_summary,
+            applicable_context_notes=self._applicable_context_notes(entry=entry, indicator=context),
+            limitation_notes=limitations,
+            source_metadata=entry.source_metadata,
+            provenance=entry.provenance,
+            applicability=entry.applicability,
+        )
+
     def _build_query_vector(self, context: RetrievalIndicatorContext) -> tuple[float, ...]:
         query_text = " ".join(
             part
@@ -105,9 +129,9 @@ class RAGService:
         score = raw_match.get("score")
         confidence = float(score) if isinstance(score, (int, float)) else 0.0
         matched_terms = self._collect_matched_terms(payload, knowledge_id=knowledge_id)
-        return KnowledgeRetrievalMatch(
-            knowledge_id=knowledge_id,
-            source_metadata=KnowledgeSeedEntry.model_validate(payload).source_metadata,
+        seed_entry = KnowledgeSeedEntry.model_validate(payload)
+        return KnowledgeRetrievalMatch.from_seed_entry(
+            entry=seed_entry,
             score=max(0.0, min(1.0, confidence)),
             retrieval_text=retrieval_text,
             matched_terms=matched_terms,
@@ -120,6 +144,63 @@ class RAGService:
             if isinstance(raw_value, str) and knowledge_id.lower() in raw_value.lower():
                 terms.append(knowledge_id)
         return tuple(dict.fromkeys(term for term in terms if term))
+
+    def _decide_applicability(
+        self,
+        *,
+        entry: KnowledgeRetrievalMatch,
+        indicator: RetrievalIndicatorContext,
+    ) -> str:
+        applicability = self._applicability_from_entry(entry)
+        if indicator.name.lower() in applicability.excluded_contexts:
+            return "not_applicable"
+        if not applicability.applicable_contexts:
+            return "insufficient_context"
+        context_name = indicator.name.lower()
+        for context in applicability.applicable_contexts:
+            if context_name in context.lower():
+                return "applicable"
+        if indicator.value is None and indicator.unit is None:
+            return "insufficient_context"
+        return "not_applicable"
+
+    def _reason_for_decision(
+        self,
+        *,
+        decision: str,
+        entry: KnowledgeRetrievalMatch,
+        indicator: RetrievalIndicatorContext,
+    ) -> str:
+        if decision == "applicable":
+            return "indicator_context_matches_curated_applicability"
+        if decision == "insufficient_context":
+            return "indicator_context_is_too_broad_for_trusted_applicability"
+        return "indicator_context_does_not_match_curated_applicability"
+
+    def _applicable_context_notes(
+        self,
+        *,
+        entry: KnowledgeRetrievalMatch,
+        indicator: RetrievalIndicatorContext,
+    ) -> str | None:
+        applicability = self._applicability_from_entry(entry)
+        contexts = ", ".join(applicability.applicable_contexts)
+        if contexts:
+            return f"Applicable contexts: {contexts}"
+        return None
+
+    def _build_provenance_summary(self, entry: KnowledgeRetrievalMatch) -> str:
+        return f"{entry.source_metadata.source_title} ({entry.source_metadata.citation_key})"
+
+    def _build_limitation_notes(self, entry: KnowledgeRetrievalMatch) -> str | None:
+        applicability = self._applicability_from_entry(entry)
+        notes = [applicability.limitations_summary]
+        if applicability.population_notes:
+            notes.append(applicability.population_notes)
+        return " ".join(notes).strip() or None
+
+    def _applicability_from_entry(self, entry: KnowledgeRetrievalMatch):
+        return entry.applicability
 
     def _format_value(self, value: object) -> str | None:
         if value is None:
