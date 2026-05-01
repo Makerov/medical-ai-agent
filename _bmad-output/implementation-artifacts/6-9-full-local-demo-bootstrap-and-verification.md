@@ -1,6 +1,6 @@
 # Story 6.9: Full Local Demo Bootstrap and Verification
 
-Status: review
+Status: done
 
 ## Story
 
