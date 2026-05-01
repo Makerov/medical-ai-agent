@@ -264,3 +264,111 @@ class GroundedSummaryContract(BaseModel):
     @classmethod
     def normalize_narrative(cls, value: str) -> str:
         return _normalize_text(value)
+
+
+class DoctorFacingIssueFocus:
+    MISSING_CONTEXT = "missing_context"
+    POSSIBLE_DEVIATION = "possible_deviation"
+    UNCERTAINTY = "uncertainty"
+
+
+DoctorFacingIssueFocusLiteral = Literal["missing_context", "possible_deviation", "uncertainty"]
+
+
+class DoctorFacingDeviationMarker(BaseModel):
+    deviation_id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    citation_keys: tuple[str, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("deviation_id", "text")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        return _normalize_text(value)
+
+    @field_validator("citation_keys")
+    @classmethod
+    def normalize_citation_keys(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for key in value:
+            normalized_key = _normalize_text(key)
+            if normalized_key in seen:
+                continue
+            normalized.append(normalized_key)
+            seen.add(normalized_key)
+        return tuple(normalized)
+
+
+class DoctorFacingUncertaintyMarker(BaseModel):
+    marker_id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    citation_keys: tuple[str, ...] = ()
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("marker_id", "text", "reason")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        return _normalize_text(value)
+
+    @field_validator("citation_keys")
+    @classmethod
+    def normalize_citation_keys(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for key in value:
+            normalized_key = _normalize_text(key)
+            if normalized_key in seen:
+                continue
+            normalized.append(normalized_key)
+            seen.add(normalized_key)
+        return tuple(normalized)
+
+
+class DoctorFacingQuestion(BaseModel):
+    question_id: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    focus: DoctorFacingIssueFocusLiteral
+    citation_keys: tuple[str, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("question_id", "text")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        return _normalize_text(value)
+
+    @field_validator("citation_keys")
+    @classmethod
+    def normalize_citation_keys(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for key in value:
+            normalized_key = _normalize_text(key)
+            if normalized_key in seen:
+                continue
+            normalized.append(normalized_key)
+            seen.add(normalized_key)
+        return tuple(normalized)
+
+
+class DoctorFacingSummaryDraft(BaseModel):
+    patient_goal_context: str | None = None
+    grounded_summary: GroundedSummaryContract
+    narrative: str = Field(min_length=1)
+    possible_deviations: tuple[DoctorFacingDeviationMarker, ...] = ()
+    uncertainty_markers: tuple[DoctorFacingUncertaintyMarker, ...] = ()
+    questions_for_doctor: tuple[DoctorFacingQuestion, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("patient_goal_context", "narrative")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_text(value)

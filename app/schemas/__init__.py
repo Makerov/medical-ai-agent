@@ -58,6 +58,10 @@ from app.schemas.patient import (
     PatientProfile,
 )
 from app.schemas.rag import (
+    DoctorFacingDeviationMarker,
+    DoctorFacingQuestion,
+    DoctorFacingSummaryDraft,
+    DoctorFacingUncertaintyMarker,
     CitationReference,
     GeneratedNarrativeClaim,
     GroundedFact,
@@ -104,6 +108,10 @@ __all__ = [
     "KnowledgeApplicabilityDecision",
     "KnowledgeRetrievalMatch",
     "KnowledgeRetrievalResult",
+    "DoctorFacingDeviationMarker",
+    "DoctorFacingQuestion",
+    "DoctorFacingSummaryDraft",
+    "DoctorFacingUncertaintyMarker",
     "CitationReference",
     "GeneratedNarrativeClaim",
     "GroundedFact",
