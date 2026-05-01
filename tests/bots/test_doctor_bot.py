@@ -3,13 +3,20 @@ from unittest.mock import AsyncMock
 
 from app.bots.doctor_bot import send_doctor_ready_case_delivery
 from app.bots.messages import (
+    DOCTOR_CASE_CARD_ACCESS_DENIED_MESSAGE,
+    DOCTOR_CASE_CARD_HEADER,
     DOCTOR_READY_CASE_ACCESS_DENIED_MESSAGE,
     DOCTOR_READY_CASE_NOTIFICATION_HEADER,
+    render_doctor_case_card,
+    render_doctor_case_card_access_denied_message,
     render_doctor_ready_case_access_denied_message,
     render_doctor_ready_case_notification_message,
 )
 from app.schemas.case import SharedCaseStatusCode
 from app.schemas.handoff import (
+    DoctorCaseCard,
+    DoctorCaseCardDelivery,
+    DoctorCaseCardRejection,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
@@ -88,3 +95,84 @@ def test_send_doctor_ready_case_delivery_routes_rejection_message() -> None:
     bot.send_message.assert_awaited_once()
     assert bot.send_message.await_args.kwargs["chat_id"] == 999999
     assert bot.send_message.await_args.kwargs["text"] == DOCTOR_READY_CASE_ACCESS_DENIED_MESSAGE
+
+
+def test_render_doctor_case_card_is_minimal() -> None:
+    card = DoctorCaseCard(
+        case_id="case_ready_002",
+        current_case_status="ready_for_doctor",
+        shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+        patient_goal="Review cough",
+        patient_profile_summary="Alex, 34 years old",
+        document_list=("document_001",),
+    )
+
+    message = render_doctor_case_card(card)
+
+    assert DOCTOR_CASE_CARD_HEADER in message
+    assert "case_ready_002" in message
+    assert "Review cough" in message
+    assert "Alex, 34 years old" in message
+    assert "document_001" in message
+    assert "source" not in message.lower()
+    assert "question" not in message.lower()
+
+
+def test_render_doctor_case_card_access_denied_message_is_generic() -> None:
+    rejection = DoctorCaseCardRejection(
+        case_id="case_ready_002",
+        doctor_telegram_id=999999,
+        rejection_code="case_not_ready_for_review",
+        rejection_message="Case is not ready for doctor review.",
+    )
+
+    message = render_doctor_case_card_access_denied_message(rejection)
+
+    assert message == DOCTOR_CASE_CARD_ACCESS_DENIED_MESSAGE
+    assert "case_ready_002" not in message
+
+
+def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
+    from app.bots.doctor_bot import send_doctor_case_card_delivery
+
+    bot = FakeBot()
+    delivery = DoctorCaseCardDelivery(
+        case_id="case_ready_002",
+        doctor_telegram_id=123456,
+        card=DoctorCaseCard(
+            case_id="case_ready_002",
+            current_case_status="ready_for_doctor",
+            shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+            patient_goal="Review cough",
+            patient_profile_summary="Alex, 34 years old",
+            document_list=("document_001",),
+        ),
+    )
+
+    asyncio.run(send_doctor_case_card_delivery(bot, delivery))
+
+    bot.send_message.assert_awaited_once()
+    assert bot.send_message.await_args.kwargs["chat_id"] == 123456
+    assert "ready_for_doctor" in bot.send_message.await_args.kwargs["text"]
+
+
+def test_send_doctor_case_card_delivery_routes_rejection_message() -> None:
+    from app.bots.doctor_bot import send_doctor_case_card_delivery
+
+    bot = FakeBot()
+    delivery = DoctorCaseCardDelivery(
+        case_id="case_ready_002",
+        doctor_telegram_id=999999,
+        rejection=DoctorCaseCardRejection(
+            case_id="case_ready_002",
+            doctor_telegram_id=999999,
+            rejection_code="case_not_ready_for_review",
+            rejection_message="Case is not ready for doctor review.",
+        ),
+    )
+
+    asyncio.run(send_doctor_case_card_delivery(bot, delivery))
+
+    bot.send_message.assert_awaited_once()
+    assert bot.send_message.await_args.kwargs["chat_id"] == 999999
+    assert bot.send_message.await_args.kwargs["text"] == DOCTOR_CASE_CARD_ACCESS_DENIED_MESSAGE
