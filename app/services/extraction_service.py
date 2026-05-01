@@ -2,8 +2,6 @@ import re
 from collections.abc import Callable, Iterable
 from datetime import datetime
 
-from pydantic import ValidationError
-
 from app.schemas.case import CaseRecordKind, CaseRecordReference, utc_now
 from app.schemas.extraction import CaseExtractionRecord
 from app.schemas.indicator import (
@@ -15,10 +13,12 @@ from app.services.case_service import CaseService
 Clock = Callable[[], datetime]
 
 _INDICATOR_LINE_PATTERN = re.compile(
-    r"^\s*(?P<name>.+?)\s*(?:[:=]|-)?\s*"
-    r"(?P<value>[+-]?\d+(?:[.,]\d+)?)\s+"
-    r"(?P<unit>[^\s,;]+)\s*$"
+    r"^\s*(?P<name>.+?)\s*(?:[:=]|-)\s*(?P<remainder>.+?)\s*$"
 )
+_RELIABLE_VALUE_PATTERN = re.compile(
+    r"^(?P<value>[+-]?\d+(?:[.,]\d+)?)(?:\s+(?P<unit>[^\s,;]+))?\s*$"
+)
+_UNCERTAIN_INDICATOR_MIN_CONFIDENCE = 0.8
 
 
 class ExtractionService:
@@ -51,7 +51,7 @@ class ExtractionService:
             self._case_service.attach_case_record_reference(indicator_reference)
             return existing_record
 
-        indicators = tuple(
+        parsed_indicators = tuple(
             indicator
             for indicator in self._build_candidate_indicators(
                 case_id=case_id,
@@ -63,7 +63,13 @@ class ExtractionService:
             )
             if indicator is not None
         )
-        if not indicators:
+        indicators = tuple(
+            indicator for indicator in parsed_indicators if not indicator.is_uncertain
+        )
+        uncertain_indicators = tuple(
+            indicator for indicator in parsed_indicators if indicator.is_uncertain
+        )
+        if not indicators and not uncertain_indicators:
             return None
 
         indicator_record = CaseIndicatorExtractionRecord(
@@ -73,6 +79,7 @@ class ExtractionService:
             raw_extraction_reference=extraction_record.extraction_reference,
             indicator_reference=indicator_reference,
             indicators=indicators,
+            uncertain_indicators=uncertain_indicators,
             extracted_at=extraction_record.extracted_at,
             provider_name=extraction_record.provider_name,
         )
@@ -144,22 +151,66 @@ class ExtractionService:
             return None
 
         name = match.group("name").strip()
-        value_text = match.group("value").replace(",", ".").strip()
-        unit = match.group("unit").strip().rstrip(".,;")
-        try:
-            value = self._normalize_value(value_text)
+        remainder = match.group("remainder").strip()
+        if not remainder:
+            return None
+
+        parsed_value = remainder.rstrip(".,;")
+        if not parsed_value:
+            return None
+
+        value_match = _RELIABLE_VALUE_PATTERN.match(parsed_value.replace(",", "."))
+        if value_match is not None:
+            unit = value_match.group("unit")
+            value = self._normalize_value(value_match.group("value").replace(",", ".").strip())
+            if unit is not None and confidence >= _UNCERTAIN_INDICATOR_MIN_CONFIDENCE:
+                return StructuredMedicalIndicator(
+                    case_id=case_id,
+                    name=name,
+                    value=value,
+                    unit=unit.strip().rstrip(".,;"),
+                    confidence=confidence,
+                    source_document_reference=source_document_reference,
+                    extracted_at=extracted_at,
+                    provider_name=provider_name,
+                )
+            uncertainty_reason = (
+                "low_extraction_confidence"
+                if confidence < _UNCERTAIN_INDICATOR_MIN_CONFIDENCE
+                else "missing_unit"
+            )
+            missing_fields = ()
+            if unit is None:
+                missing_fields = ("unit",)
             return StructuredMedicalIndicator(
                 case_id=case_id,
                 name=name,
                 value=value,
-                unit=unit,
+                unit=unit.strip().rstrip(".,;") if unit is not None else None,
                 confidence=confidence,
                 source_document_reference=source_document_reference,
                 extracted_at=extracted_at,
                 provider_name=provider_name,
+                is_uncertain=True,
+                uncertainty_reason=uncertainty_reason,
+                missing_fields=missing_fields,
             )
-        except (ValidationError, ValueError):
-            return None
+
+        if confidence < _UNCERTAIN_INDICATOR_MIN_CONFIDENCE:
+            return StructuredMedicalIndicator(
+                case_id=case_id,
+                name=name,
+                value=parsed_value,
+                unit=None,
+                confidence=confidence,
+                source_document_reference=source_document_reference,
+                extracted_at=extracted_at,
+                provider_name=provider_name,
+                is_uncertain=True,
+                uncertainty_reason="low_extraction_confidence",
+                missing_fields=("unit",),
+            )
+        return None
 
     @staticmethod
     def _normalize_value(value_text: str) -> int | float | str:
