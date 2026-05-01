@@ -46,6 +46,12 @@ from app.schemas.indicator import (
     StructuredIndicatorValue,
     StructuredMedicalIndicator,
 )
+from app.schemas.handoff import (
+    DoctorReadyCaseNotification,
+    DoctorReadyCaseNotificationDelivery,
+    DoctorReadyCaseNotificationRejection,
+    DoctorReadyCaseNotificationStatus,
+)
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
     KnowledgeBaseCollectionConfig,
@@ -125,6 +131,10 @@ __all__ = [
     "DoctorFacingQuestion",
     "DoctorFacingSummaryDraft",
     "DoctorFacingUncertaintyMarker",
+    "DoctorReadyCaseNotification",
+    "DoctorReadyCaseNotificationDelivery",
+    "DoctorReadyCaseNotificationRejection",
+    "DoctorReadyCaseNotificationStatus",
     "CitationReference",
     "GeneratedNarrativeClaim",
     "GroundedFact",

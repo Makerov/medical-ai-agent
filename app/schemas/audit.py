@@ -21,6 +21,8 @@ class AuditEventType(StrEnum):
     CASE_STATUS_CHANGED = "case_status_changed"
     RECORD_REFERENCE_ATTACHED = "record_reference_attached"
     HANDOFF_READINESS_EVALUATED = "handoff_readiness_evaluated"
+    DOCTOR_READY_CASE_NOTIFICATION_SENT = "doctor_ready_case_notification_sent"
+    DOCTOR_READY_CASE_NOTIFICATION_REJECTED = "doctor_ready_case_notification_rejected"
     SUMMARY_TRACE_RECORDED = "summary_trace_recorded"
 
 
