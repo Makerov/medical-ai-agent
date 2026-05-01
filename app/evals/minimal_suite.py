@@ -55,7 +55,10 @@ class MinimalEvalSuite:
                 outcome="fail",
                 score=0.0,
                 threshold_signal="missing_required_fields",
-                failure_reason=f"Structured extraction example is missing required fields: {', '.join(missing)}",
+                failure_reason=(
+                    "Structured extraction example is missing required fields: "
+                    f"{', '.join(missing)}"
+                ),
                 source_artifact=path,
             )
         return EvalCheckResult(
@@ -98,7 +101,9 @@ class MinimalEvalSuite:
     def _build_safety_check(self, *, case_id: str) -> EvalCheckResult:
         path = f"{case_id}/safety/demo/safety-check-examples.json"
         payload = self._read_artifact(path)
-        blocked = next(example for example in payload["examples"] if example["decision"] == "blocked")
+        blocked = next(
+            example for example in payload["examples"] if example["decision"] == "blocked"
+        )
         issues = blocked.get("issues", [])
         if not issues:
             return EvalCheckResult(
