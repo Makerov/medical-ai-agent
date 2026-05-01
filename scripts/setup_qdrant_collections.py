@@ -1,17 +1,24 @@
 from __future__ import annotations
 
 import argparse
+import time
 from collections.abc import Sequence
 from typing import Any
 
 from app.core.settings import Settings, get_settings
-from app.integrations.qdrant_client import QdrantHttpClient, QdrantVectorStore
+from app.integrations.qdrant_client import (
+    QdrantClientError,
+    QdrantHttpClient,
+    QdrantVectorStore,
+)
 
 DEFAULT_COLLECTION_METADATA = {
     "collection_kind": "curated_medical_knowledge_seed",
     "embedding_strategy": "deterministic_hash_v1",
     "source_system": "medical-ai-agent",
 }
+DEFAULT_QDRANT_READY_RETRIES = 30
+DEFAULT_QDRANT_READY_DELAY_SECONDS = 1.0
 
 
 def build_qdrant_client(settings: Settings | None = None) -> QdrantHttpClient:
@@ -20,6 +27,23 @@ def build_qdrant_client(settings: Settings | None = None) -> QdrantHttpClient:
         base_url=active_settings.qdrant_url,
         api_key=active_settings.qdrant_api_key,
     )
+
+
+def wait_for_qdrant_ready(
+    *,
+    client: QdrantVectorStore,
+    collection_name: str,
+    retries: int = DEFAULT_QDRANT_READY_RETRIES,
+    delay_seconds: float = DEFAULT_QDRANT_READY_DELAY_SECONDS,
+) -> None:
+    for attempt in range(1, retries + 1):
+        try:
+            client.collection_exists(collection_name)
+            return
+        except QdrantClientError as exc:
+            if exc.code != "connection_failed" or attempt == retries:
+                raise
+            time.sleep(delay_seconds)
 
 
 def ensure_qdrant_collection(
@@ -69,6 +93,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     settings = get_settings()
     client = build_qdrant_client(settings)
+    wait_for_qdrant_ready(client=client, collection_name=args.collection_name)
     created = run_setup(
         client=client,
         collection_name=args.collection_name,
