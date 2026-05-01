@@ -1,0 +1,20 @@
+{
+  "case_id": "case_demo_happy_path",
+  "data_classification": "synthetic_anonymized_demo",
+  "patient_profile": {
+    "full_name": "Alex Novak",
+    "age": 34
+  },
+  "consultation_goal": "Review persistent cough and recent lab results",
+  "document": {
+    "file_id": "demo_lab_panel_pdf",
+    "file_name": "synthetic-lab-panel.pdf",
+    "mime_type": "application/pdf",
+    "file_size": 4096,
+    "file_unique_id": "demo_lab_panel_pdf_v1"
+  },
+  "ocr_text": "Hemoglobin: 13.5 g/dL\nGlucose: 5.6 mmol/L\nCreatinine: 88 umol/L",
+  "ocr_confidence": 0.95,
+  "doctor_telegram_id": 123456,
+  "document_note": "Synthetic/anonymized demo content only. No real patient documents are required."
+}
