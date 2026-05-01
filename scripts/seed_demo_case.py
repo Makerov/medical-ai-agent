@@ -20,13 +20,13 @@ from app.schemas.demo_export import (
 from app.schemas.document import DocumentUploadMetadata
 from app.schemas.extraction import StructuredExtractionExampleSet
 from app.schemas.indicator import CaseIndicatorExtractionRecord
-from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
     KnowledgeProvenance,
     KnowledgeSeedEntry,
     KnowledgeSourceMetadata,
 )
+from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
 from app.schemas.rag import (
     CitationReference,
     GeneratedNarrativeClaim,
@@ -301,7 +301,12 @@ def seed_demo_case(
     demo_bundle_path = artifact_root / fixture["case_id"] / "demo" / "reviewer-export.json"
     demo_bundle_path.parent.mkdir(parents=True, exist_ok=True)
     demo_bundle_path.write_text(
-        json.dumps(export_contract.model_dump(mode="json"), ensure_ascii=True, indent=2, sort_keys=True),
+        json.dumps(
+            export_contract.model_dump(mode="json"),
+            ensure_ascii=True,
+            indent=2,
+            sort_keys=True,
+        ),
         encoding="utf-8",
     )
     artifacts["demo_export_contract"] = demo_bundle_path.resolve(strict=False)
@@ -586,7 +591,8 @@ def _build_rag_provenance_examples(
         grounded_summary=grounded_summary,
         grounded=False,
         limitation_notes=(
-            "Retrieval failed because no trustworthy knowledge entries were found for the indicator."
+            "Retrieval failed because no trustworthy knowledge entries were found "
+            "for the indicator."
         ),
     )
     example_set = RAGProvenanceExampleSet(
@@ -635,7 +641,8 @@ def _build_demo_export_contract(
         generated_at=generated_at,
         data_classification=data_classification,
         reviewer_notes=(
-            "Synthetic, case-scoped export bundle for reviewer walkthrough without live model calls."
+            "Synthetic, case-scoped export bundle for reviewer walkthrough without "
+            "live model calls."
         ),
         non_goals=(
             "No autonomous diagnosis or treatment guidance.",
@@ -647,7 +654,10 @@ def _build_demo_export_contract(
         DemoExportArtifactReference(
             label="structured_extraction_examples",
             artifact_path=artifact_paths["structured_extraction_examples"].as_posix(),
-            description="Structured extraction and indicator payloads derived from the stable seed case.",
+            description=(
+                "Structured extraction and indicator payloads derived from the stable "
+                "seed case."
+            ),
         ),
         DemoExportArtifactReference(
             label="rag_provenance_examples",
