@@ -2,6 +2,33 @@ services:
   api:
     build: .
     env_file:
-      - .env.example
+      - .env
+    environment:
+      QDRANT_URL: http://qdrant:6333
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      - postgres
+      - qdrant
+
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: medical_ai_agent
+      POSTGRES_USER: medical_ai_agent
+      POSTGRES_PASSWORD: medical_ai_agent
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+volumes:
+  postgres-data:
+  qdrant-data:
