@@ -13,9 +13,14 @@ class Settings(BaseSettings):
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
     artifact_root_dir: Path = Path("data/artifacts")
+    knowledge_base_seed_dir: Path = Path("data/knowledge_base")
     debug: bool = False
     log_level: str = "INFO"
     doctor_telegram_id_allowlist: Annotated[tuple[int, ...], NoDecode] = ()
+    qdrant_url: str = "http://localhost:6333"
+    qdrant_api_key: str | None = None
+    qdrant_collection_name: str = "curated_medical_knowledge_v1"
+    qdrant_vector_size: int = Field(default=384, gt=0)
     document_extraction_min_confidence: float = Field(
         default=0.75,
         ge=0.0,
@@ -131,6 +136,43 @@ class Settings(BaseSettings):
             msg = "ARTIFACT_ROOT_DIR must not be empty"
             raise ValueError(msg)
         return value
+
+    @field_validator("knowledge_base_seed_dir", mode="before")
+    @classmethod
+    def validate_knowledge_base_seed_dir(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            msg = "KNOWLEDGE_BASE_SEED_DIR must not be empty"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("qdrant_url")
+    @classmethod
+    def validate_qdrant_url(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "QDRANT_URL must not be empty"
+            raise ValueError(msg)
+        return normalized.rstrip("/")
+
+    @field_validator("qdrant_api_key", mode="before")
+    @classmethod
+    def normalize_qdrant_api_key(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        msg = "QDRANT_API_KEY must be a string"
+        raise ValueError(msg)
+
+    @field_validator("qdrant_collection_name")
+    @classmethod
+    def validate_qdrant_collection_name(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "QDRANT_COLLECTION_NAME must not be empty"
+            raise ValueError(msg)
+        return normalized
 
 
 @lru_cache
