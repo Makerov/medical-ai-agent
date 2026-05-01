@@ -32,6 +32,7 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         "intake_snapshot": Path("case_demo_happy_path/export/demo/intake-snapshot.json"),
         "extracted_facts": Path("case_demo_happy_path/export/demo/extracted-facts.json"),
         "safety_check_result": Path("case_demo_happy_path/safety/demo/safety-check-result.json"),
+        "safety_check_examples": Path("case_demo_happy_path/safety/demo/safety-check-examples.json"),
         "handoff_payload": Path("case_demo_happy_path/export/demo/doctor-handoff.json"),
         "source_references": Path("case_demo_happy_path/export/demo/source-references.json"),
         "shared_status": Path("case_demo_happy_path/export/demo/shared-status.json"),
@@ -60,6 +61,14 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
     assert '"data_classification": "synthetic_anonymized_demo"' in structured_examples_json
     assert '"uncertainty_reason": "missing_unit"' in structured_examples_json
 
+    safety_examples_json = (
+        settings.artifact_root_dir / expected_relative_paths["safety_check_examples"]
+    ).read_text(encoding="utf-8")
+    assert '"decision": "pass"' in safety_examples_json
+    assert '"decision": "blocked"' in safety_examples_json
+    assert '"decision": "corrected"' in safety_examples_json
+    assert '"data_classification": "synthetic_anonymized_demo"' in safety_examples_json
+
 
 def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:
     settings = _build_settings(tmp_path)
@@ -81,6 +90,18 @@ def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:
     assert first.safety_result == second.safety_result
     assert first.artifacts == second.artifacts
 
+    safety_examples_path = (
+        settings.artifact_root_dir
+        / "case_demo_happy_path"
+        / "safety"
+        / "demo"
+        / "safety-check-examples.json"
+    )
+    safety_examples_json = safety_examples_path.read_text(encoding="utf-8")
+    assert safety_examples_json.count('"decision": "pass"') == 1
+    assert safety_examples_json.count('"decision": "blocked"') == 1
+    assert safety_examples_json.count('"decision": "corrected"') == 1
+
 
 def test_seed_demo_case_leaves_case_ready_for_doctor(tmp_path: Path) -> None:
     settings = _build_settings(tmp_path)
@@ -95,3 +116,11 @@ def test_seed_demo_case_leaves_case_ready_for_doctor(tmp_path: Path) -> None:
 
     assert result.handoff_delivery.notification is not None
     assert result.handoff_delivery.notification.shared_status.value == "ready_for_doctor"
+    safety_examples_path = (
+        settings.artifact_root_dir
+        / "case_demo_happy_path"
+        / "safety"
+        / "demo"
+        / "safety-check-examples.json"
+    )
+    assert safety_examples_path.exists()

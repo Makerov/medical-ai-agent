@@ -23,7 +23,7 @@ from app.schemas.rag import (
     GroundedSummaryContract,
     SummaryValidationResult,
 )
-from app.schemas.safety import SafetyCheckResult
+from app.schemas.safety import SafetyCheckExampleSet, SafetyCheckResult, SafetyIssue
 from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
 from app.services.document_service import DocumentService
@@ -201,6 +201,17 @@ def seed_demo_case(
             relative_path="demo/safety-check-result.json",
             payload=safety_result.model_dump(mode="json"),
         ),
+        "safety_check_examples": _write_json_artifact(
+            audit_service,
+            case_id=fixture["case_id"],
+            artifact_kind=ArtifactKind.SAFETY,
+            relative_path="demo/safety-check-examples.json",
+            payload=_build_safety_check_examples(
+                case_id=fixture["case_id"],
+                data_classification=str(fixture["data_classification"]),
+                pass_result=safety_result,
+            ),
+        ),
         "handoff_payload": _write_json_artifact(
             audit_service,
             case_id=fixture["case_id"],
@@ -350,6 +361,71 @@ def _build_structured_extraction_examples(
             )
         )
     return [example.model_dump(mode="json") for example in examples]
+
+
+def _build_safety_check_examples(
+    *,
+    case_id: str,
+    data_classification: str,
+    pass_result: SafetyCheckResult,
+) -> dict[str, Any]:
+    unsafe_example = SafetyCheckResult(
+        case_id=case_id,
+        decision="blocked",
+        issues=(
+            SafetyIssue(
+                category="diagnosis_language",
+                severity="high",
+                message="Diagnosis language is not allowed in the doctor-facing summary draft.",
+                evidence="diagnosis",
+            ),
+            SafetyIssue(
+                category="treatment_recommendation_language",
+                severity="high",
+                message=(
+                    "Treatment recommendation language is not allowed in the doctor-facing "
+                    "summary draft."
+                ),
+                evidence="treatment recommendation",
+            ),
+            SafetyIssue(
+                category="unsupported_clinical_certainty",
+                severity="high",
+                message="Unsupported certainty language must be blocked.",
+                evidence="definitely",
+            ),
+        ),
+        decision_rationale="Unsafe clinical language requires blocking before handoff.",
+        correction_path="manual_review_required",
+    )
+    corrected_example = SafetyCheckResult(
+        case_id=case_id,
+        decision="corrected",
+        issues=(
+            SafetyIssue(
+                category="borderline_phrasing",
+                severity="medium",
+                message="Borderline phrasing should be corrected before handoff.",
+                evidence="might",
+            ),
+        ),
+        decision_rationale="Borderline phrasing should be corrected before handoff.",
+        correction_path="recoverable_correction",
+    )
+    example_set = SafetyCheckExampleSet(
+        case_id=case_id,
+        data_classification=data_classification,
+        examples=(
+            pass_result,
+            corrected_example,
+            unsafe_example,
+        ),
+        example_note=(
+            "Synthetic demo safety examples derived from the stable seed case and canonical "
+            "safety gate."
+        ),
+    )
+    return example_set.model_dump(mode="json")
 
 
 def _write_json_artifact(
