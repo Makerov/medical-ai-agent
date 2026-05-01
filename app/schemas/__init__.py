@@ -48,6 +48,7 @@ from app.schemas.knowledge_base import (
     KnowledgeSourceMetadata,
 )
 from app.schemas.rag import (
+    KnowledgeApplicabilityDecision,
     KnowledgeRetrievalMatch,
     KnowledgeRetrievalResult,
     RetrievalIndicatorContext,
@@ -95,6 +96,7 @@ __all__ = [
     "KnowledgeProvenance",
     "KnowledgeSeedEntry",
     "KnowledgeSourceMetadata",
+    "KnowledgeApplicabilityDecision",
     "KnowledgeRetrievalMatch",
     "KnowledgeRetrievalResult",
     "OCRTextExtractionResult",
