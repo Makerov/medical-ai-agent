@@ -35,6 +35,7 @@ from app.schemas.rag import (
 )
 from app.services.access_control_service import authorize_capability
 from app.services.audit_service import AuditService
+from app.services.boundary_copy import SAFETY_BOUNDARY_STATEMENT
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import PatientIntakeService
 from app.services.summary_service import SummaryService
@@ -212,6 +213,7 @@ class HandoffService:
             case_id=case_id,
             current_case_status=view.lifecycle_status.value,
             shared_status=view.handoff_readiness.shared_status,
+            ai_boundary_label=SAFETY_BOUNDARY_STATEMENT,
             patient_goal=(
                 payload.consultation_goal.text if payload and payload.consultation_goal else None
             ),
@@ -497,7 +499,9 @@ class HandoffService:
         if not references:
             return DoctorCaseSourceReferenceState(
                 case_id=case_id,
-                unavailable_reason="No source document references were attached to extracted facts.",
+                unavailable_reason=(
+                    "No source document references were attached to extracted facts."
+                ),
             )
         return DoctorCaseSourceReferenceState(case_id=case_id, references=tuple(references))
 

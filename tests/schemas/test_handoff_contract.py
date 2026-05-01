@@ -3,13 +3,13 @@ from app.schemas.handoff import (
     DoctorCaseCard,
     DoctorCaseCardDelivery,
     DoctorCaseCardRejection,
+    DoctorCaseSourceReference,
+    DoctorCaseSourceReferenceState,
+    DoctorCaseSourceReferenceStatus,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
     DoctorReadyCaseNotificationStatus,
-    DoctorCaseSourceReference,
-    DoctorCaseSourceReferenceState,
-    DoctorCaseSourceReferenceStatus,
 )
 
 
@@ -57,6 +57,9 @@ def test_doctor_case_card_contract_is_typed_and_minimal() -> None:
         case_id="case_ready_003",
         current_case_status="ready_for_doctor",
         shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+        ai_boundary_label=(
+            "ИИ подготавливает информацию для врача, но не ставит диагноз и не назначает лечение."
+        ),
         patient_goal="Discuss ongoing cough",
         patient_profile_summary="Alex, 34 years old",
         document_list=("document_001", "document_002"),
@@ -66,6 +69,9 @@ def test_doctor_case_card_contract_is_typed_and_minimal() -> None:
         "case_id": "case_ready_003",
         "current_case_status": "ready_for_doctor",
         "shared_status": SharedCaseStatusCode.READY_FOR_DOCTOR,
+        "ai_boundary_label": (
+            "ИИ подготавливает информацию для врача, но не ставит диагноз и не назначает лечение."
+        ),
         "patient_goal": "Discuss ongoing cough",
         "patient_profile_summary": "Alex, 34 years old",
         "document_list": ("document_001", "document_002"),
@@ -98,7 +104,9 @@ def test_doctor_case_source_reference_contract_supports_available_and_unavailabl
 
     assert available_reference.status == DoctorCaseSourceReferenceStatus.AVAILABLE
     assert available_reference.model_dump(mode="python")["label"] == "Document document_001"
-    assert unavailable_state.unavailable_reason == "No source document references are available for review."
+    assert unavailable_state.unavailable_reason == (
+        "No source document references are available for review."
+    )
 
 
 def test_doctor_case_card_delivery_requires_single_outcome() -> None:

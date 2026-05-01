@@ -413,6 +413,7 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
         f"{DOCTOR_CASE_CARD_HEADER}\n\n"
         f"Номер заявки: {card.case_id}\n"
         f"Статус: {card.current_case_status}\n"
+        f"AI boundary label: {card.ai_boundary_label}\n"
         f"Patient goal: {patient_goal}\n"
         f"Patient profile summary: {patient_profile_summary}\n"
         f"Documents: {document_list}\n\n"
@@ -439,7 +440,8 @@ def _render_doctor_case_source_references(card: DoctorCaseCard) -> str:
         fact_suffix = f"; fact: {reference.related_fact_id}" if reference.related_fact_id else ""
         if reference.document_reference is not None:
             lines.append(
-                f"- {reference.label}: {reference.document_reference.record_id}{fact_suffix}{context_suffix}"
+                f"- {reference.label}: {reference.document_reference.record_id}"
+                f"{fact_suffix}{context_suffix}"
             )
         else:
             lines.append(f"- {reference.label}: unavailable ({reference.unavailable_reason})")
@@ -498,6 +500,14 @@ def _render_doctor_case_warnings(card: DoctorCaseCard) -> str:
     for warning in card.review_warnings:
         lines.append(f"- {warning.text}")
     return "\n".join(lines)
+
+
+def doctor_case_card_template_text() -> str:
+    return (
+        "AI boundary label: "
+        "ИИ подготавливает информацию для врача, но не ставит диагноз и не назначает лечение.\n"
+        "Итоговое медицинское решение остается за врачом."
+    )
 
 
 def render_doctor_case_card_access_denied_message(

@@ -268,13 +268,20 @@ def test_get_doctor_case_card_returns_structured_card_for_ready_case() -> None:
     assert delivery.card.case_id == case_id
     assert delivery.card.current_case_status == "ready_for_doctor"
     assert delivery.card.shared_status.value == "ready_for_doctor"
+    assert (
+        delivery.card.ai_boundary_label
+        == "ИИ подготавливает информацию для врача, но не ставит диагноз и не назначает лечение."
+    )
     assert delivery.card.patient_goal == "Review persistent cough"
     assert delivery.card.patient_profile_summary == "Alex Novak, 34 years old"
     assert delivery.card.document_list == ("document_001",)
     assert delivery.card.source_references is not None
     assert delivery.card.source_references.unavailable_reason is None
     assert delivery.card.source_references.references[0].document_reference is not None
-    assert delivery.card.source_references.references[0].document_reference.record_id == "document_001"
+    assert (
+        delivery.card.source_references.references[0].document_reference.record_id
+        == "document_001"
+    )
     assert delivery.card.extracted_facts == ()
     assert delivery.card.questions_for_doctor == ()
     assert delivery.card.review_warnings == ()
@@ -382,6 +389,10 @@ def test_get_doctor_case_card_includes_extracted_facts_and_uncertainty_warnings(
 
     assert delivery.card is not None
     assert len(delivery.card.extracted_facts) == 2
+    assert (
+        delivery.card.ai_boundary_label
+        == "ИИ подготавливает информацию для врача, но не ставит диагноз и не назначает лечение."
+    )
     assert delivery.card.extracted_facts[0].name == "Hemoglobin"
     assert delivery.card.extracted_facts[0].source_confidence == 0.97
     assert delivery.card.extracted_facts[0].is_uncertain is False
@@ -402,7 +413,8 @@ def test_get_doctor_case_card_includes_extracted_facts_and_uncertainty_warnings(
     assert delivery.card.source_references.references[0].label == "Document document_001"
 
 
-def test_get_doctor_case_card_renders_structured_unavailable_source_references_when_missing() -> None:
+def test_get_doctor_case_card_renders_structured_unavailable_source_references_when_missing(
+) -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_ready_card_004")
     patient_intake_service = PatientIntakeService(case_service=case_service)

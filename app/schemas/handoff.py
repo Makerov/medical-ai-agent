@@ -261,6 +261,7 @@ class DoctorCaseCard(BaseModel):
     case_id: str = Field(min_length=1)
     current_case_status: str = Field(min_length=1)
     shared_status: SharedCaseStatusCode
+    ai_boundary_label: str = Field(min_length=1)
     patient_goal: str | None = None
     patient_profile_summary: str | None = None
     document_list: tuple[str, ...] = ()
@@ -279,6 +280,15 @@ class DoctorCaseCard(BaseModel):
         normalized = value.strip()
         if not normalized:
             msg = "Doctor case card text fields must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("ai_boundary_label")
+    @classmethod
+    def normalize_boundary_label(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "Doctor case boundary label must not be empty"
             raise ValueError(msg)
         return normalized
 
