@@ -40,6 +40,12 @@ from app.schemas.indicator import (
     StructuredIndicatorValue,
     StructuredMedicalIndicator,
 )
+from app.schemas.knowledge_base import (
+    KnowledgeApplicability,
+    KnowledgeProvenance,
+    KnowledgeSeedEntry,
+    KnowledgeSourceMetadata,
+)
 from app.schemas.patient import (
     ConsultationGoal,
     ConsultationGoalCaptureResult,
@@ -78,6 +84,10 @@ __all__ = [
     "CaseExtractionRecord",
     "CaseIndicatorExtractionRecord",
     "DocumentProcessingResult",
+    "KnowledgeApplicability",
+    "KnowledgeProvenance",
+    "KnowledgeSeedEntry",
+    "KnowledgeSourceMetadata",
     "OCRTextExtractionResult",
     "PatientIntakeCaptureResult",
     "PatientIntakeField",
