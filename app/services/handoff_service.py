@@ -213,6 +213,8 @@ class HandoffService:
             case_id=case_id,
             current_case_status=view.lifecycle_status.value,
             shared_status=view.handoff_readiness.shared_status,
+            doctor_review_status=view.doctor_review_status,
+            doctor_review_reason=view.doctor_review_reason,
             ai_boundary_label=SAFETY_BOUNDARY_STATEMENT,
             patient_goal=(
                 payload.consultation_goal.text if payload and payload.consultation_goal else None

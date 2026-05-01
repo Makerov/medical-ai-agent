@@ -31,6 +31,13 @@ class SharedCaseStatusCode(StrEnum):
     CASE_CLOSED = "case_closed"
 
 
+class DoctorFacingStatusCode(StrEnum):
+    READY = "ready"
+    PARTIAL = "partial"
+    BLOCKED = "blocked"
+    REVIEW_REQUIRED = "review_required"
+
+
 class HandoffBlockingReasonCode(StrEnum):
     PATIENT_PROFILE_MISSING = "patient_profile_missing"
     CONSENT_MISSING = "consent_missing"
@@ -184,6 +191,8 @@ class HandoffReadinessResult(BaseModel):
     case_id: str = Field(min_length=1)
     is_ready_for_doctor: bool
     shared_status: SharedCaseStatusCode
+    doctor_status: DoctorFacingStatusCode
+    doctor_status_reason: str = Field(min_length=1)
     blocking_reasons: tuple[HandoffBlockingReason, ...] = ()
 
     model_config = ConfigDict(frozen=True)
@@ -194,6 +203,8 @@ class SharedStatusView(BaseModel):
     lifecycle_status: CaseStatus
     patient_status: SharedCaseStatusCode
     doctor_status: SharedCaseStatusCode
+    doctor_review_status: DoctorFacingStatusCode
+    doctor_review_reason: str = Field(min_length=1)
     handoff_readiness: HandoffReadinessResult
 
     model_config = ConfigDict(frozen=True)

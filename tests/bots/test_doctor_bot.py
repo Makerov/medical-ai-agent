@@ -108,6 +108,8 @@ def test_render_doctor_case_card_is_minimal() -> None:
         case_id="case_ready_002",
         current_case_status="ready_for_doctor",
         shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+        doctor_review_status="ready",
+        doctor_review_reason="Case is ready for doctor review.",
         ai_boundary_label=(
             "ИИ подготавливает информацию для врача, но не ставит диагноз "
             "и не назначает лечение."
@@ -162,6 +164,8 @@ def test_render_doctor_case_card_is_minimal() -> None:
     assert DOCTOR_CASE_CARD_HEADER in message
     assert "case_ready_002" in message
     assert "AI boundary label:" in message
+    assert "Doctor status: ready" in message
+    assert "Case is ready for doctor review." in message
     assert "не ставит диагноз" in message
     assert "Review cough" in message
     assert "Alex, 34 years old" in message
@@ -174,8 +178,31 @@ def test_render_doctor_case_card_is_minimal() -> None:
     assert "AI-prepared questions:" in message
     assert "Which extracted facts need more clinical context before review?" in message
     assert "Review warnings:" in message
+    assert "Doctor status: ready" in message
     assert "diagnosis" not in message.lower()
     assert "treatment instruction" not in message.lower()
+
+
+def test_render_doctor_case_card_shows_safe_problem_explanation_without_internal_errors() -> None:
+    card = DoctorCaseCard(
+        case_id="case_problem_001",
+        current_case_status="processing_documents",
+        shared_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        doctor_review_status="partial",
+        doctor_review_reason="Processing is partial and the case needs more work before review.",
+        ai_boundary_label=(
+            "ИИ подготавливает информацию для врача, но не ставит диагноз "
+            "и не назначает лечение."
+        ),
+    )
+
+    message = render_doctor_case_card(card)
+
+    assert "Doctor status: partial" in message
+    assert "Processing is partial" in message
+    assert "traceback" not in message.lower()
+    assert "stack trace" not in message.lower()
+    assert "raw model" not in message.lower()
 
 
 def test_doctor_case_card_template_text_is_boundary_safe() -> None:
@@ -216,6 +243,8 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
             case_id="case_ready_002",
             current_case_status="ready_for_doctor",
             shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+            doctor_review_status="ready",
+            doctor_review_reason="Case is ready for doctor review.",
             ai_boundary_label=(
                 "ИИ подготавливает информацию для врача, но не ставит диагноз "
                 "и не назначает лечение."
@@ -242,6 +271,7 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
     bot.send_message.assert_awaited_once()
     assert bot.send_message.await_args.kwargs["chat_id"] == 123456
     assert "ready_for_doctor" in bot.send_message.await_args.kwargs["text"]
+    assert "Doctor status: ready" in bot.send_message.await_args.kwargs["text"]
     assert "Source document references:" in bot.send_message.await_args.kwargs["text"]
     assert "AI-prepared questions:" in bot.send_message.await_args.kwargs["text"]
 

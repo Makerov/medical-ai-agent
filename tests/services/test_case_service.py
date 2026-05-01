@@ -8,6 +8,7 @@ from app.schemas.case import (
     CaseRecordReference,
     CaseStatus,
     CaseTransitionError,
+    DoctorFacingStatusCode,
     SharedCaseStatusCode,
 )
 from app.schemas.document import DocumentUploadMetadata
@@ -492,6 +493,8 @@ def test_evaluate_handoff_readiness_returns_structured_blocking_reasons_for_empt
     assert readiness.case_id == patient_case.case_id
     assert readiness.is_ready_for_doctor is False
     assert readiness.shared_status == SharedCaseStatusCode.INTAKE_REQUIRED
+    assert readiness.doctor_status == DoctorFacingStatusCode.PARTIAL
+    assert "Intake is incomplete" in readiness.doctor_status_reason
     assert {reason.code.value for reason in readiness.blocking_reasons} >= {
         "patient_profile_missing",
         "consent_missing",
@@ -566,6 +569,8 @@ def test_transition_to_ready_for_doctor_uses_shared_status_view() -> None:
     assert readiness.is_ready_for_doctor is True
     assert readiness.blocking_reasons == ()
     assert readiness.shared_status == SharedCaseStatusCode.READY_FOR_DOCTOR
+    assert readiness.doctor_status == DoctorFacingStatusCode.READY
+    assert readiness.doctor_status_reason == "Case is ready for doctor review."
 
     transitioned_case = service.transition_case(patient_case.case_id, CaseStatus.READY_FOR_DOCTOR)
 
@@ -574,6 +579,8 @@ def test_transition_to_ready_for_doctor_uses_shared_status_view() -> None:
     assert shared_status_view.lifecycle_status == CaseStatus.READY_FOR_DOCTOR
     assert shared_status_view.patient_status == SharedCaseStatusCode.READY_FOR_DOCTOR
     assert shared_status_view.doctor_status == SharedCaseStatusCode.READY_FOR_DOCTOR
+    assert shared_status_view.doctor_review_status == DoctorFacingStatusCode.READY
+    assert shared_status_view.doctor_review_reason == "Case is ready for doctor review."
     assert shared_status_view.patient_status is shared_status_view.doctor_status
     assert shared_status_view.handoff_readiness.is_ready_for_doctor is True
 
@@ -597,6 +604,8 @@ def test_get_shared_status_view_maps_processing_failure_to_patient_recoverable_s
     assert shared_status_view.lifecycle_status == CaseStatus.EXTRACTION_FAILED
     assert shared_status_view.patient_status == SharedCaseStatusCode.PROCESSING_PENDING
     assert shared_status_view.doctor_status == SharedCaseStatusCode.PROCESSING_PENDING
+    assert shared_status_view.doctor_review_status == DoctorFacingStatusCode.PARTIAL
+    assert "not ready for review" in shared_status_view.doctor_review_reason
     assert (
         shared_status_view.handoff_readiness.shared_status
         == SharedCaseStatusCode.PROCESSING_PENDING
@@ -617,6 +626,8 @@ def test_get_shared_status_view_maps_documents_uploaded_to_processing_pending_st
     assert shared_status_view.lifecycle_status == CaseStatus.DOCUMENTS_UPLOADED
     assert shared_status_view.patient_status == SharedCaseStatusCode.PROCESSING_PENDING
     assert shared_status_view.doctor_status == SharedCaseStatusCode.PROCESSING_PENDING
+    assert shared_status_view.doctor_review_status == DoctorFacingStatusCode.PARTIAL
+    assert "not ready for review" in shared_status_view.doctor_review_reason
 
 
 def test_get_shared_status_view_maps_deleted_case_to_closed_status() -> None:
@@ -631,6 +642,8 @@ def test_get_shared_status_view_maps_deleted_case_to_closed_status() -> None:
     assert shared_status_view.lifecycle_status == CaseStatus.DELETED
     assert shared_status_view.patient_status == SharedCaseStatusCode.CASE_CLOSED
     assert shared_status_view.doctor_status == SharedCaseStatusCode.CASE_CLOSED
+    assert shared_status_view.doctor_review_status == DoctorFacingStatusCode.BLOCKED
+    assert "unavailable for doctor review" in shared_status_view.doctor_review_reason
     assert shared_status_view.handoff_readiness.shared_status == SharedCaseStatusCode.CASE_CLOSED
 
 
@@ -870,6 +883,8 @@ def test_failure_state_never_reports_ready_for_doctor() -> None:
 
     assert readiness.is_ready_for_doctor is False
     assert readiness.shared_status == SharedCaseStatusCode.SAFETY_REVIEW_REQUIRED
+    assert readiness.doctor_status == DoctorFacingStatusCode.REVIEW_REQUIRED
+    assert "Safety review is required" in readiness.doctor_status_reason
     assert {reason.code.value for reason in readiness.blocking_reasons} >= {
         "case_status_not_ready",
     }

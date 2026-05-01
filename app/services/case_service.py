@@ -9,6 +9,7 @@ from app.schemas.case import (
     CaseRecordReference,
     CaseStatus,
     CaseTransitionError,
+    DoctorFacingStatusCode,
     HandoffBlockingReason,
     HandoffBlockingReasonCode,
     HandoffReadinessResult,
@@ -245,6 +246,8 @@ class CaseService:
             lifecycle_status=records.patient_case.status,
             patient_status=shared_status,
             doctor_status=shared_status,
+            doctor_review_status=handoff_readiness.doctor_status,
+            doctor_review_reason=handoff_readiness.doctor_status_reason,
             handoff_readiness=handoff_readiness,
         )
 
@@ -315,6 +318,8 @@ class CaseService:
                 case_id=case.case_id,
                 is_ready_for_doctor=False,
                 shared_status=SharedCaseStatusCode.CASE_CLOSED,
+                doctor_status=DoctorFacingStatusCode.BLOCKED,
+                doctor_status_reason="Case is deleted and unavailable for doctor review.",
                 blocking_reasons=(
                     HandoffBlockingReason(
                         code=HandoffBlockingReasonCode.CASE_DELETED,
@@ -327,6 +332,8 @@ class CaseService:
                 case_id=case.case_id,
                 is_ready_for_doctor=False,
                 shared_status=SharedCaseStatusCode.CASE_CLOSED,
+                doctor_status=DoctorFacingStatusCode.BLOCKED,
+                doctor_status_reason="Case is closed and unavailable for doctor review.",
                 blocking_reasons=(
                     HandoffBlockingReason(
                         code=HandoffBlockingReasonCode.CASE_NOT_ACTIVE,
@@ -430,12 +437,85 @@ class CaseService:
             processing_ready=processing_ready,
             safety_ready=safety_ready,
         )
+        doctor_status = self._doctor_status_from_flags(
+            case.status,
+            blocking_reasons=blocking_reasons,
+            intake_ready=intake_ready,
+            processing_ready=processing_ready,
+            safety_ready=safety_ready,
+        )
+        doctor_status_reason = self._doctor_status_reason(
+            case.status,
+            blocking_reasons=blocking_reasons,
+            doctor_status=doctor_status,
+        )
         return HandoffReadinessResult(
             case_id=case.case_id,
             is_ready_for_doctor=not blocking_reasons,
             shared_status=shared_status,
+            doctor_status=doctor_status,
+            doctor_status_reason=doctor_status_reason,
             blocking_reasons=tuple(blocking_reasons),
         )
+
+    @classmethod
+    def _doctor_status_from_flags(
+        cls,
+        case_status: CaseStatus,
+        *,
+        blocking_reasons: list[HandoffBlockingReason],
+        intake_ready: bool,
+        processing_ready: bool,
+        safety_ready: bool,
+    ) -> DoctorFacingStatusCode:
+        _ = intake_ready, processing_ready, safety_ready
+        if case_status == CaseStatus.SAFETY_FAILED:
+            return DoctorFacingStatusCode.REVIEW_REQUIRED
+        if case_status in cls._CLOSED_CASE_STATUSES:
+            return DoctorFacingStatusCode.BLOCKED
+        if not blocking_reasons:
+            return DoctorFacingStatusCode.READY
+        return DoctorFacingStatusCode.PARTIAL
+
+    @staticmethod
+    def _doctor_status_reason(
+        case_status: CaseStatus,
+        *,
+        blocking_reasons: list[HandoffBlockingReason],
+        doctor_status: DoctorFacingStatusCode,
+    ) -> str:
+        if doctor_status == DoctorFacingStatusCode.READY:
+            return "Case is ready for doctor review."
+        if case_status == CaseStatus.SAFETY_FAILED:
+            return "Safety review is required before doctor review."
+        if not blocking_reasons:
+            return "Case is ready for doctor review."
+
+        reason_codes = {reason.code for reason in blocking_reasons}
+        if reason_codes & {
+            HandoffBlockingReasonCode.PATIENT_PROFILE_MISSING,
+            HandoffBlockingReasonCode.CONSENT_MISSING,
+            HandoffBlockingReasonCode.INTAKE_READINESS_MISSING,
+        }:
+            return "Intake is incomplete and the case is not ready for review."
+        if reason_codes & {
+            HandoffBlockingReasonCode.DOCUMENTS_MISSING,
+            HandoffBlockingReasonCode.EXTRACTIONS_MISSING,
+            HandoffBlockingReasonCode.SUMMARY_MISSING,
+            HandoffBlockingReasonCode.PROCESSING_READINESS_MISSING,
+        }:
+            return "Processing is partial and the case needs more work before review."
+        if reason_codes & {
+            HandoffBlockingReasonCode.SAFETY_CLEARANCE_MISSING,
+            HandoffBlockingReasonCode.CASE_STATUS_NOT_READY,
+        }:
+            return "Manual review is required before doctor handoff."
+        if reason_codes & {
+            HandoffBlockingReasonCode.CASE_NOT_ACTIVE,
+            HandoffBlockingReasonCode.CASE_DELETED,
+        }:
+            return "Case is blocked and unavailable for doctor review."
+        return "Manual review is required before doctor handoff."
 
     @classmethod
     def _shared_status_from_flags(

@@ -42,10 +42,10 @@ from app.schemas.extraction import (
     OCRTextExtractionResult,
 )
 from app.schemas.handoff import (
-    DoctorCaseIndicatorFact,
     DoctorCaseCard,
     DoctorCaseCardDelivery,
     DoctorCaseCardRejection,
+    DoctorCaseIndicatorFact,
     DoctorCaseReviewWarning,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
