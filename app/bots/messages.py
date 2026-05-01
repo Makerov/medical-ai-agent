@@ -403,6 +403,7 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
     document_list = ", ".join(card.document_list) if card.document_list else "нет документов"
     patient_goal = card.patient_goal or "не указана"
     patient_profile_summary = card.patient_profile_summary or "краткий профиль недоступен"
+    source_references_block = _render_doctor_case_source_references(card)
     facts_block = _render_doctor_case_facts(card)
     deviations_block = _render_doctor_case_deviations(card)
     uncertainty_block = _render_doctor_case_uncertainty(card)
@@ -415,12 +416,34 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
         f"Patient goal: {patient_goal}\n"
         f"Patient profile summary: {patient_profile_summary}\n"
         f"Documents: {document_list}\n\n"
+        f"{source_references_block}\n\n"
         f"{facts_block}\n\n"
         f"{deviations_block}\n\n"
         f"{uncertainty_block}\n\n"
         f"{questions_block}\n\n"
         f"{warnings_block}"
     )
+
+
+def _render_doctor_case_source_references(card: DoctorCaseCard) -> str:
+    source_references = card.source_references
+    if source_references is None:
+        return "Source document references:\n- unavailable: no source references were assembled"
+    if source_references.unavailable_reason is not None:
+        return f"Source document references:\n- unavailable: {source_references.unavailable_reason}"
+    lines = ["Source document references:"]
+    for reference in source_references.references:
+        context_suffix = (
+            f"; context: {reference.related_context}" if reference.related_context else ""
+        )
+        fact_suffix = f"; fact: {reference.related_fact_id}" if reference.related_fact_id else ""
+        if reference.document_reference is not None:
+            lines.append(
+                f"- {reference.label}: {reference.document_reference.record_id}{fact_suffix}{context_suffix}"
+            )
+        else:
+            lines.append(f"- {reference.label}: unavailable ({reference.unavailable_reason})")
+    return "\n".join(lines)
 
 
 def _render_doctor_case_facts(card: DoctorCaseCard) -> str:

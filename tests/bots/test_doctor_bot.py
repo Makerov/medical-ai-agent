@@ -19,6 +19,8 @@ from app.schemas.handoff import (
     DoctorCaseCardRejection,
     DoctorCaseIndicatorFact,
     DoctorCaseReviewWarning,
+    DoctorCaseSourceReference,
+    DoctorCaseSourceReferenceState,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
@@ -108,6 +110,23 @@ def test_render_doctor_case_card_is_minimal() -> None:
         patient_goal="Review cough",
         patient_profile_summary="Alex, 34 years old",
         document_list=("document_001",),
+        source_references=DoctorCaseSourceReferenceState(
+            case_id="case_ready_002",
+            references=(
+                DoctorCaseSourceReference(
+                    case_id="case_ready_002",
+                    document_reference={
+                        "case_id": "case_ready_002",
+                        "record_kind": "document",
+                        "record_id": "document_001",
+                        "created_at": "2026-04-28T06:00:00Z",
+                    },
+                    label="Document document_001",
+                    related_fact_id="document_001:Hemoglobin",
+                    related_context="Source for Hemoglobin",
+                ),
+            ),
+        ),
         extracted_facts=(
             DoctorCaseIndicatorFact(
                 fact_id="document_001:Hemoglobin",
@@ -140,6 +159,9 @@ def test_render_doctor_case_card_is_minimal() -> None:
     assert "Review cough" in message
     assert "Alex, 34 years old" in message
     assert "document_001" in message
+    assert "Source document references:" in message
+    assert "Document document_001" in message
+    assert "fact: document_001:Hemoglobin" in message
     assert "Extracted facts:" in message
     assert "confidence: 0.97" in message
     assert "AI-prepared questions:" in message
@@ -176,6 +198,10 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
             patient_goal="Review cough",
             patient_profile_summary="Alex, 34 years old",
             document_list=("document_001",),
+            source_references=DoctorCaseSourceReferenceState(
+                case_id="case_ready_002",
+                unavailable_reason="No source document references are available for review.",
+            ),
             questions_for_doctor=(
                 DoctorFacingQuestion(
                     question_id="question:1",
@@ -191,6 +217,7 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
     bot.send_message.assert_awaited_once()
     assert bot.send_message.await_args.kwargs["chat_id"] == 123456
     assert "ready_for_doctor" in bot.send_message.await_args.kwargs["text"]
+    assert "Source document references:" in bot.send_message.await_args.kwargs["text"]
     assert "AI-prepared questions:" in bot.send_message.await_args.kwargs["text"]
 
 

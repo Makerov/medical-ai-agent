@@ -18,6 +18,9 @@ from app.schemas.handoff import (
     DoctorCaseCardRejection,
     DoctorCaseIndicatorFact,
     DoctorCaseReviewWarning,
+    DoctorCaseSourceReference,
+    DoctorCaseSourceReferenceState,
+    DoctorCaseSourceReferenceStatus,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
@@ -187,6 +190,12 @@ class HandoffService:
         core_records = self._case_service.get_case_core_records(case_id)
         indicator_records = self._case_service.get_case_indicator_records(case_id)
         extracted_facts = self._build_extracted_facts(indicator_records)
+        source_references = self._build_source_reference_state(
+            case_id=case_id,
+            core_records=core_records,
+            extracted_facts=extracted_facts,
+            indicator_records=indicator_records,
+        )
         grounded_summary = self._build_grounded_summary(case_id, extracted_facts)
         summary_draft = self._summary_service.build_doctor_facing_summary_draft(
             grounded_summary=grounded_summary,
@@ -212,6 +221,7 @@ class HandoffService:
                 else None
             ),
             document_list=tuple(reference.record_id for reference in core_records.documents),
+            source_references=source_references,
             extracted_facts=extracted_facts,
             possible_deviations=summary_draft.possible_deviations,
             uncertainty_markers=summary_draft.uncertainty_markers,
@@ -415,6 +425,81 @@ class HandoffService:
                     )
                 )
         return tuple(facts)
+
+    @staticmethod
+    def _build_source_reference_state(
+        *,
+        case_id: str,
+        core_records,
+        extracted_facts: tuple[DoctorCaseIndicatorFact, ...],
+        indicator_records: tuple,
+    ) -> DoctorCaseSourceReferenceState:
+        if not core_records.documents and not indicator_records:
+            return DoctorCaseSourceReferenceState(
+                case_id=case_id,
+                unavailable_reason="No case-linked source documents are available for review.",
+            )
+
+        document_by_id = {reference.record_id: reference for reference in core_records.documents}
+        references: list[DoctorCaseSourceReference] = []
+        seen_document_ids: set[str] = set()
+
+        for document_reference in core_records.documents:
+            references.append(
+                DoctorCaseSourceReference(
+                    case_id=case_id,
+                    document_reference=document_reference,
+                    label=f"Document {document_reference.record_id}",
+                )
+            )
+            seen_document_ids.add(document_reference.record_id)
+
+        for record in indicator_records:
+            for indicator in (*record.indicators, *record.uncertain_indicators):
+                document_reference = indicator.source_document_reference
+                if document_reference.record_id in seen_document_ids:
+                    continue
+                seen_document_ids.add(document_reference.record_id)
+                if document_reference.record_id not in document_by_id:
+                    references.append(
+                        DoctorCaseSourceReference(
+                            case_id=case_id,
+                            label=f"Document {document_reference.record_id}",
+                            related_context=(
+                                f"Source for {indicator.name}"
+                                if indicator.name
+                                else None
+                            ),
+                            status=DoctorCaseSourceReferenceStatus.UNAVAILABLE,
+                            unavailable_reason=(
+                                "Source document reference is not available in the case record."
+                            ),
+                        )
+                    )
+                    continue
+                references.append(
+                    DoctorCaseSourceReference(
+                        case_id=case_id,
+                        document_reference=document_by_id[document_reference.record_id],
+                        label=f"Document {document_reference.record_id}",
+                        related_fact_id=next(
+                            (
+                                fact.fact_id
+                                for fact in extracted_facts
+                                if fact.fact_id.endswith(f":{indicator.name}")
+                            ),
+                            None,
+                        ),
+                        related_context=f"Source for {indicator.name}",
+                    )
+                )
+
+        if not references:
+            return DoctorCaseSourceReferenceState(
+                case_id=case_id,
+                unavailable_reason="No source document references were attached to extracted facts.",
+            )
+        return DoctorCaseSourceReferenceState(case_id=case_id, references=tuple(references))
 
     @staticmethod
     def _build_grounded_summary(
