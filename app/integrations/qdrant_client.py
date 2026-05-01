@@ -34,6 +34,15 @@ class QdrantVectorStore(Protocol):
         points: Sequence[Mapping[str, Any]],
     ) -> int: ...
 
+    def query_points(
+        self,
+        *,
+        collection_name: str,
+        vector: Sequence[float],
+        limit: int,
+        query_filter: Mapping[str, Any] | None = None,
+    ) -> list[Mapping[str, Any]]: ...
+
 
 def build_deterministic_vector(text: str, *, dimension: int) -> tuple[float, ...]:
     normalized_text = text.strip()
@@ -126,6 +135,35 @@ class QdrantHttpClient:
             query={"wait": "true", "ordering": "strong"},
         )
         return len(point_list)
+
+    def query_points(
+        self,
+        *,
+        collection_name: str,
+        vector: Sequence[float],
+        limit: int,
+        query_filter: Mapping[str, Any] | None = None,
+    ) -> list[Mapping[str, Any]]:
+        body: dict[str, Any] = {
+            "vector": [float(value) for value in vector],
+            "limit": limit,
+            "with_payload": True,
+            "with_vector": False,
+        }
+        if query_filter is not None:
+            body["filter"] = dict(query_filter)
+        response = self._request_json(
+            "POST",
+            f"/collections/{collection_name}/points/search",
+            body=body,
+        )
+        if isinstance(response, dict):
+            points = response.get("result", [])
+        else:
+            points = response or []
+        if not isinstance(points, list):
+            return []
+        return [point for point in points if isinstance(point, Mapping)]
 
     def _request_json(
         self,

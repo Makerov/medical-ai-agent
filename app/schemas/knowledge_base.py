@@ -142,3 +142,10 @@ class KnowledgeSeedEntry(BaseModel):
             "vector": [float(value) for value in vector],
             "payload": self.to_qdrant_payload(),
         }
+
+
+class KnowledgeBaseCollectionConfig(BaseModel):
+    collection_name: str = Field(min_length=1)
+    vector_size: int = Field(gt=0)
+
+    model_config = ConfigDict(frozen=True)

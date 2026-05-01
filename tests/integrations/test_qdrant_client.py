@@ -80,3 +80,28 @@ def test_qdrant_client_sends_collection_and_point_payloads() -> None:
     assert "ordering=strong" in requests[2][1]
     assert b'"medlineplus_hemoglobin_test"' in (requests[2][2] or b"")
     assert requests[2][3]["api-key"] == "secret-token"
+
+
+def test_qdrant_client_queries_points_with_payload_filters() -> None:
+    requests: list[tuple[str, str, bytes | None]] = []
+
+    def opener(request):  # noqa: ANN001
+        body = request.data if request.data is not None else None
+        requests.append((request.get_method(), request.full_url, body))
+        return _FakeResponse(200, b'{"status":"ok","result":[{"id":"k1","score":0.7,"payload":{"knowledge_id":"k1","source_metadata":{"source_id":"k1","source_title":"Title","source_url":"https://example.com","publisher":"Pub","source_type":"medical_test_reference","accessed_at":"2026-05-01","citation_key":"k1"},"search_text":"Hemoglobin"}}]}')
+
+    client = QdrantHttpClient(base_url="http://qdrant.local:6333", opener=opener)
+
+    points = client.query_points(
+        collection_name="curated_medical_knowledge_v1",
+        vector=(0.1, 0.2, 0.3),
+        limit=3,
+        query_filter={"must": [{"key": "search_text", "match": {"text": "Hemoglobin"}}]},
+    )
+
+    assert len(points) == 1
+    assert points[0]["score"] == 0.7
+    assert requests[0][0] == "POST"
+    assert requests[0][1] == "http://qdrant.local:6333/collections/curated_medical_knowledge_v1/points/search"
+    assert b'"limit": 3' in (requests[0][2] or b"")
+    assert b'"with_payload": true' in (requests[0][2] or b"")
