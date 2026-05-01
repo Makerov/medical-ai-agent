@@ -75,7 +75,7 @@ development_status:
   4-5-doctor-facing-summary-draft-with-uncertainty-markers: done
   4-6-safety-validation-и-safetycheckresult: done
   4-7-safety-boundary-consistency-across-outputs: done
-  4-8-provenance-и-safety-decisions-в-audit-trail: backlog
+  4-8-provenance-и-safety-decisions-в-audit-trail: done
   epic-4-retrospective: optional
   epic-5: backlog
   5-1-doctor-ready-case-notification: backlog
