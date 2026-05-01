@@ -10,8 +10,10 @@ from app.schemas.case import (
     CaseStatus,
 )
 from app.schemas.handoff import DoctorReadyCaseNotificationStatus
+from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
 from app.services.case_service import CaseService
 from app.services.handoff_service import HandoffService
+from app.services.patient_intake_service import PatientIntakeService
 
 
 class RecordingAuditService:
@@ -88,6 +90,14 @@ def _build_ready_case(case_service: CaseService) -> str:
         CaseReadinessSnapshot(intake_ready=True, processing_ready=True, safety_cleared=True),
     )
     return case.case_id
+
+
+def _build_patient_payload(patient_intake_service: PatientIntakeService, case_id: str) -> None:
+    patient_intake_service._intake_payloads[case_id] = PatientIntakePayload(
+        case_id=case_id,
+        patient_profile=PatientProfile(full_name="Alex Novak", age=34),
+        consultation_goal=ConsultationGoal(text="Review persistent cough"),
+    )
 
 
 def test_mark_case_ready_for_review_sends_minimal_notification_for_allowlisted_doctor() -> None:
@@ -184,6 +194,74 @@ def test_mark_case_ready_for_review_rejects_not_ready_case() -> None:
     )
 
     assert delivery.notification is None
+    assert delivery.rejection is not None
+    assert delivery.rejection.rejection_code == "case_not_ready_for_review"
+    assert delivery.rejection.shared_status.value == "intake_required"
+    assert audit_service.recorded[0][1] == AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_REJECTED
+
+
+def test_get_doctor_case_card_returns_structured_card_for_ready_case() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_ready_card_001")
+    patient_intake_service = PatientIntakeService(case_service=case_service)
+    audit_service = RecordingAuditService()
+    handoff_service = HandoffService(
+        case_service=case_service,
+        patient_intake_service=patient_intake_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        settings=Settings(doctor_telegram_id_allowlist=(123456,)),
+    )
+    case_id = _build_ready_case(case_service)
+    _build_patient_payload(patient_intake_service, case_id)
+
+    handoff_service.mark_case_ready_for_review(
+        case_id=case_id,
+        doctor_telegram_id=123456,
+    )
+
+    delivery = handoff_service.get_doctor_case_card(
+        case_id=case_id,
+        doctor_telegram_id=123456,
+    )
+
+    assert delivery.card is not None
+    assert delivery.rejection is None
+    assert delivery.card.case_id == case_id
+    assert delivery.card.current_case_status == "ready_for_doctor"
+    assert delivery.card.shared_status.value == "ready_for_doctor"
+    assert delivery.card.patient_goal == "Review persistent cough"
+    assert delivery.card.patient_profile_summary == "Alex Novak, 34 years old"
+    assert delivery.card.document_list == ("document_001",)
+    assert audit_service.recorded[-1] == (
+        case_id,
+        AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_SENT,
+        {
+            "doctor_telegram_id": 123456,
+            "delivery_status": "sent",
+            "card_status": "ready_for_doctor",
+        },
+    )
+
+
+def test_get_doctor_case_card_rejects_not_ready_case_with_structured_reason() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_ready_card_002")
+    patient_intake_service = PatientIntakeService(case_service=case_service)
+    audit_service = RecordingAuditService()
+    handoff_service = HandoffService(
+        case_service=case_service,
+        patient_intake_service=patient_intake_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        settings=Settings(doctor_telegram_id_allowlist=(123456,)),
+    )
+    case = case_service.create_case()
+
+    delivery = handoff_service.get_doctor_case_card(
+        case_id=case.case_id,
+        doctor_telegram_id=123456,
+    )
+
+    assert delivery.card is None
     assert delivery.rejection is not None
     assert delivery.rejection.rejection_code == "case_not_ready_for_review"
     assert delivery.rejection.shared_status.value == "intake_required"

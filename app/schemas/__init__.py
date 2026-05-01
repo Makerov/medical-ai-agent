@@ -41,16 +41,19 @@ from app.schemas.extraction import (
     DocumentProcessingResult,
     OCRTextExtractionResult,
 )
-from app.schemas.indicator import (
-    CaseIndicatorExtractionRecord,
-    StructuredIndicatorValue,
-    StructuredMedicalIndicator,
-)
 from app.schemas.handoff import (
+    DoctorCaseCard,
+    DoctorCaseCardDelivery,
+    DoctorCaseCardRejection,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
     DoctorReadyCaseNotificationStatus,
+)
+from app.schemas.indicator import (
+    CaseIndicatorExtractionRecord,
+    StructuredIndicatorValue,
+    StructuredMedicalIndicator,
 )
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
@@ -135,6 +138,9 @@ __all__ = [
     "DoctorReadyCaseNotificationDelivery",
     "DoctorReadyCaseNotificationRejection",
     "DoctorReadyCaseNotificationStatus",
+    "DoctorCaseCard",
+    "DoctorCaseCardDelivery",
+    "DoctorCaseCardRejection",
     "CitationReference",
     "GeneratedNarrativeClaim",
     "GroundedFact",
