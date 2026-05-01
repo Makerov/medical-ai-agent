@@ -12,6 +12,11 @@ from app.core.settings import Settings, get_settings
 from app.integrations.ocr_client import OCRClient
 from app.schemas.audit import ArtifactKind
 from app.schemas.case import CaseReadinessSnapshot, CaseRecordKind, CaseRecordReference, CaseStatus
+from app.schemas.demo_export import (
+    DemoArtifactExportContract,
+    DemoExportArtifactReference,
+    DemoExportOverview,
+)
 from app.schemas.document import DocumentUploadMetadata
 from app.schemas.extraction import StructuredExtractionExampleSet
 from app.schemas.indicator import CaseIndicatorExtractionRecord
@@ -287,6 +292,19 @@ def seed_demo_case(
             ),
         ),
     }
+    export_contract = _build_demo_export_contract(
+        case_id=fixture["case_id"],
+        data_classification=str(fixture["data_classification"]),
+        artifact_paths={name: path.relative_to(artifact_root) for name, path in artifacts.items()},
+        generated_at=current_time(),
+    )
+    demo_bundle_path = artifact_root / fixture["case_id"] / "demo" / "reviewer-export.json"
+    demo_bundle_path.parent.mkdir(parents=True, exist_ok=True)
+    demo_bundle_path.write_text(
+        json.dumps(export_contract.model_dump(mode="json"), ensure_ascii=True, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    artifacts["demo_export_contract"] = demo_bundle_path.resolve(strict=False)
     return SeededDemoCaseResult(
         case_id=fixture["case_id"],
         intake_payload=patient_payload,
@@ -602,6 +620,87 @@ def _write_json_artifact(
         encoding="utf-8",
     )
     return artifact_path.absolute_path
+
+
+def _build_demo_export_contract(
+    *,
+    case_id: str,
+    data_classification: str,
+    artifact_paths: dict[str, Path],
+    generated_at: datetime,
+) -> DemoArtifactExportContract:
+    overview = DemoExportOverview(
+        case_id=case_id,
+        title="Reviewer-ready demo artifact export",
+        generated_at=generated_at,
+        data_classification=data_classification,
+        reviewer_notes=(
+            "Synthetic, case-scoped export bundle for reviewer walkthrough without live model calls."
+        ),
+        non_goals=(
+            "No autonomous diagnosis or treatment guidance.",
+            "No real patient documents required.",
+            "No duplicate demo pipeline or storage layer.",
+        ),
+    )
+    required_artifacts = (
+        DemoExportArtifactReference(
+            label="structured_extraction_examples",
+            artifact_path=artifact_paths["structured_extraction_examples"].as_posix(),
+            description="Structured extraction and indicator payloads derived from the stable seed case.",
+        ),
+        DemoExportArtifactReference(
+            label="rag_provenance_examples",
+            artifact_path=artifact_paths["rag_provenance_examples"].as_posix(),
+            description="Grounded and not-grounded provenance examples with summary linkage.",
+        ),
+        DemoExportArtifactReference(
+            label="safety_check_result",
+            artifact_path=artifact_paths["safety_check_result"].as_posix(),
+            description="Typed safety decision for the doctor-facing summary draft.",
+        ),
+        DemoExportArtifactReference(
+            label="minimal_eval_suite",
+            artifact_path=f"{case_id}/demo/minimal-eval-suite.json",
+            description="Minimal eval summary showing extraction, groundedness, and safety checks.",
+        ),
+    )
+    optional_artifacts = (
+        DemoExportArtifactReference(
+            label="shared_status",
+            artifact_path=artifact_paths["shared_status"].as_posix(),
+            description="Reviewer-readable case overview and current status snapshot.",
+            optional=True,
+        ),
+        DemoExportArtifactReference(
+            label="summary_draft",
+            artifact_path=artifact_paths["summary_draft"].as_posix(),
+            description="Grounded summary draft used by the handoff path.",
+            optional=True,
+        ),
+    )
+    derived_artifacts = (
+        DemoExportArtifactReference(
+            label="intake_snapshot",
+            artifact_path=artifact_paths["intake_snapshot"].as_posix(),
+            description="Synthetic intake snapshot derived from the stable seed case.",
+        ),
+        DemoExportArtifactReference(
+            label="doctor_handoff",
+            artifact_path=artifact_paths["handoff_payload"].as_posix(),
+            description="Case-linked handoff payload with the same stable case identifier.",
+        ),
+    )
+    return DemoArtifactExportContract(
+        case_id=case_id,
+        generated_at=generated_at,
+        data_classification=data_classification,
+        overview=overview,
+        required_artifacts=required_artifacts,
+        optional_artifacts=optional_artifacts,
+        derived_artifacts=derived_artifacts,
+        export_path=f"{case_id}/demo/reviewer-export.json",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

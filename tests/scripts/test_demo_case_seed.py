@@ -43,6 +43,7 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         ),
         "rag_provenance_examples": Path("case_demo_happy_path/export/demo/rag-provenance-examples.json"),
         "summary_draft": Path("case_demo_happy_path/summary/demo/summary-draft.json"),
+        "demo_export_contract": Path("case_demo_happy_path/demo/reviewer-export.json"),
     }
     assert set(result.artifacts) == set(expected_relative_paths)
     for key, path in result.artifacts.items():
@@ -79,6 +80,14 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
     assert '"decision": "corrected"' in safety_examples_json
     assert '"data_classification": "synthetic_anonymized_demo"' in safety_examples_json
 
+    reviewer_export_json = (
+        settings.artifact_root_dir / expected_relative_paths["demo_export_contract"]
+    ).read_text(encoding="utf-8")
+    assert '"case_id": "case_demo_happy_path"' in reviewer_export_json
+    assert '"reviewer_notes": "Synthetic, case-scoped export bundle for reviewer walkthrough without live model calls."' in reviewer_export_json
+    assert '"label": "minimal_eval_suite"' in reviewer_export_json
+    assert '"artifact_path": "case_demo_happy_path/demo/minimal-eval-suite.json"' in reviewer_export_json
+
 
 def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:
     settings = _build_settings(tmp_path)
@@ -99,6 +108,10 @@ def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:
     )
     assert first.safety_result == second.safety_result
     assert first.artifacts == second.artifacts
+    assert (
+        second.artifacts["demo_export_contract"]
+        == settings.artifact_root_dir / "case_demo_happy_path" / "demo" / "reviewer-export.json"
+    )
 
     rag_examples_path = (
         settings.artifact_root_dir
@@ -156,3 +169,7 @@ def test_seed_demo_case_leaves_case_ready_for_doctor(tmp_path: Path) -> None:
         / "safety-check-examples.json"
     )
     assert safety_examples_path.exists()
+    reviewer_export_path = (
+        settings.artifact_root_dir / "case_demo_happy_path" / "demo" / "reviewer-export.json"
+    )
+    assert reviewer_export_path.exists()
