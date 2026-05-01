@@ -403,14 +403,66 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
     document_list = ", ".join(card.document_list) if card.document_list else "нет документов"
     patient_goal = card.patient_goal or "не указана"
     patient_profile_summary = card.patient_profile_summary or "краткий профиль недоступен"
+    facts_block = _render_doctor_case_facts(card)
+    deviations_block = _render_doctor_case_deviations(card)
+    uncertainty_block = _render_doctor_case_uncertainty(card)
+    warnings_block = _render_doctor_case_warnings(card)
     return (
         f"{DOCTOR_CASE_CARD_HEADER}\n\n"
         f"Номер заявки: {card.case_id}\n"
         f"Статус: {card.current_case_status}\n"
         f"Patient goal: {patient_goal}\n"
         f"Patient profile summary: {patient_profile_summary}\n"
-        f"Documents: {document_list}"
+        f"Documents: {document_list}\n\n"
+        f"{facts_block}\n\n"
+        f"{deviations_block}\n\n"
+        f"{uncertainty_block}\n\n"
+        f"{warnings_block}"
     )
+
+
+def _render_doctor_case_facts(card: DoctorCaseCard) -> str:
+    if not card.extracted_facts:
+        return "Extracted facts:\n- нет извлеченных фактов"
+    lines = ["Extracted facts:"]
+    for fact in card.extracted_facts:
+        marker = " [uncertain]" if fact.is_uncertain else ""
+        unit = f" {fact.unit}" if fact.unit else ""
+        uncertainty = f" ({fact.uncertainty_reason})" if fact.uncertainty_reason else ""
+        lines.append(
+            "- "
+            f"{fact.name}: {fact.value}{unit}; "
+            f"reference: {fact.reference_context}; "
+            f"confidence: {fact.source_confidence:.2f}{marker}{uncertainty}"
+        )
+    return "\n".join(lines)
+
+
+def _render_doctor_case_deviations(card: DoctorCaseCard) -> str:
+    if not card.possible_deviations:
+        return "Possible deviations:\n- нет отмеченных deviations"
+    lines = ["Possible deviations:"]
+    for deviation in card.possible_deviations:
+        lines.append(f"- {deviation.text}")
+    return "\n".join(lines)
+
+
+def _render_doctor_case_uncertainty(card: DoctorCaseCard) -> str:
+    if not card.uncertainty_markers:
+        return "Uncertainty markers:\n- нет uncertainty markers"
+    lines = ["Uncertainty markers:"]
+    for marker in card.uncertainty_markers:
+        lines.append(f"- {marker.text}")
+    return "\n".join(lines)
+
+
+def _render_doctor_case_warnings(card: DoctorCaseCard) -> str:
+    if not card.review_warnings:
+        return "Review warnings:\n- нет warnings"
+    lines = ["Review warnings:"]
+    for warning in card.review_warnings:
+        lines.append(f"- {warning.text}")
+    return "\n".join(lines)
 
 
 def render_doctor_case_card_access_denied_message(

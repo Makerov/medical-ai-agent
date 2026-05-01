@@ -17,6 +17,8 @@ from app.schemas.handoff import (
     DoctorCaseCard,
     DoctorCaseCardDelivery,
     DoctorCaseCardRejection,
+    DoctorCaseIndicatorFact,
+    DoctorCaseReviewWarning,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
@@ -105,6 +107,22 @@ def test_render_doctor_case_card_is_minimal() -> None:
         patient_goal="Review cough",
         patient_profile_summary="Alex, 34 years old",
         document_list=("document_001",),
+        extracted_facts=(
+            DoctorCaseIndicatorFact(
+                fact_id="document_001:Hemoglobin",
+                name="Hemoglobin",
+                value="13.5",
+                unit="g/dL",
+                reference_context="document_001 (document)",
+                source_confidence=0.97,
+            ),
+        ),
+        review_warnings=(
+            DoctorCaseReviewWarning(
+                warning_id="warning:uncertain_facts",
+                text="Some extracted facts are marked uncertain and should be checked before use.",
+            ),
+        ),
     )
 
     message = render_doctor_case_card(card)
@@ -114,7 +132,9 @@ def test_render_doctor_case_card_is_minimal() -> None:
     assert "Review cough" in message
     assert "Alex, 34 years old" in message
     assert "document_001" in message
-    assert "source" not in message.lower()
+    assert "Extracted facts:" in message
+    assert "confidence: 0.97" in message
+    assert "Review warnings:" in message
     assert "question" not in message.lower()
 
 

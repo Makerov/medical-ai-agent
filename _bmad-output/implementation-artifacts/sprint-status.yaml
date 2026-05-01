@@ -80,7 +80,7 @@ development_status:
   epic-5: in-progress
   5-1-doctor-ready-case-notification: done
   5-2-structured-case-card-для-ready-case: done
-  5-3-extracted-facts-deviations-и-uncertainty-view: backlog
+  5-3-extracted-facts-deviations-и-uncertainty-view: done
   5-4-ai-prepared-questions-для-doctor-follow-up: backlog
   5-5-source-document-references-в-doctor-bot: backlog
   5-6-doctor-facing-ai-boundary-labeling: backlog

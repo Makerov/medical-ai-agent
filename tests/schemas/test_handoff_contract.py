@@ -66,6 +66,10 @@ def test_doctor_case_card_contract_is_typed_and_minimal() -> None:
         "patient_goal": "Discuss ongoing cough",
         "patient_profile_summary": "Alex, 34 years old",
         "document_list": ("document_001", "document_002"),
+        "extracted_facts": (),
+        "possible_deviations": (),
+        "uncertainty_markers": (),
+        "review_warnings": (),
     }
 
 
