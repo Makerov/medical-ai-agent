@@ -406,6 +406,7 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
     facts_block = _render_doctor_case_facts(card)
     deviations_block = _render_doctor_case_deviations(card)
     uncertainty_block = _render_doctor_case_uncertainty(card)
+    questions_block = _render_doctor_case_questions(card)
     warnings_block = _render_doctor_case_warnings(card)
     return (
         f"{DOCTOR_CASE_CARD_HEADER}\n\n"
@@ -417,6 +418,7 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
         f"{facts_block}\n\n"
         f"{deviations_block}\n\n"
         f"{uncertainty_block}\n\n"
+        f"{questions_block}\n\n"
         f"{warnings_block}"
     )
 
@@ -453,6 +455,16 @@ def _render_doctor_case_uncertainty(card: DoctorCaseCard) -> str:
     lines = ["Uncertainty markers:"]
     for marker in card.uncertainty_markers:
         lines.append(f"- {marker.text}")
+    return "\n".join(lines)
+
+
+def _render_doctor_case_questions(card: DoctorCaseCard) -> str:
+    if not card.questions_for_doctor:
+        return "AI-prepared questions:\n- нет вопросов для follow-up"
+    lines = ["AI-prepared questions:"]
+    for question in card.questions_for_doctor:
+        focus = f" ({question.focus})" if question.focus else ""
+        lines.append(f"- {question.text}{focus}")
     return "\n".join(lines)
 
 

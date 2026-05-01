@@ -69,6 +69,7 @@ def test_doctor_case_card_contract_is_typed_and_minimal() -> None:
         "extracted_facts": (),
         "possible_deviations": (),
         "uncertainty_markers": (),
+        "questions_for_doctor": (),
         "review_warnings": (),
     }
 

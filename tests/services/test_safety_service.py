@@ -8,6 +8,7 @@ from app.schemas.knowledge_base import (
 )
 from app.schemas.rag import (
     CitationReference,
+    DoctorFacingQuestion,
     DoctorFacingSummaryDraft,
     GeneratedNarrativeClaim,
     GroundedSummaryContract,
@@ -102,7 +103,21 @@ def test_safety_service_passes_safe_summary_draft() -> None:
 def test_safety_service_blocks_diagnosis_and_treatment_language() -> None:
     service = SafetyService()
     draft = _build_summary_draft(
-        narrative="This suggests a diagnosis and treatment recommendation should be started.",
+        narrative="Doctor-facing summary draft with grounded facts only.",
+    )
+    draft = draft.model_copy(
+        update={
+            "questions_for_doctor": (
+                DoctorFacingQuestion(
+                    question_id="question:unsafe",
+                    text=(
+                        "What diagnosis should we confirm and what treatment "
+                        "recommendation should be started?"
+                    ),
+                    focus="missing_context",
+                ),
+            )
+        }
     )
 
     result = service.validate_doctor_facing_summary(case_id="case_123", draft=draft)

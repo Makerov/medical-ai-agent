@@ -272,6 +272,7 @@ def test_get_doctor_case_card_returns_structured_card_for_ready_case() -> None:
     assert delivery.card.patient_profile_summary == "Alex Novak, 34 years old"
     assert delivery.card.document_list == ("document_001",)
     assert delivery.card.extracted_facts == ()
+    assert delivery.card.questions_for_doctor == ()
     assert delivery.card.review_warnings == ()
     assert audit_service.recorded[-1] == (
         case_id,
@@ -383,6 +384,12 @@ def test_get_doctor_case_card_includes_extracted_facts_and_uncertainty_warnings(
     assert delivery.card.extracted_facts[1].name == "Glucose"
     assert delivery.card.extracted_facts[1].is_uncertain is True
     assert delivery.card.extracted_facts[1].uncertainty_reason == "low_extraction_confidence"
+    assert delivery.card.questions_for_doctor
+    assert delivery.card.questions_for_doctor[0].focus in {
+        "missing_context",
+        "uncertainty",
+        "possible_deviation",
+    }
     assert delivery.card.uncertainty_markers
     assert delivery.card.review_warnings
     assert any("uncertain" in warning.text.lower() for warning in delivery.card.review_warnings)

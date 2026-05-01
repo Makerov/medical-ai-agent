@@ -23,6 +23,7 @@ from app.schemas.handoff import (
     DoctorReadyCaseNotificationDelivery,
     DoctorReadyCaseNotificationRejection,
 )
+from app.schemas.rag import DoctorFacingQuestion
 
 
 class FakeBot:
@@ -123,6 +124,13 @@ def test_render_doctor_case_card_is_minimal() -> None:
                 text="Some extracted facts are marked uncertain and should be checked before use.",
             ),
         ),
+        questions_for_doctor=(
+            DoctorFacingQuestion(
+                question_id="question:1",
+                text="Which extracted facts need more clinical context before review?",
+                focus="missing_context",
+            ),
+        ),
     )
 
     message = render_doctor_case_card(card)
@@ -134,8 +142,10 @@ def test_render_doctor_case_card_is_minimal() -> None:
     assert "document_001" in message
     assert "Extracted facts:" in message
     assert "confidence: 0.97" in message
+    assert "AI-prepared questions:" in message
+    assert "Which extracted facts need more clinical context before review?" in message
     assert "Review warnings:" in message
-    assert "question" not in message.lower()
+    assert "diagnosis" not in message.lower()
 
 
 def test_render_doctor_case_card_access_denied_message_is_generic() -> None:
@@ -166,6 +176,13 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
             patient_goal="Review cough",
             patient_profile_summary="Alex, 34 years old",
             document_list=("document_001",),
+            questions_for_doctor=(
+                DoctorFacingQuestion(
+                    question_id="question:1",
+                    text="Which extracted facts need more clinical context before review?",
+                    focus="missing_context",
+                ),
+            ),
         ),
     )
 
@@ -174,6 +191,7 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
     bot.send_message.assert_awaited_once()
     assert bot.send_message.await_args.kwargs["chat_id"] == 123456
     assert "ready_for_doctor" in bot.send_message.await_args.kwargs["text"]
+    assert "AI-prepared questions:" in bot.send_message.await_args.kwargs["text"]
 
 
 def test_send_doctor_case_card_delivery_routes_rejection_message() -> None:
