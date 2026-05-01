@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus
 from app.schemas.document import DocumentUploadMetadata
+from app.schemas.indicator import CaseIndicatorExtractionRecord, StructuredMedicalIndicator
 
 
 class OCRTextExtractionResult(BaseModel):
@@ -109,4 +110,52 @@ class CaseExtractionRecord(BaseModel):
         if self.extraction_reference.record_kind != CaseRecordKind.EXTRACTION:
             msg = "Extraction reference must be an extraction reference"
             raise ValueError(msg)
+        return self
+
+
+class StructuredExtractionExampleSet(BaseModel):
+    case_id: str = Field(min_length=1)
+    data_classification: str = Field(min_length=1)
+    source_document: DocumentUploadMetadata
+    source_document_reference: CaseRecordReference
+    raw_extraction_reference: CaseRecordReference
+    indicator_reference: CaseRecordReference
+    indicators: tuple[StructuredMedicalIndicator, ...] = ()
+    uncertain_indicators: tuple[StructuredMedicalIndicator, ...] = ()
+    extracted_at: datetime
+    provider_name: str | None = None
+    example_note: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("data_classification", "example_note")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("extracted_at")
+    @classmethod
+    def validate_extracted_at_timezone_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            msg = "Example timestamps must be timezone-aware"
+            raise ValueError(msg)
+        return value
+
+    @model_validator(mode="after")
+    def validate_internal_consistency(self) -> "StructuredExtractionExampleSet":
+        indicator_record = CaseIndicatorExtractionRecord(
+            case_id=self.case_id,
+            source_document=self.source_document,
+            source_document_reference=self.source_document_reference,
+            raw_extraction_reference=self.raw_extraction_reference,
+            indicator_reference=self.indicator_reference,
+            indicators=self.indicators,
+            uncertain_indicators=self.uncertain_indicators,
+            extracted_at=self.extracted_at,
+            provider_name=self.provider_name,
+        )
+        _ = indicator_record
         return self
