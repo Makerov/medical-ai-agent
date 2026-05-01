@@ -8,7 +8,7 @@ from app.schemas.knowledge_base import (
     KnowledgeSeedEntry,
     KnowledgeSourceMetadata,
 )
-from app.schemas.rag import KnowledgeApplicabilityDecision
+from app.schemas.rag import GeneratedNarrativeClaim, KnowledgeApplicabilityDecision
 from app.services.rag_service import RAGService
 
 
@@ -20,7 +20,9 @@ class FakeQdrantVectorStore:
     def collection_exists(self, collection_name: str) -> bool:  # pragma: no cover - protocol
         return True
 
-    def create_collection(self, *, collection_name: str, vector_size: int, metadata=None) -> bool:  # pragma: no cover - protocol
+    def create_collection(
+        self, *, collection_name: str, vector_size: int, metadata=None
+    ) -> bool:  # pragma: no cover - protocol
         return True
 
     def upsert_points(self, *, collection_name: str, points) -> int:  # pragma: no cover - protocol
@@ -45,7 +47,9 @@ class FakeQdrantVectorStore:
         return self.results
 
 
-def _build_indicator(name: str = "Hemoglobin", value: float | None = 13.5, unit: str | None = "g/dL") -> StructuredMedicalIndicator:
+def _build_indicator(
+    name: str = "Hemoglobin", value: float | None = 13.5, unit: str | None = "g/dL"
+) -> StructuredMedicalIndicator:
     now = datetime(2026, 5, 1, 8, 0, tzinfo=UTC)
     return StructuredMedicalIndicator(
         case_id="case_rag_001",
@@ -160,7 +164,9 @@ def test_rag_service_marks_mismatched_entry_as_not_applicable() -> None:
         {
             "id": "medlineplus_hemoglobin_test",
             "score": 0.93,
-            "payload": _build_payload(applicable_contexts=("hemoglobin review",), excluded_contexts=("creatinine",)),
+            "payload": _build_payload(
+                applicable_contexts=("hemoglobin review",), excluded_contexts=("creatinine",)
+            ),
         }
     )
     assert entry is not None
@@ -193,3 +199,82 @@ def test_rag_service_marks_broad_context_as_insufficient_context() -> None:
     assert decision.status == "insufficient_context"
     assert decision.reason == "indicator_context_is_too_broad_for_trusted_applicability"
     assert decision.provenance_summary == "Hemoglobin Test (medlineplus-hemoglobin-test)"
+
+
+def test_rag_service_builds_summary_contract_with_separate_grounded_facts_and_narrative() -> None:
+    indicator = _build_indicator()
+    store = FakeQdrantVectorStore(
+        results=[
+            {
+                "id": "medlineplus_hemoglobin_test",
+                "score": 0.93,
+                "payload": _build_payload(applicable_contexts=("hemoglobin review",)),
+            }
+        ]
+    )
+    service = RAGService(
+        vector_store=store,
+        clock=lambda: datetime(2026, 5, 1, 9, 0, tzinfo=UTC),
+    )
+    retrieval = service.retrieve_for_indicator(indicator=indicator)
+    claim = GeneratedNarrativeClaim(
+        claim_id="claim-1",
+        text="Hemoglobin is within the expected review context.",
+        supported_citation_keys=("medlineplus-hemoglobin-test",),
+    )
+
+    contract = service.build_summary_contract(
+        indicators=(indicator,),
+        retrievals=(retrieval,),
+        narrative="Generated narrative stays separate from grounded facts.",
+        claims=(claim,),
+    )
+
+    assert contract.narrative == "Generated narrative stays separate from grounded facts."
+    assert len(contract.grounded_facts) == 2
+    assert contract.grounded_facts[0].source_kind == "indicator"
+    assert contract.grounded_facts[1].source_kind == "knowledge"
+    assert (
+        contract.citations[0].citation_key == "case_rag_001:telegram_document:unique_001:Hemoglobin"
+    )
+    assert contract.citations[1].citation_key == "medlineplus-hemoglobin-test"
+    assert contract.validation.status == "valid"
+    assert contract.validation.has_unsupported_claims is False
+    assert contract.claims[0].is_supported is True
+    assert (
+        contract.model_dump(mode="json")["narrative"]
+        == "Generated narrative stays separate from grounded facts."
+    )
+
+
+def test_rag_service_downgrades_claims_without_grounded_support() -> None:
+    indicator = _build_indicator()
+    store = FakeQdrantVectorStore(
+        results=[
+            {
+                "id": "medlineplus_hemoglobin_test",
+                "score": 0.93,
+                "payload": _build_payload(applicable_contexts=("hemoglobin review",)),
+            }
+        ]
+    )
+    service = RAGService(vector_store=store)
+    retrieval = service.retrieve_for_indicator(indicator=indicator)
+    unsupported_claim = GeneratedNarrativeClaim(
+        claim_id="claim-2",
+        text="This statement has no citation support.",
+        supported_citation_keys=("missing-citation",),
+        status="supported",
+    )
+
+    contract = service.build_summary_contract(
+        indicators=(indicator,),
+        retrievals=(retrieval,),
+        narrative="Separate narrative.",
+        claims=(unsupported_claim,),
+    )
+
+    assert contract.validation.status == "downgraded"
+    assert contract.validation.has_unsupported_claims is True
+    assert contract.claims[0].status == "unsupported"
+    assert contract.claims[0].rejection_reason == "claim_lacks_grounded_support"

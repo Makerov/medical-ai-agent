@@ -8,7 +8,12 @@ from app.schemas.knowledge_base import (
     KnowledgeSeedEntry,
     KnowledgeSourceMetadata,
 )
-from app.schemas.rag import KnowledgeApplicabilityDecision, KnowledgeRetrievalMatch, KnowledgeRetrievalResult, RetrievalIndicatorContext
+from app.schemas.rag import (
+    KnowledgeApplicabilityDecision,
+    KnowledgeRetrievalMatch,
+    KnowledgeRetrievalResult,
+    RetrievalIndicatorContext,
+)
 from app.workflow.nodes.retrieve_knowledge import RetrieveKnowledgeNode
 
 
@@ -72,7 +77,9 @@ def _build_entry() -> KnowledgeRetrievalMatch:
 class FakeRAGService:
     def __init__(self) -> None:
         self.retrieve_calls: list[StructuredMedicalIndicator] = []
-        self.applicability_calls: list[tuple[KnowledgeRetrievalMatch, StructuredMedicalIndicator]] = []
+        self.applicability_calls: list[
+            tuple[KnowledgeRetrievalMatch, StructuredMedicalIndicator]
+        ] = []
         self.result = KnowledgeRetrievalResult(
             indicator=RetrievalIndicatorContext.from_indicator(_build_indicator()),
             matches=(_build_entry(),),
@@ -86,15 +93,22 @@ class FakeRAGService:
             reason="indicator_context_matches_curated_applicability",
             provenance_summary="Hemoglobin Test (medlineplus-hemoglobin-test)",
             applicable_context_notes="Applicable contexts: hemoglobin review",
-            limitation_notes="Lab-specific reference ranges still govern final interpretation. Adult-oriented demo content.",
+            limitation_notes=(
+                "Lab-specific reference ranges still govern final interpretation. "
+                "Adult-oriented demo content."
+            ),
             source_metadata=_build_entry().source_metadata,
             provenance=_build_entry().provenance,
             applicability=_build_entry().applicability,
         )
 
-    def retrieve_for_indicator(self, *, indicator: StructuredMedicalIndicator) -> KnowledgeRetrievalResult:
+    def retrieve_for_indicator(
+        self, *, indicator: StructuredMedicalIndicator
+    ) -> KnowledgeRetrievalResult:
         self.retrieve_calls.append(indicator)
-        return self.result.model_copy(update={"indicator": RetrievalIndicatorContext.from_indicator(indicator)})
+        return self.result.model_copy(
+            update={"indicator": RetrievalIndicatorContext.from_indicator(indicator)}
+        )
 
     def assess_applicability(
         self,
