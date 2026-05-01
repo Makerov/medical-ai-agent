@@ -70,7 +70,7 @@ development_status:
   epic-4: in-progress
   4-1-curated-knowledge-base-seed-и-qdrant-collection: done
   4-2-retrieval-релевантных-knowledge-entries: done
-  4-3-reference-range-provenance-и-applicability-checks: backlog
+  4-3-reference-range-provenance-и-applicability-checks: done
   4-4-grounded-facts-vs-generated-summary-contract: backlog
   4-5-doctor-facing-summary-draft-with-uncertainty-markers: backlog
   4-6-safety-validation-и-safetycheckresult: backlog
