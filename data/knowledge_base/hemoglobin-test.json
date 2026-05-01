@@ -1,0 +1,46 @@
+{
+  "knowledge_id": "medlineplus_hemoglobin_test",
+  "title": "Hemoglobin test interpretation",
+  "summary": "Hemoglobin levels are used to assess anemia risk, but the normal range depends on the laboratory and patient factors.",
+  "content": "Hemoglobin is an iron-rich protein in red blood cells that carries oxygen. Elevated or low values can support a broader anemia or blood disorder workup, but the result must be interpreted against the laboratory reference range and the patient's age, sex, and clinical context.",
+  "source_metadata": {
+    "source_id": "medlineplus_hemoglobin_test",
+    "source_title": "Hemoglobin Test",
+    "source_url": "https://medlineplus.gov/lab-tests/hemoglobin-test/",
+    "publisher": "MedlinePlus / National Library of Medicine",
+    "source_type": "medical_test_reference",
+    "accessed_at": "2026-05-01",
+    "citation_key": "medlineplus-hemoglobin-test"
+  },
+  "provenance": {
+    "curation_method": "Manual curation from MedlinePlus medical test guidance.",
+    "evidence_basis": "Reference-range interpretation and anemia screening context.",
+    "source_reference": "https://medlineplus.gov/lab-tests/hemoglobin-test/",
+    "curation_notes": "Demo-grade grounding entry for CBC interpretation."
+  },
+  "applicability": {
+    "intended_use": "Ground extracted hemoglobin indicators and explain why interpretation depends on reference ranges.",
+    "applicable_contexts": [
+      "adult CBC review",
+      "anemia screening",
+      "document-grounded summaries"
+    ],
+    "excluded_contexts": [
+      "diagnosis",
+      "treatment recommendation",
+      "pediatric interpretation without source-specific adaptation"
+    ],
+    "population_notes": "Adult-oriented demo content. Race, sex, and age can affect reference interpretation.",
+    "limitations_summary": "Reference range varies by laboratory and patient factors."
+  },
+  "limitations": [
+    "Lab-specific reference ranges still govern final interpretation.",
+    "This entry does not diagnose anemia by itself.",
+    "Pediatric or pregnancy-specific interpretation requires additional sources."
+  ],
+  "domain_tags": [
+    "hematology",
+    "cbc",
+    "anemia"
+  ]
+}

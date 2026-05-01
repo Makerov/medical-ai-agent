@@ -58,7 +58,7 @@ development_status:
   2-5-patient-facing-case-status: done
   2-6-demo-case-deletion-request: done
   epic-2-retrospective: optional
-  epic-3: in-progress
+  epic-3: done
   3-1-document-upload-в-active-case: done
   3-2-supported-file-validation-и-recoverable-rejection: done
   3-3-text-extraction-из-pdf-image-documents: done
@@ -67,8 +67,8 @@ development_status:
   3-6-uncertainty-marking-и-partial-processing: done
   3-7-original-document-references-для-doctor-review: done
   epic-3-retrospective: optional
-  epic-4: backlog
-  4-1-curated-knowledge-base-seed-и-qdrant-collection: backlog
+  epic-4: in-progress
+  4-1-curated-knowledge-base-seed-и-qdrant-collection: done
   4-2-retrieval-релевантных-knowledge-entries: backlog
   4-3-reference-range-provenance-и-applicability-checks: backlog
   4-4-grounded-facts-vs-generated-summary-contract: backlog

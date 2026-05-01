@@ -1,0 +1,46 @@
+{
+  "knowledge_id": "medlineplus_blood_glucose_test",
+  "title": "Blood glucose test interpretation",
+  "summary": "Fasting blood glucose is used for screening or monitoring diabetes risk, but interpretation depends on the test type and the patient's medical context.",
+  "content": "Blood glucose testing can be fasting, random, oral glucose tolerance, or A1C. Higher-than-normal values may suggest diabetes or prediabetes risk, while low values can reflect medication effects, inadequate intake, or other medical conditions. The correct interpretation depends on which glucose test was ordered and the rest of the clinical picture.",
+  "source_metadata": {
+    "source_id": "medlineplus_blood_glucose_test",
+    "source_title": "Blood Glucose Test",
+    "source_url": "https://medlineplus.gov/lab-tests/blood-glucose-test/",
+    "publisher": "MedlinePlus / National Library of Medicine",
+    "source_type": "medical_test_reference",
+    "accessed_at": "2026-05-01",
+    "citation_key": "medlineplus-blood-glucose-test"
+  },
+  "provenance": {
+    "curation_method": "Manual curation from MedlinePlus medical test guidance.",
+    "evidence_basis": "Glucose test interpretation, fasting preparation, and diabetes screening context.",
+    "source_reference": "https://medlineplus.gov/lab-tests/blood-glucose-test/",
+    "curation_notes": "Demo-grade grounding entry for glucose interpretation."
+  },
+  "applicability": {
+    "intended_use": "Ground extracted glucose indicators and explain that interpretation depends on the specific glucose test type.",
+    "applicable_contexts": [
+      "diabetes screening",
+      "fasting glucose review",
+      "document-grounded summaries"
+    ],
+    "excluded_contexts": [
+      "diagnosis",
+      "treatment recommendation",
+      "test-type-agnostic numeric thresholds"
+    ],
+    "population_notes": "Adult-oriented demo content. Test type and medical history change interpretation.",
+    "limitations_summary": "Different glucose test types use different interpretation rules."
+  },
+  "limitations": [
+    "The result meaning depends on the exact glucose test type.",
+    "A single glucose result does not establish a diagnosis by itself.",
+    "Gestational, pediatric, and endocrinology-specific interpretation requires additional sources."
+  ],
+  "domain_tags": [
+    "endocrinology",
+    "glucose",
+    "diabetes"
+  ]
+}
