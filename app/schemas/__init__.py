@@ -42,16 +42,10 @@ from app.schemas.indicator import (
 )
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
-    KnowledgeProvenance,
     KnowledgeBaseCollectionConfig,
+    KnowledgeProvenance,
     KnowledgeSeedEntry,
     KnowledgeSourceMetadata,
-)
-from app.schemas.rag import (
-    KnowledgeApplicabilityDecision,
-    KnowledgeRetrievalMatch,
-    KnowledgeRetrievalResult,
-    RetrievalIndicatorContext,
 )
 from app.schemas.patient import (
     ConsultationGoal,
@@ -62,6 +56,17 @@ from app.schemas.patient import (
     PatientIntakePayload,
     PatientIntakeUpdateResult,
     PatientProfile,
+)
+from app.schemas.rag import (
+    CitationReference,
+    GeneratedNarrativeClaim,
+    GroundedFact,
+    GroundedSummaryContract,
+    KnowledgeApplicabilityDecision,
+    KnowledgeRetrievalMatch,
+    KnowledgeRetrievalResult,
+    RetrievalIndicatorContext,
+    SummaryValidationResult,
 )
 
 __all__ = [
@@ -99,6 +104,10 @@ __all__ = [
     "KnowledgeApplicabilityDecision",
     "KnowledgeRetrievalMatch",
     "KnowledgeRetrievalResult",
+    "CitationReference",
+    "GeneratedNarrativeClaim",
+    "GroundedFact",
+    "GroundedSummaryContract",
     "OCRTextExtractionResult",
     "PatientIntakeCaptureResult",
     "PatientIntakeField",
@@ -109,6 +118,7 @@ __all__ = [
     "PatientCase",
     "StructuredMedicalIndicator",
     "RetrievalIndicatorContext",
+    "SummaryValidationResult",
     "StructuredIndicatorValue",
     "generate_case_id",
 ]
