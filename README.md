@@ -37,3 +37,5 @@ Useful local URLs:
 - OpenAPI docs: http://localhost:8000/docs
 
 This MVP is a portfolio/demo system. It is not production medical software and is not compliance-ready for clinical use.
+
+Safety boundary: the AI prepares information for a doctor, but does not diagnose or prescribe treatment. A human doctor must review the materials before any medical decision.
