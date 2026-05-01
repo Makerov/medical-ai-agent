@@ -4,7 +4,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.schemas.auth import Capability
 from app.schemas.case import SharedCaseStatusCode
-from app.schemas.rag import DoctorFacingDeviationMarker, DoctorFacingUncertaintyMarker
+from app.schemas.rag import (
+    DoctorFacingDeviationMarker,
+    DoctorFacingQuestion,
+    DoctorFacingUncertaintyMarker,
+)
 
 
 class DoctorCaseIndicatorFact(BaseModel):
@@ -176,6 +180,7 @@ class DoctorCaseCard(BaseModel):
     extracted_facts: tuple[DoctorCaseIndicatorFact, ...] = ()
     possible_deviations: tuple[DoctorFacingDeviationMarker, ...] = ()
     uncertainty_markers: tuple[DoctorFacingUncertaintyMarker, ...] = ()
+    questions_for_doctor: tuple[DoctorFacingQuestion, ...] = ()
     review_warnings: tuple[DoctorCaseReviewWarning, ...] = ()
 
     model_config = ConfigDict(frozen=True)
