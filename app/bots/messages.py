@@ -1,4 +1,9 @@
-from app.schemas.case import CaseStatus, SharedCaseStatusCode, SharedStatusView
+from app.schemas.case import (
+    CaseStatus,
+    DoctorFacingStatusCode,
+    SharedCaseStatusCode,
+    SharedStatusView,
+)
 from app.schemas.consent import ConsentCaptureResult, ConsentOutcome
 from app.schemas.document import (
     DocumentUploadMessageKind,
@@ -404,6 +409,7 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
     patient_goal = card.patient_goal or "не указана"
     patient_profile_summary = card.patient_profile_summary or "краткий профиль недоступен"
     source_references_block = _render_doctor_case_source_references(card)
+    status_block = _render_doctor_case_status(card)
     facts_block = _render_doctor_case_facts(card)
     deviations_block = _render_doctor_case_deviations(card)
     uncertainty_block = _render_doctor_case_uncertainty(card)
@@ -413,6 +419,7 @@ def render_doctor_case_card(card: DoctorCaseCard) -> str:
         f"{DOCTOR_CASE_CARD_HEADER}\n\n"
         f"Номер заявки: {card.case_id}\n"
         f"Статус: {card.current_case_status}\n"
+        f"{status_block}\n"
         f"AI boundary label: {card.ai_boundary_label}\n"
         f"Patient goal: {patient_goal}\n"
         f"Patient profile summary: {patient_profile_summary}\n"
@@ -446,6 +453,16 @@ def _render_doctor_case_source_references(card: DoctorCaseCard) -> str:
         else:
             lines.append(f"- {reference.label}: unavailable ({reference.unavailable_reason})")
     return "\n".join(lines)
+
+
+def _render_doctor_case_status(card: DoctorCaseCard) -> str:
+    status_label = {
+        DoctorFacingStatusCode.READY: "ready",
+        DoctorFacingStatusCode.PARTIAL: "partial",
+        DoctorFacingStatusCode.BLOCKED: "blocked",
+        DoctorFacingStatusCode.REVIEW_REQUIRED: "review-required",
+    }[card.doctor_review_status]
+    return f"Doctor status: {status_label}\nReason: {card.doctor_review_reason}"
 
 
 def _render_doctor_case_facts(card: DoctorCaseCard) -> str:
