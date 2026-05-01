@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import json
 from pathlib import Path
 
 from app.core.settings import Settings
@@ -40,6 +41,7 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         "structured_extraction_examples": Path(
             "case_demo_happy_path/export/demo/structured-extraction-examples.json"
         ),
+        "rag_provenance_examples": Path("case_demo_happy_path/export/demo/rag-provenance-examples.json"),
         "summary_draft": Path("case_demo_happy_path/summary/demo/summary-draft.json"),
     }
     assert set(result.artifacts) == set(expected_relative_paths)
@@ -60,6 +62,14 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
     ).read_text(encoding="utf-8")
     assert '"data_classification": "synthetic_anonymized_demo"' in structured_examples_json
     assert '"uncertainty_reason": "missing_unit"' in structured_examples_json
+
+    rag_examples_json = (
+        settings.artifact_root_dir / expected_relative_paths["rag_provenance_examples"]
+    ).read_text(encoding="utf-8")
+    assert '"data_classification": "synthetic_anonymized_demo"' in rag_examples_json
+    assert '"grounded": true' in rag_examples_json
+    assert '"grounded": false' in rag_examples_json
+    assert '"no_trustworthy_knowledge_entries_found"' in rag_examples_json
 
     safety_examples_json = (
         settings.artifact_root_dir / expected_relative_paths["safety_check_examples"]
@@ -90,6 +100,20 @@ def test_seed_demo_case_is_deterministic_across_reruns(tmp_path: Path) -> None:
     assert first.safety_result == second.safety_result
     assert first.artifacts == second.artifacts
 
+    rag_examples_path = (
+        settings.artifact_root_dir
+        / "case_demo_happy_path"
+        / "export"
+        / "demo"
+        / "rag-provenance-examples.json"
+    )
+    rag_examples_payload = json.loads(rag_examples_path.read_text(encoding="utf-8"))
+    assert [example["example_id"] for example in rag_examples_payload["examples"]] == [
+        "grounded_hemoglobin_provenance",
+        "not_grounded_creatinine_provenance",
+    ]
+    assert [example["grounded"] for example in rag_examples_payload["examples"]] == [True, False]
+
     safety_examples_path = (
         settings.artifact_root_dir
         / "case_demo_happy_path"
@@ -116,6 +140,14 @@ def test_seed_demo_case_leaves_case_ready_for_doctor(tmp_path: Path) -> None:
 
     assert result.handoff_delivery.notification is not None
     assert result.handoff_delivery.notification.shared_status.value == "ready_for_doctor"
+    rag_examples_path = (
+        settings.artifact_root_dir
+        / "case_demo_happy_path"
+        / "export"
+        / "demo"
+        / "rag-provenance-examples.json"
+    )
+    assert rag_examples_path.exists()
     safety_examples_path = (
         settings.artifact_root_dir
         / "case_demo_happy_path"
