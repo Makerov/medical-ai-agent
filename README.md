@@ -1,6 +1,6 @@
 # medical-ai-agent
 
-Telegram-based medical consultation workflow with AI agents, RAG, lab result extraction, and human-in-the-loop recommendations
+Backend-first medical consultation workflow for portfolio review. The system uses FastAPI, Telegram adapters, LangGraph orchestration, typed schemas, RAG grounding, safety validation, audit trail storage, and case-scoped demo artifacts to prepare information for a doctor.
 
 ## Local demo setup
 
@@ -70,6 +70,36 @@ The default demo path uses synthetic or anonymized knowledge-base fixtures from 
 
 These fixtures keep the local demo on non-production sample content by default. Real patient data requires separate legal, security, and compliance review before use.
 
+## Portfolio Overview
+
+This repository is organized around a backend workflow rather than a dashboard. The user-facing adapters are thin, while the core logic stays in services, schemas, and a LangGraph workflow that can be exercised from Telegram, the API, or local demo scripts.
+
+Major runtime boundaries:
+
+- FastAPI exposes the backend API and health surface.
+- Telegram bots are thin adapters for patient and doctor interactions.
+- LangGraph orchestrates intake, document processing, grounding, safety checks, and handoff preparation.
+- PostgreSQL stores case state, workflow state, and audit records.
+- Qdrant stores retrieval data for grounded knowledge lookup.
+- Pydantic schemas validate structured contracts before downstream use.
+- The safety gate blocks or corrects unsupported doctor-facing output before it is shown.
+- Demo artifacts remain case-scoped so reviewers can trace every output through the same `case_id`.
+
+The architecture diagram is stored at [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md) and is linked as a standalone portfolio artifact.
+
+## Demo Traceability
+
+The stable demo case is `case_demo_happy_path`. That `case_id` threads through seeded inputs, exports, safety examples, reviewer bundles, and eval output so the demo can be traced end-to-end without searching the repository.
+
+Stable demo artifact locations:
+
+- Seed data and generated outputs: `data/artifacts/<case_id>/`
+- Reviewer export bundle: `data/artifacts/<case_id>/demo/reviewer-export.json`
+- Synthetic extraction, grounding, and safety examples: `data/artifacts/<case_id>/export/demo/`
+- Minimal eval suite output: `data/artifacts/<case_id>/demo/minimal-eval-suite.json`
+
+The repo uses synthetic or anonymized defaults for the portfolio path. The documented paths are intended to make seed data, export outputs, and eval results easy to find from the README alone.
+
 ## Backend scaffold
 
 This repository uses Python 3.13 and FastAPI for the backend API.
@@ -111,6 +141,20 @@ Demo exports also include synthetic safety check examples showing pass, blocked,
 The demo artifact set also includes synthetic RAG/source provenance examples under `data/artifacts/<case_id>/export/demo/`, showing both grounded and not-grounded retrieval paths with explicit source metadata and summary linkage.
 For reviewer walkthroughs, the seed command also writes a case-scoped bundle to `data/artifacts/<case_id>/demo/reviewer-export.json` that links the extracted facts, provenance, safety result, minimal eval summary, and reviewer-readable case overview without requiring live model calls.
 
+## Limitations
+
+This is an MVP portfolio demo, not a production clinical platform.
+
+- No diagnosis or treatment recommendations are provided.
+- No production compliance claim is made.
+- No EHR, LIS, or MIS integrations are included in the MVP.
+- No web dashboard is part of the current demo surface.
+- The system assumes low-concurrency portfolio usage rather than production-scale throughput.
+- Real patient data, clinical deployment, and regulated use require separate legal, security, and compliance review.
+- Future growth features should be treated as planned work, not current capability.
+
+The low-concurrency assumption means the demo is designed for sequential walkthroughs, deterministic artifact review, and local validation rather than high-volume concurrent traffic or hospital-grade operational guarantees.
+
 ### Minimal eval suite
 
 The portfolio demo also ships a minimal eval suite for the stable seed case.
@@ -128,3 +172,7 @@ The suite checks three typed categories:
 - safety: unsupported diagnosis, treatment, and overconfident clinical language remain blocked or corrected.
 
 The default outputs are synthetic or anonymized, case-linked, and deterministic in artifact shape. The suite does not use real patient documents or live model calls for the default fixture set.
+
+## Architecture Diagram
+
+The standalone portfolio diagram is here: [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md)
