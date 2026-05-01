@@ -18,6 +18,7 @@ from app.schemas.case import (
     generate_case_id,
     utc_now,
 )
+from app.schemas.document import DocumentUploadMetadata
 from app.schemas.extraction import CaseExtractionRecord
 from app.schemas.indicator import CaseIndicatorExtractionRecord
 from app.workflow.transitions import assert_case_transition_allowed
@@ -208,6 +209,18 @@ class CaseService:
     def get_case_indicator_records(self, case_id: str) -> tuple[CaseIndicatorExtractionRecord, ...]:
         self._get_existing_case(case_id)
         return tuple(self._indicator_records.get(case_id, ()))
+
+    def get_case_document_reference(
+        self,
+        case_id: str,
+        document: DocumentUploadMetadata,
+    ) -> CaseRecordReference | None:
+        records = self.get_case_core_records(case_id)
+        expected_record_id = self._build_document_record_id(document)
+        for reference in reversed(records.documents):
+            if reference.record_id == expected_record_id:
+                return reference
+        return None
 
     def set_case_readiness_snapshot(
         self,
@@ -470,6 +483,11 @@ class CaseService:
         record_kind: CaseRecordKind,
     ) -> tuple[CaseRecordReference, ...]:
         return tuple(reference for reference in references if reference.record_kind == record_kind)
+
+    @staticmethod
+    def _build_document_record_id(document: DocumentUploadMetadata) -> str:
+        identity = document.file_unique_id or document.file_id
+        return f"telegram_document:{identity}"
 
     @classmethod
     def _single_reference(
