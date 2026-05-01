@@ -36,6 +36,7 @@ from app.schemas.document import (
     DocumentUploadMetadata,
     DocumentUploadResult,
 )
+from app.schemas.eval import EvalCheckResult, EvalSuiteSummary
 from app.schemas.extraction import (
     CaseExtractionRecord,
     DocumentProcessingResult,
@@ -121,6 +122,8 @@ __all__ = [
     "DocumentUploadMessageKind",
     "DocumentUploadMetadata",
     "DocumentUploadResult",
+    "EvalCheckResult",
+    "EvalSuiteSummary",
     "CaseExtractionRecord",
     "CaseIndicatorExtractionRecord",
     "DocumentProcessingResult",
