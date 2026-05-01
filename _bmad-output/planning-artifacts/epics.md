@@ -1090,3 +1090,33 @@ FR50: Epic 1 - patient-facing and doctor-facing role separation.
 **Когда** он читает limitations section
 **Тогда** docs явно перечисляют MVP scope, non-goals, low-concurrency assumption, compliance limitations и отложенные integrations
 **И** trade-offs описаны честно и достаточно конкретно для portfolio review.
+
+### Story 6.9: Full Local Demo Bootstrap and Verification
+
+**Требования:** FR40, FR41, FR44, NFR22, NFR23, NFR26
+
+Как interviewer или reviewer,
+я хочу поднять локальное демо по одному documented path и получить working PostgreSQL, Qdrant, seeded knowledge base и happy path artifacts,
+чтобы проект действительно проходил portfolio demo с fresh checkout без скрытого developer state.
+
+**Критерии приемки:**
+
+**Дано** fresh checkout репозитория
+**Когда** reviewer следует documented `.env` и `docker compose` path
+**Тогда** поднимаются все обязательные MVP demo services: API, PostgreSQL и Qdrant
+**И** documented commands не требуют неявных ручных шагов разработчика.
+
+**Дано** local demo services запущены
+**Когда** reviewer выполняет documented bootstrap sequence
+**Тогда** Qdrant collection создается идемпотентно
+**И** curated knowledge base seed загружается без дубликатов.
+
+**Дано** knowledge base и supporting services готовы
+**Когда** reviewer запускает prepared demo flow
+**Тогда** stable seed demo case проходит documented happy path end-to-end
+**И** reviewer получает case-linked artifacts без ручного ремонта окружения.
+
+**Дано** reviewer использует `.env.example`, README и compose files
+**Когда** он настраивает окружение
+**Тогда** все required infrastructure variables, defaults и optional secrets описаны явно
+**И** README, compose и actual scripts не противоречат друг другу.
