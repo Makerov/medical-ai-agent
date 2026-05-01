@@ -7,6 +7,8 @@ from app.schemas.document import (
     DocumentUploadValidationContext,
 )
 from app.schemas.handoff import (
+    DoctorCaseCard,
+    DoctorCaseCardRejection,
     DoctorReadyCaseNotification,
     DoctorReadyCaseNotificationRejection,
 )
@@ -168,6 +170,15 @@ DOCTOR_READY_CASE_NOTIFICATION_HEADER = (
 
 DOCTOR_READY_CASE_ACCESS_DENIED_MESSAGE = (
     "Доступ к doctor review недоступен.\nПроверьте разрешенный doctor Telegram ID."
+)
+
+DOCTOR_CASE_CARD_HEADER = (
+    "Structured case card.\n"
+    "AI prepares the information for the doctor and does not replace clinical review."
+)
+
+DOCTOR_CASE_CARD_ACCESS_DENIED_MESSAGE = (
+    "Structured case card is unavailable.\nCase is not ready for doctor review."
 )
 
 
@@ -386,3 +397,24 @@ def render_doctor_ready_case_access_denied_message(
 ) -> str:
     _ = rejection
     return DOCTOR_READY_CASE_ACCESS_DENIED_MESSAGE
+
+
+def render_doctor_case_card(card: DoctorCaseCard) -> str:
+    document_list = ", ".join(card.document_list) if card.document_list else "нет документов"
+    patient_goal = card.patient_goal or "не указана"
+    patient_profile_summary = card.patient_profile_summary or "краткий профиль недоступен"
+    return (
+        f"{DOCTOR_CASE_CARD_HEADER}\n\n"
+        f"Номер заявки: {card.case_id}\n"
+        f"Статус: {card.current_case_status}\n"
+        f"Patient goal: {patient_goal}\n"
+        f"Patient profile summary: {patient_profile_summary}\n"
+        f"Documents: {document_list}"
+    )
+
+
+def render_doctor_case_card_access_denied_message(
+    rejection: DoctorCaseCardRejection,
+) -> str:
+    _ = rejection
+    return DOCTOR_CASE_CARD_ACCESS_DENIED_MESSAGE
