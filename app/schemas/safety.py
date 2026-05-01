@@ -62,3 +62,18 @@ class SafetyCheckResult(BaseModel):
     def is_blocked(self) -> bool:
         return self.decision == "blocked"
 
+
+class SafetyCheckExampleSet(BaseModel):
+    case_id: str = Field(min_length=1)
+    data_classification: str = Field(min_length=1)
+    examples: tuple[SafetyCheckResult, ...]
+    example_note: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("case_id", "data_classification", "example_note")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_text(value)
