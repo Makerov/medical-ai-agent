@@ -16,11 +16,23 @@ from app.schemas.document import DocumentUploadMetadata
 from app.schemas.extraction import StructuredExtractionExampleSet
 from app.schemas.indicator import CaseIndicatorExtractionRecord
 from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
+from app.schemas.knowledge_base import (
+    KnowledgeApplicability,
+    KnowledgeProvenance,
+    KnowledgeSeedEntry,
+    KnowledgeSourceMetadata,
+)
 from app.schemas.rag import (
     CitationReference,
     GeneratedNarrativeClaim,
     GroundedFact,
     GroundedSummaryContract,
+    KnowledgeApplicabilityDecision,
+    KnowledgeRetrievalMatch,
+    KnowledgeRetrievalResult,
+    RAGProvenanceExample,
+    RAGProvenanceExampleSet,
+    RetrievalIndicatorContext,
     SummaryValidationResult,
 )
 from app.schemas.safety import SafetyCheckExampleSet, SafetyCheckResult, SafetyIssue
@@ -261,6 +273,19 @@ def seed_demo_case(
             relative_path="demo/summary-draft.json",
             payload=summary_draft.model_dump(mode="json"),
         ),
+        "rag_provenance_examples": _write_json_artifact(
+            audit_service,
+            case_id=fixture["case_id"],
+            artifact_kind=ArtifactKind.EXPORT,
+            relative_path="demo/rag-provenance-examples.json",
+            payload=_build_rag_provenance_examples(
+                case_id=fixture["case_id"],
+                data_classification=str(fixture["data_classification"]),
+                extracted_facts=extracted_facts,
+                grounded_summary=grounded_summary,
+                clock=current_time,
+            ),
+        ),
     }
     return SeededDemoCaseResult(
         case_id=fixture["case_id"],
@@ -423,6 +448,136 @@ def _build_safety_check_examples(
         example_note=(
             "Synthetic demo safety examples derived from the stable seed case and canonical "
             "safety gate."
+        ),
+    )
+    return example_set.model_dump(mode="json")
+
+
+def _build_rag_provenance_examples(
+    *,
+    case_id: str,
+    data_classification: str,
+    extracted_facts: tuple[GroundedFact, ...],
+    grounded_summary: GroundedSummaryContract,
+    clock: Callable[[], datetime],
+) -> dict[str, Any]:
+    indicator_fact = extracted_facts[0]
+    indicator = RetrievalIndicatorContext(
+        name="Hemoglobin",
+        value=indicator_fact.machine_value,
+        unit="g/dL",
+        source_context=f"{case_id}:telegram_document:unique_001",
+    )
+    seed_entry = KnowledgeSeedEntry(
+        knowledge_id="medlineplus_hemoglobin_test",
+        title="Hemoglobin test interpretation",
+        summary="Hemoglobin levels help assess anemia risk.",
+        content="Hemoglobin reference ranges vary by laboratory and patient factors.",
+        source_metadata=KnowledgeSourceMetadata(
+            source_id="medlineplus_hemoglobin_test",
+            source_title="Hemoglobin Test",
+            source_url="https://medlineplus.gov/lab-tests/hemoglobin-test/",
+            publisher="MedlinePlus / National Library of Medicine",
+            source_type="medical_test_reference",
+            accessed_at=clock().date(),
+            citation_key="medlineplus-hemoglobin-test",
+        ),
+        provenance=KnowledgeProvenance(
+            curation_method="Manual curation.",
+            evidence_basis="Reference-range interpretation.",
+            source_reference="https://medlineplus.gov/lab-tests/hemoglobin-test/",
+        ),
+        applicability=KnowledgeApplicability(
+            intended_use="Ground extracted hemoglobin indicators.",
+            applicable_contexts=("hemoglobin review",),
+            excluded_contexts=(),
+            population_notes="Adult-oriented demo content.",
+            limitations_summary="Lab-specific reference ranges still govern final interpretation.",
+        ),
+        limitations=("Lab-specific reference ranges still govern final interpretation.",),
+        domain_tags=("hematology",),
+    )
+    knowledge_match = KnowledgeRetrievalMatch(
+        knowledge_id=seed_entry.knowledge_id,
+        source_metadata=seed_entry.source_metadata,
+        provenance=seed_entry.provenance,
+        applicability=seed_entry.applicability,
+        score=0.93,
+        retrieval_text="Hemoglobin reference ranges vary by laboratory and patient factors.",
+        matched_terms=("medlineplus_hemoglobin_test",),
+    )
+    grounded_retrieval = KnowledgeRetrievalResult(
+        indicator=indicator,
+        matches=(knowledge_match,),
+        grounded=True,
+        reason=None,
+        retrieved_at=datetime.now(UTC),
+    )
+    applicability_decision = KnowledgeApplicabilityDecision(
+        knowledge_id=knowledge_match.knowledge_id,
+        status="applicable",
+        reason="indicator_context_matches_curated_applicability",
+        provenance_summary="Hemoglobin Test (medlineplus-hemoglobin-test)",
+        applicable_context_notes="Applicable contexts: hemoglobin review",
+        limitation_notes="Lab-specific reference ranges still govern final interpretation.",
+        source_metadata=knowledge_match.source_metadata,
+        provenance=knowledge_match.provenance,
+        applicability=knowledge_match.applicability,
+    )
+    grounded_example = RAGProvenanceExample(
+        case_id=case_id,
+        example_id="grounded_hemoglobin_provenance",
+        indicator=indicator,
+        retrieval=grounded_retrieval,
+        applicability_decision=applicability_decision,
+        summary_reference=CaseRecordReference(
+            case_id=case_id,
+            record_kind=CaseRecordKind.SUMMARY,
+            record_id="summary_demo_happy_path",
+            created_at=clock(),
+        ),
+        grounded_summary=grounded_summary,
+        grounded=True,
+        limitation_notes="Lab-specific reference ranges still govern final interpretation.",
+    )
+    not_grounded_indicator = RetrievalIndicatorContext(
+        name="Creatinine",
+        value=None,
+        unit=None,
+        source_context=f"{case_id}:telegram_document:unique_001",
+    )
+    not_grounded_retrieval = KnowledgeRetrievalResult(
+        indicator=not_grounded_indicator,
+        matches=(),
+        grounded=False,
+        reason="no_trustworthy_knowledge_entries_found",
+        retrieved_at=datetime.now(UTC),
+    )
+    not_grounded_example = RAGProvenanceExample(
+        case_id=case_id,
+        example_id="not_grounded_creatinine_provenance",
+        indicator=not_grounded_indicator,
+        retrieval=not_grounded_retrieval,
+        applicability_decision=None,
+        summary_reference=CaseRecordReference(
+            case_id=case_id,
+            record_kind=CaseRecordKind.SUMMARY,
+            record_id="summary_demo_happy_path",
+            created_at=clock(),
+        ),
+        grounded_summary=grounded_summary,
+        grounded=False,
+        limitation_notes=(
+            "Retrieval failed because no trustworthy knowledge entries were found for the indicator."
+        ),
+    )
+    example_set = RAGProvenanceExampleSet(
+        case_id=case_id,
+        data_classification=data_classification,
+        examples=(grounded_example, not_grounded_example),
+        example_note=(
+            "Synthetic demo RAG provenance examples derived from the stable seed case and "
+            "canonical grounding boundary."
         ),
     )
     return example_set.model_dump(mode="json")
