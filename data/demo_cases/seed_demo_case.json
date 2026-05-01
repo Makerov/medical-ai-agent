@@ -13,7 +13,7 @@
     "file_size": 4096,
     "file_unique_id": "demo_lab_panel_pdf_v1"
   },
-  "ocr_text": "Hemoglobin: 13.5 g/dL\nGlucose: 5.6 mmol/L\nCreatinine: 88 umol/L",
+  "ocr_text": "Hemoglobin: 13.5 g/dL\nGlucose: 5.6 mmol/L\nFerritin: 42\nCreatinine: 88 umol/L",
   "ocr_confidence": 0.95,
   "doctor_telegram_id": 123456,
   "document_note": "Synthetic/anonymized demo content only. No real patient documents are required."
