@@ -9,7 +9,9 @@ from app.schemas.case import (
     CaseRecordReference,
     CaseStatus,
 )
+from app.schemas.document import DocumentUploadMetadata
 from app.schemas.handoff import DoctorReadyCaseNotificationStatus
+from app.schemas.indicator import CaseIndicatorExtractionRecord, StructuredMedicalIndicator
 from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
 from app.services.case_service import CaseService
 from app.services.handoff_service import HandoffService
@@ -97,6 +99,43 @@ def _build_patient_payload(patient_intake_service: PatientIntakeService, case_id
         case_id=case_id,
         patient_profile=PatientProfile(full_name="Alex Novak", age=34),
         consultation_goal=ConsultationGoal(text="Review persistent cough"),
+    )
+
+
+def _build_indicator_record(
+    *,
+    case_id: str,
+    record_id: str,
+    indicators: tuple[StructuredMedicalIndicator, ...],
+    uncertain_indicators: tuple[StructuredMedicalIndicator, ...] = (),
+) -> CaseIndicatorExtractionRecord:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    source_document_reference = CaseRecordReference(
+        case_id=case_id,
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id=f"{record_id}_document",
+        created_at=now,
+    )
+    return CaseIndicatorExtractionRecord(
+        case_id=case_id,
+        source_document=DocumentUploadMetadata(file_id=f"{record_id}_file"),
+        source_document_reference=source_document_reference,
+        raw_extraction_reference=CaseRecordReference(
+            case_id=case_id,
+            record_kind=CaseRecordKind.EXTRACTION,
+            record_id=f"{record_id}_extraction",
+            created_at=now,
+        ),
+        indicator_reference=CaseRecordReference(
+            case_id=case_id,
+            record_kind=CaseRecordKind.INDICATOR,
+            record_id=record_id,
+            created_at=now,
+        ),
+        indicators=indicators,
+        uncertain_indicators=uncertain_indicators,
+        extracted_at=now,
+        provider_name="stub",
     )
 
 
@@ -232,6 +271,8 @@ def test_get_doctor_case_card_returns_structured_card_for_ready_case() -> None:
     assert delivery.card.patient_goal == "Review persistent cough"
     assert delivery.card.patient_profile_summary == "Alex Novak, 34 years old"
     assert delivery.card.document_list == ("document_001",)
+    assert delivery.card.extracted_facts == ()
+    assert delivery.card.review_warnings == ()
     assert audit_service.recorded[-1] == (
         case_id,
         AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_SENT,
@@ -266,3 +307,82 @@ def test_get_doctor_case_card_rejects_not_ready_case_with_structured_reason() ->
     assert delivery.rejection.rejection_code == "case_not_ready_for_review"
     assert delivery.rejection.shared_status.value == "intake_required"
     assert audit_service.recorded[0][1] == AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_REJECTED
+
+
+def test_get_doctor_case_card_includes_extracted_facts_and_uncertainty_warnings() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_ready_card_003")
+    patient_intake_service = PatientIntakeService(case_service=case_service)
+    audit_service = RecordingAuditService()
+    handoff_service = HandoffService(
+        case_service=case_service,
+        patient_intake_service=patient_intake_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        settings=Settings(doctor_telegram_id_allowlist=(123456,)),
+    )
+    case_id = _build_ready_case(case_service)
+    _build_patient_payload(patient_intake_service, case_id)
+
+    reliable_indicator = StructuredMedicalIndicator(
+        case_id=case_id,
+        name="Hemoglobin",
+        value=13.5,
+        unit="g/dL",
+        confidence=0.97,
+        source_document_reference=CaseRecordReference(
+            case_id=case_id,
+            record_kind=CaseRecordKind.DOCUMENT,
+            record_id="indicator_001_document",
+            created_at=now,
+        ),
+        extracted_at=now,
+        provider_name="stub",
+    )
+    uncertain_indicator = StructuredMedicalIndicator(
+        case_id=case_id,
+        name="Glucose",
+        value="possible elevation",
+        unit=None,
+        confidence=0.51,
+        source_document_reference=CaseRecordReference(
+            case_id=case_id,
+            record_kind=CaseRecordKind.DOCUMENT,
+            record_id="indicator_001_document",
+            created_at=now,
+        ),
+        extracted_at=now,
+        provider_name="stub",
+        is_uncertain=True,
+        uncertainty_reason="low_extraction_confidence",
+        missing_fields=("unit",),
+    )
+    case_service.attach_case_indicator_record(
+        _build_indicator_record(
+            case_id=case_id,
+            record_id="indicator_001",
+            indicators=(reliable_indicator,),
+            uncertain_indicators=(uncertain_indicator,),
+        )
+    )
+
+    handoff_service.mark_case_ready_for_review(
+        case_id=case_id,
+        doctor_telegram_id=123456,
+    )
+
+    delivery = handoff_service.get_doctor_case_card(
+        case_id=case_id,
+        doctor_telegram_id=123456,
+    )
+
+    assert delivery.card is not None
+    assert len(delivery.card.extracted_facts) == 2
+    assert delivery.card.extracted_facts[0].name == "Hemoglobin"
+    assert delivery.card.extracted_facts[0].source_confidence == 0.97
+    assert delivery.card.extracted_facts[0].is_uncertain is False
+    assert delivery.card.extracted_facts[1].name == "Glucose"
+    assert delivery.card.extracted_facts[1].is_uncertain is True
+    assert delivery.card.extracted_facts[1].uncertainty_reason == "low_extraction_confidence"
+    assert delivery.card.uncertainty_markers
+    assert delivery.card.review_warnings
+    assert any("uncertain" in warning.text.lower() for warning in delivery.card.review_warnings)
