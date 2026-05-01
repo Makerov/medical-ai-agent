@@ -12,6 +12,7 @@ from app.schemas.rag import (
     KnowledgeApplicabilityDecision,
     KnowledgeRetrievalResult,
 )
+from app.services.boundary_copy import HUMAN_REVIEW_STATEMENT, SAFETY_BOUNDARY_STATEMENT
 
 
 class SummaryService:
@@ -213,7 +214,7 @@ class SummaryService:
         uncertainty_markers: Sequence[DoctorFacingUncertaintyMarker],
         questions_for_doctor: Sequence[DoctorFacingQuestion],
     ) -> str:
-        parts = ["Doctor-facing summary draft."]
+        parts = [SAFETY_BOUNDARY_STATEMENT, HUMAN_REVIEW_STATEMENT]
         if patient_goal_context is not None:
             parts.append(f"Patient goal context: {patient_goal_context}.")
         parts.append(

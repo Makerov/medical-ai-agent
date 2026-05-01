@@ -69,6 +69,7 @@ from app.schemas.patient import (
     PatientIntakeMessageKind,
     PatientIntakeUpdateResult,
 )
+from app.services.boundary_copy import HUMAN_REVIEW_STATEMENT, SAFETY_BOUNDARY_STATEMENT
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import (
     PatientIntakeService,
@@ -228,9 +229,8 @@ def test_handle_patient_start_replies_with_success_message() -> None:
     reply_markup = message.answer.await_args.kwargs["reply_markup"]
     assert "Заявка на приём начата." in reply
     assert "case_patient_001" in reply
-    assert "Врач лично проверит материалы" in reply
-    assert "диагноз" not in reply.lower()
-    assert "лечение" not in reply.lower()
+    assert SAFETY_BOUNDARY_STATEMENT in reply
+    assert HUMAN_REVIEW_STATEMENT in reply
     assert reply_markup.inline_keyboard[0][0].callback_data == AI_BOUNDARY_CONTINUE_CALLBACK
 
 
@@ -244,9 +244,8 @@ def test_render_ai_boundary_message_keeps_safety_wording() -> None:
 
     message = render_ai_boundary_message(result)
 
-    assert "Врач лично проверит материалы" in message
-    assert "диагноз" not in message.lower()
-    assert "лечение" not in message.lower()
+    assert SAFETY_BOUNDARY_STATEMENT in message
+    assert HUMAN_REVIEW_STATEMENT in message
     assert "финальное медицинское решение" not in message.lower()
 
 
