@@ -1,0 +1,112 @@
+[
+  {
+    "case_id": "case_demo_happy_path",
+    "data_classification": "synthetic_anonymized_demo",
+    "example_note": "Synthetic demo extraction example derived from the stable seed case.",
+    "extracted_at": "2026-05-02T10:29:20.906700Z",
+    "indicator_reference": {
+      "case_id": "case_demo_happy_path",
+      "created_at": "2026-05-02T10:29:20.906633Z",
+      "record_id": "structured_indicator:telegram_document:demo_lab_panel_pdf_v1",
+      "record_kind": "indicator"
+    },
+    "indicators": [
+      {
+        "case_id": "case_demo_happy_path",
+        "confidence": 0.95,
+        "extracted_at": "2026-05-02T10:29:20.906700Z",
+        "is_uncertain": false,
+        "missing_fields": [],
+        "name": "Hemoglobin",
+        "provider_name": "synthetic_demo_fixture",
+        "source_document_reference": {
+          "case_id": "case_demo_happy_path",
+          "created_at": "2026-05-02T10:29:20.906633Z",
+          "record_id": "telegram_document:demo_lab_panel_pdf_v1",
+          "record_kind": "document"
+        },
+        "uncertainty_reason": null,
+        "unit": "g/dL",
+        "value": 13.5
+      },
+      {
+        "case_id": "case_demo_happy_path",
+        "confidence": 0.95,
+        "extracted_at": "2026-05-02T10:29:20.906700Z",
+        "is_uncertain": false,
+        "missing_fields": [],
+        "name": "Glucose",
+        "provider_name": "synthetic_demo_fixture",
+        "source_document_reference": {
+          "case_id": "case_demo_happy_path",
+          "created_at": "2026-05-02T10:29:20.906633Z",
+          "record_id": "telegram_document:demo_lab_panel_pdf_v1",
+          "record_kind": "document"
+        },
+        "uncertainty_reason": null,
+        "unit": "mmol/L",
+        "value": 5.6
+      },
+      {
+        "case_id": "case_demo_happy_path",
+        "confidence": 0.95,
+        "extracted_at": "2026-05-02T10:29:20.906700Z",
+        "is_uncertain": false,
+        "missing_fields": [],
+        "name": "Creatinine",
+        "provider_name": "synthetic_demo_fixture",
+        "source_document_reference": {
+          "case_id": "case_demo_happy_path",
+          "created_at": "2026-05-02T10:29:20.906633Z",
+          "record_id": "telegram_document:demo_lab_panel_pdf_v1",
+          "record_kind": "document"
+        },
+        "uncertainty_reason": null,
+        "unit": "umol/L",
+        "value": 88
+      }
+    ],
+    "provider_name": "synthetic_demo_fixture",
+    "raw_extraction_reference": {
+      "case_id": "case_demo_happy_path",
+      "created_at": "2026-05-02T10:29:20.906700Z",
+      "record_id": "extraction:telegram_document:demo_lab_panel_pdf_v1",
+      "record_kind": "extraction"
+    },
+    "source_document": {
+      "file_id": "demo_lab_panel_pdf",
+      "file_name": "synthetic-lab-panel.pdf",
+      "file_size": 4096,
+      "file_unique_id": "demo_lab_panel_pdf_v1",
+      "mime_type": "application/pdf"
+    },
+    "source_document_reference": {
+      "case_id": "case_demo_happy_path",
+      "created_at": "2026-05-02T10:29:20.906633Z",
+      "record_id": "telegram_document:demo_lab_panel_pdf_v1",
+      "record_kind": "document"
+    },
+    "uncertain_indicators": [
+      {
+        "case_id": "case_demo_happy_path",
+        "confidence": 0.95,
+        "extracted_at": "2026-05-02T10:29:20.906700Z",
+        "is_uncertain": true,
+        "missing_fields": [
+          "unit"
+        ],
+        "name": "Ferritin",
+        "provider_name": "synthetic_demo_fixture",
+        "source_document_reference": {
+          "case_id": "case_demo_happy_path",
+          "created_at": "2026-05-02T10:29:20.906633Z",
+          "record_id": "telegram_document:demo_lab_panel_pdf_v1",
+          "record_kind": "document"
+        },
+        "uncertainty_reason": "missing_unit",
+        "unit": null,
+        "value": 42
+      }
+    ]
+  }
+]

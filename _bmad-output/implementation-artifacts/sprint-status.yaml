@@ -1,5 +1,5 @@
-# generated: 2026-04-26T15:41:58+0600
-# last_updated: 2026-05-01
+# generated: 2026-05-02T18:37:20+0600
+# last_updated: 2026-05-02T18:37:20+0600
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -34,66 +34,54 @@
 # - Developer typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
-generated: 2026-04-26T15:41:58+0600
-last_updated: 2026-05-01
+generated: 2026-05-02T18:37:20+0600
+last_updated: 2026-05-02T18:37:20+0600
 project: medical-ai-agent
 project_key: NOKEY
 tracking_system: file-system
 story_location: /Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts
 
 development_status:
-  epic-1: done
-  1-1-backend-scaffold-и-health-api: done
-  1-2-case-identity-и-lifecycle-model: done
-  1-3-case-linked-core-records: done
-  1-4-role-separation-и-access-foundation: done
-  1-5-handoff-readiness-gate-и-shared-status-view: done
-  1-6-audit-events-и-case-scoped-artifacts-foundation: done
+  epic-1: backlog
+  1-1-runtime-scaffold-and-process-topology: backlog
+  1-2-case-lifecycle-and-stable-identity-model: backlog
+  1-3-environment-secret-and-runtime-profile-handling: backlog
+  1-4-internal-api-and-role-separated-runtime-boundaries: backlog
+  1-5-core-error-contract-for-recoverable-failures: backlog
   epic-1-retrospective: optional
-  epic-2: done
-  2-1-старт-patient-intake-через-patient-bot: done
-  2-2-ai-boundary-explanation-перед-consent: done
-  2-3-explicit-consent-capture: done
-  2-4-сбор-patient-profile-и-consultation-goal: done
-  2-5-patient-facing-case-status: done
-  2-6-demo-case-deletion-request: done
+  epic-2: backlog
+  2-1-start-intake-through-patient-bot: backlog
+  2-2-ai-boundary-explanation-and-explicit-consent: backlog
+  2-3-consent-record-for-operational-intake: backlog
+  2-4-profile-and-consultation-goal-capture-with-anonymized-default: backlog
+  2-5-patient-status-and-deletion-control: backlog
   epic-2-retrospective: optional
-  epic-3: done
-  3-1-document-upload-в-active-case: done
-  3-2-supported-file-validation-и-recoverable-rejection: done
-  3-3-text-extraction-из-pdf-image-documents: done
-  3-4-extraction-quality-detection-и-retry-flow: done
-  3-5-structured-medical-indicator-extraction: done
-  3-6-uncertainty-marking-и-partial-processing: done
-  3-7-original-document-references-для-doctor-review: done
+  epic-3: backlog
+  3-1-document-upload-and-processing-dispatch: backlog
+  3-2-supported-file-validation-and-recoverable-rejection: backlog
+  3-3-operational-ocr-provider-boundary: backlog
+  3-4-structured-medical-extraction-with-provenance-and-confidence: backlog
+  3-5-recoverable-ocr-and-extraction-failure-handling: backlog
   epic-3-retrospective: optional
-  epic-4: done
-  4-1-curated-knowledge-base-seed-и-qdrant-collection: done
-  4-2-retrieval-релевантных-knowledge-entries: done
-  4-3-reference-range-provenance-и-applicability-checks: done
-  4-4-grounded-facts-vs-generated-summary-contract: done
-  4-5-doctor-facing-summary-draft-with-uncertainty-markers: done
-  4-6-safety-validation-и-safetycheckresult: done
-  4-7-safety-boundary-consistency-across-outputs: done
-  4-8-provenance-и-safety-decisions-в-audit-trail: done
+  epic-4: backlog
+  4-1-operational-retrieval-through-qdrant: backlog
+  4-2-real-llm-summary-generation-with-grounding-inputs: backlog
+  4-3-safety-validation-before-doctor-facing-output: backlog
+  4-4-degraded-and-fallback-profile-presentation-rules: backlog
   epic-4-retrospective: optional
-  epic-5: done
-  5-1-doctor-ready-case-notification: done
-  5-2-structured-case-card-для-ready-case: done
-  5-3-extracted-facts-deviations-и-uncertainty-view: done
-  5-4-ai-prepared-questions-для-doctor-follow-up: done
-  5-5-source-document-references-в-doctor-bot: done
-  5-6-doctor-facing-ai-boundary-labeling: done
-  5-7-doctor-case-status-и-problem-cases: done
+  epic-5: backlog
+  5-1-doctor-runtime-and-access-allowlist: backlog
+  5-2-ready-for-doctor-notification-and-case-card: backlog
+  5-3-doctor-review-surface-for-facts-questions-and-provenance: backlog
+  5-4-case-scoped-audit-review-by-case-id: backlog
   epic-5-retrospective: optional
   epic-6: in-progress
-  6-1-reproducible-local-demo-setup: done
-  6-2-seed-demo-case-и-end-to-end-happy-path: done
-  6-3-structured-extraction-examples: done
-  6-4-safety-check-result-examples: done
-  6-5-rag-и-source-provenance-examples: done
-  6-6-minimal-eval-suite-for-extraction-groundedness-and-safety: done
-  6-7-demo-artifacts-export-by-case-id: done
-  6-8-portfolio-readme-architecture-diagram-и-known-limitations: done
-  6-9-full-local-demo-bootstrap-and-verification: done
+  6-1-runtime-health-and-readiness-checks: backlog
+  6-2-startup-verification-for-migrations-and-knowledge-base: backlog
+  6-3-restart-and-recovery-behavior: backlog
+  6-4-operational-documentation-and-profile-guardrails: backlog
+  6-5-prepared-anonymized-operational-verification-case: backlog
+  6-6-minimal-eval-suite-and-reviewable-quality-results: backlog
+  6-7-runtime-api-reference-artifacts-and-operational-examples: backlog
+  6-8-demo-path-cleanup-and-operational-verification-refactor: ready-for-dev
   epic-6-retrospective: optional

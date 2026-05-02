@@ -1,0 +1,10 @@
+{
+  "case_id": "case_demo_happy_path",
+  "consultation_goal": {
+    "text": "Review persistent cough and recent lab results"
+  },
+  "patient_profile": {
+    "age": 34,
+    "full_name": "Alex Novak"
+  }
+}

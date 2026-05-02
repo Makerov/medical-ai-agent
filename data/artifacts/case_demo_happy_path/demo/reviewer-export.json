@@ -1,0 +1,74 @@
+{
+  "case_id": "case_demo_happy_path",
+  "data_classification": "synthetic_anonymized_demo",
+  "derived_artifacts": [
+    {
+      "artifact_path": "case_demo_happy_path/export/demo/intake-snapshot.json",
+      "description": "Synthetic intake snapshot derived from the stable seed case.",
+      "label": "intake_snapshot",
+      "optional": false
+    },
+    {
+      "artifact_path": "case_demo_happy_path/export/demo/doctor-handoff.json",
+      "description": "Case-linked handoff payload with the same stable case identifier.",
+      "label": "doctor_handoff",
+      "optional": false
+    }
+  ],
+  "export_path": "case_demo_happy_path/demo/reviewer-export.json",
+  "generated_at": "2026-05-02T10:29:20.914857Z",
+  "optional_artifacts": [
+    {
+      "artifact_path": "case_demo_happy_path/export/demo/shared-status.json",
+      "description": "Reviewer-readable case overview and current status snapshot.",
+      "label": "shared_status",
+      "optional": true
+    },
+    {
+      "artifact_path": "case_demo_happy_path/summary/demo/summary-draft.json",
+      "description": "Grounded summary draft used by the handoff path.",
+      "label": "summary_draft",
+      "optional": true
+    }
+  ],
+  "overview": {
+    "case_id": "case_demo_happy_path",
+    "data_classification": "synthetic_anonymized_demo",
+    "generated_at": "2026-05-02T10:29:20.914857Z",
+    "non_goals": [
+      "No autonomous diagnosis or treatment guidance.",
+      "No real patient documents required.",
+      "No duplicate demo pipeline or storage layer."
+    ],
+    "reviewer_notes": "Synthetic, case-scoped export bundle for reviewer walkthrough without live model calls.",
+    "synthetic_by_default": true,
+    "title": "Reviewer-ready demo artifact export"
+  },
+  "required_artifacts": [
+    {
+      "artifact_path": "case_demo_happy_path/export/demo/structured-extraction-examples.json",
+      "description": "Structured extraction and indicator payloads derived from the stable seed case.",
+      "label": "structured_extraction_examples",
+      "optional": false
+    },
+    {
+      "artifact_path": "case_demo_happy_path/export/demo/rag-provenance-examples.json",
+      "description": "Grounded and not-grounded provenance examples with summary linkage.",
+      "label": "rag_provenance_examples",
+      "optional": false
+    },
+    {
+      "artifact_path": "case_demo_happy_path/safety/demo/safety-check-result.json",
+      "description": "Typed safety decision for the doctor-facing summary draft.",
+      "label": "safety_check_result",
+      "optional": false
+    },
+    {
+      "artifact_path": "case_demo_happy_path/demo/minimal-eval-suite.json",
+      "description": "Minimal eval summary showing extraction, groundedness, and safety checks.",
+      "label": "minimal_eval_suite",
+      "optional": false
+    }
+  ],
+  "synthetic_by_default": true
+}

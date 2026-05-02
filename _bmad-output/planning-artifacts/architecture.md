@@ -11,656 +11,551 @@ stepsCompleted:
 inputDocuments:
   - "_bmad-output/planning-artifacts/prd.md"
   - "_bmad-output/planning-artifacts/product-brief-medical-ai-agent.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-05-02.md"
 workflowType: "architecture"
 lastStep: 8
 status: "complete"
-completedAt: "2026-04-26"
+completedAt: "2026-05-02"
 project_name: "medical-ai-agent"
 user_name: "Maker"
-date: "2026-04-26"
+date: "2026-05-02"
+editHistory:
+  - date: "2026-05-02"
+    changes: "Reframed architecture to operational pet project mode with real Telegram runtimes, explicit deployment assumptions, real provider boundaries, and recoverable failure handling."
 ---
 
 # Документ архитектурных решений
 
-_Документ формируется совместно, шаг за шагом. Разделы добавляются по мере проработки архитектурных решений._
+Архитектура описывает `medical-ai-agent` как backend-first operational pet project для подготовки медицинского обращения. Telegram остается тонким интерфейсом поверх backend capabilities. Медицинское решение остается за врачом; AI извлекает, структурирует, обогащает источниками и подготавливает handoff.
 
 ## Анализ проектного контекста
 
 ### Обзор требований
 
-**Функциональные требования:**
-PRD задает 50 функциональных требований в восьми архитектурных областях:
+PRD и change proposal требуют сохранить core backend-first architecture, safety boundary, role separation, case lifecycle и adapter/provider boundaries, но убрать прежнее showcase framing и привести документ к operational runtime assumptions.
 
-- Intake пациента и согласие: создание case через Telegram, фиксация согласия, базовые профильные данные, цель консультации, загрузка документов, статус обработки и удаление demo-case.
-- Управление case и workflow: отслеживание lifecycle от intake до doctor handoff, привязка профиля пациента, consent, документов, extracted facts, summaries и audit records к стабильному case, а также явные recoverable states.
-- Обработка документов и извлечение данных: прием поддерживаемых медицинских документов, отклонение unsupported files, OCR/parsing, определение качества, retry flow, structured extraction медицинских показателей, confidence markers и ссылки на исходные документы.
-- Grounding на базе знаний: curated knowledge entries, provenance для reference ranges, ограничения применимости, разделение grounded facts и generated text, видимость citations в doctor-facing outputs.
-- Передача case врачу: уведомление, structured case card, цель пациента, документы, extracted facts, possible deviations, uncertainty markers, вопросы для врача, source document references и явная маркировка границ AI.
-- Safety boundaries: validation AI outputs перед показом врачу, блокировка или маркировка diagnosis, treatment recommendations и unsupported certainty, uncertainty и limitations в summaries, обязательный human doctor review.
-- Demo и evaluation: воспроизводимое local demo, end-to-end happy path, примеры structured extraction, safety check examples, RAG/source provenance examples и minimal eval results.
-- Auditability: стабильные case identifiers, source provenance, safety decisions, intermediate demo artifacts и разделение patient-facing и doctor-facing capabilities.
+Ключевые функциональные ожидания:
 
-Архитектурно это указывает на backend-first систему с тонкими Telegram adapters, явными domain/state models, typed AI contracts, асинхронной обработкой и устойчивой traceability для каждого generated doctor-facing artifact.
+- `patient_bot` создает и ведет case: consent, intake, загрузка документов, получение статусов.
+- `doctor_bot` получает doctor-facing handoff только после завершения допустимого workflow и safety validation.
+- Backend обрабатывает документы, извлекает структурированные медицинские факты, выполняет retrieval, генерирует summary и фиксирует audit trail.
+- В `operational profile` summary generation и doctor-facing generation используют configured real `LLM` provider.
+- В `operational profile` retrieval uses real `Qdrant`.
+- В `operational profile` document processing uses configured real `OCR` provider boundary.
+- `mock`/`stub` допустимы только в `dev/test` или explicit `fallback` profile.
+- Provider failure, retrieval failure или OCR failure не ведут к silent fallback и переводят case в explicit recoverable state.
+- Doctor-facing output не должен выглядеть fully grounded, если upstream retrieval/provider failed.
 
-**Нефункциональные требования:**
-30 NFR существенно формируют архитектуру:
+Ключевые нефункциональные ожидания:
 
-- Bot interactions, не требующие document processing, должны оставаться отзывчивыми.
-- Long-running OCR/LLM работа должна показывать status updates, а не блокировать Telegram interactions.
-- Demo cases по умолчанию должны использовать synthetic или anonymized data.
-- Patient и doctor capabilities должны быть разделены по ролям.
-- Doctor access в MVP должен использовать configured allowlist.
-- Documents, extracted facts и summaries должны быть удаляемыми для demo cases.
-- Logs и artifacts не должны без необходимости раскрывать sensitive data.
-- Doctor-facing summaries должны проходить safety validation перед показом.
-- Каждый highlighted indicator должен трассироваться к extracted fact или curated knowledge source.
-- Unsupported files, unreadable documents, extraction failures и safety failures должны становиться recoverable workflow states.
-- Typed schemas должны валидировать core AI contracts до downstream use.
-- Проект должен включать minimal eval cases для extraction, groundedness и safety.
-- Telegram должен оставаться заменяемым interface поверх backend capabilities.
+- Система должна быть operable, restartable и наблюдаемой.
+- Токены Telegram и provider credentials поступают из environment или secret management.
+- Long-running processing не должен блокировать bot interactions.
+- Обезличенные данные являются режимом по умолчанию.
+- Каждый doctor-facing artifact должен быть трассируем по `case_id`, source provenance и safety result.
+- Failure является частью нормального workflow, а не исключением, скрытым внутри integration layer.
 
-Эти NFR требуют четких service boundaries, явной persistence strategy, AI output validation, trace/audit records, controlled logging и workflow model, где failure является полноценным состоянием.
+### Архитектурные следствия
 
-**Масштаб и сложность:**
+Из требований следуют обязательные свойства архитектуры:
 
-- Primary domain: healthcare-oriented AI backend demo
-- Complexity level: high
-- Estimated architectural components: 12-14
+- Backend является источником истины для case state, artifacts, safety results и audit records.
+- `patient_bot` и `doctor_bot` работают как отдельные runtime processes, но не содержат business logic.
+- Все provider integrations скрыты за typed adapter boundaries.
+- Данные кейса и workflow state живут в `PostgreSQL`; retrieval layer живет в `Qdrant`.
+- AI pipeline должен быть асинхронным и идемпотентным относительно `case_id`.
+- Любой деградированный режим должен быть explicit, observable и отражен в case state и doctor-facing surface.
 
-Ожидаемые core components:
-
-- `patient_bot`
-- `doctor_bot`
-- backend API
-- case lifecycle/domain layer
-- document storage layer
-- OCR/document parsing pipeline
-- structured extraction service
-- knowledge base / RAG retrieval
-- summary generation service
-- safety validation service
-- notification/handoff service
-- audit/artifact store
-- eval suite
-- local demo infrastructure
-
-Проект ограничен MVP для low-concurrency portfolio/demo usage, но его внутренняя сложность высокая: он объединяет medical-domain safety, asynchronous document processing, LLM contracts, RAG provenance, role separation и auditability.
-
-### Технические ограничения и зависимости
-
-Известный или рекомендованный stack из продуктовых документов:
-
-- Python backend на `FastAPI`.
-- Telegram bots на `aiogram`.
-- Workflow orchestration через `LangGraph` или эквивалентную state-machine orchestration.
-- `PostgreSQL` для cases, documents metadata, audit records и workflow state.
-- `pgvector` для RAG retrieval по curated medical knowledge.
-- Pydantic / JSON Schema для typed AI contracts.
-- OCR/parser pipeline для поддерживаемых PDF или image-based medical documents.
-- Docker Compose для воспроизводимого local demo.
-- Seed knowledge base и prepared demo cases.
-- Minimal eval suite для extraction quality, groundedness и safety boundary behavior.
-
-Архитектурные ограничения:
-
-- Telegram является demo UX channel, а не core product boundary.
-- Core workflow должен оставаться переиспользуемым для будущего web dashboard, CLI demo или другого UI.
-- Public third-party API access находится вне MVP scope.
-- Production legal/compliance readiness явно вне MVP scope, но архитектура не должна противоречить будущим privacy, security и compliance requirements.
-- Real patient data не должны требоваться для portfolio demonstration.
-- Medical outputs должны избегать diagnosis, treatment recommendations и unsupported certainty.
-
-### Выявленные сквозные concerns
-
-- Safety gating перед любым doctor-facing AI output.
-- Provenance от original document к extracted fact, RAG source, summary sentence и safety decision.
-- Structured validation каждого AI-generated contract.
-- Role separation между patient, doctor и debug/admin capabilities.
-- Recoverable workflow states для OCR, extraction, grounding и safety failures.
-- Privacy-conscious data retention, deletion и logging.
-- Async/background processing с user-visible status.
-- Demo reproducibility через Docker Compose, seed data, eval fixtures и documented trade-offs.
-- Replaceable interface adapters, чтобы Telegram не проникал в core domain logic.
-- Observability, достаточная для portfolio review: стабильный `case_id`, selected artifacts, source metadata и safety results.
-
-## Оценка starter template
+## Оценка технологической основы
 
 ### Основной технологический домен
 
-Основной технологический домен: backend-first AI workflow system.
+Проект является backend-first AI workflow system с operational Telegram entrypoints. Это не full-stack web product и не showcase scaffold. Основной фокус архитектуры:
 
-MVP не является full-stack web application. Это Python backend с двумя Telegram bot adapters и асинхронным AI/document-processing pipeline. Базовый scaffold должен оптимизировать backend boundaries, typed schemas, database persistence, readiness к background processing и testability, а не React dashboard.
+- runtime topology и process boundaries;
+- typed schemas и validation;
+- persistent workflow state;
+- provider contracts;
+- observability и recovery behavior.
 
-### Рассмотренные starter options
+### Starter strategy
 
-**Option 1: Official FastAPI Full Stack Template**
+Выбранный путь: `Custom FastAPI Backend Scaffold`.
 
-Official FastAPI Full Stack Template актуален и поддерживается. На момент проверки последняя release version на GitHub: `0.10.0` от 23 января 2026 года. Template включает `FastAPI`, `SQLModel`, `Pydantic`, `PostgreSQL`, `Docker Compose`, `pytest`, generated frontend client, `React`, `Vite`, `Tailwind`, `shadcn/ui`, `Playwright`, JWT auth, email recovery, Traefik и GitHub Actions.
+Причины:
 
-Это сильный reference для production-grade FastAPI conventions, Docker Compose setup, database wiring, test layout и environment configuration.
+- официальный full-stack template слишком широк и приносит ненужные frontend/auth assumptions;
+- LangGraph template недостаточен как основной scaffold, потому что вокруг graph нужны API, bots, persistence, providers, audit и operations;
+- custom scaffold лучше соответствует backend-first operational runtime с отдельными процессами `api`, `patient_bot`, `doctor_bot` и optional worker.
 
-Но как прямой starter для MVP он слишком широкий: добавляет web frontend, user/password auth, email flows и deployment machinery, которые не входят в Telegram-first portfolio demo. Его прямое использование с высокой вероятностью превратит первый implementation story в удаление или обход лишней product surface.
-
-**Option 2: LangGraph CLI Template**
-
-Current LangGraph CLI поддерживает создание проектов из templates, local development с hot reload, Docker-based execution, Docker image builds и `langgraph.json` для graph configuration.
-
-Пример команды из текущей документации:
-
-```bash
-pip install "langgraph-cli[inmem]"
-langgraph new medical-ai-agent-workflow --template react-agent
-```
-
-Этот starter полезен как reference для packaging agent workflow, graph entrypoints и local graph development.
-
-Но он недостаточен как primary starter, потому что проекту нужен более широкий backend вокруг LangGraph: Telegram adapters, case lifecycle, document storage, PostgreSQL persistence, RAG, safety checks, audit artifacts и eval fixtures.
-
-**Option 3: Custom Backend Scaffold по official patterns**
-
-Custom scaffold лучше всего подходит для MVP. Он должен использовать official FastAPI larger-application organization через `APIRouter` modules и выборочно заимствовать подходы из FastAPI Full Stack Template для Docker Compose, PostgreSQL, settings, test conventions и migration discipline.
-
-Такой подход не наследует лишнюю web frontend/auth/email complexity, но остается согласованным с актуальными FastAPI и LangGraph patterns.
-
-### Выбранный starter: Custom FastAPI Backend Scaffold
-
-**Rationale for Selection:**
-
-Проект backend-first и AI-workflow-heavy. Custom scaffold дает implementation agent чистую основу с ровно теми boundaries, которые нужны PRD:
-
-- thin Telegram adapters;
-- core backend domain layer independent of Telegram;
-- explicit case lifecycle;
-- typed AI contracts;
-- document-processing pipeline;
-- LangGraph workflow module;
-- RAG and safety services;
-- audit/demo artifacts;
-- eval suite.
-
-Official FastAPI Full Stack Template следует использовать как reference, а не копировать целиком, потому что MVP не требует React frontend, password auth, email recovery или full-stack dashboard.
-
-**Initialization Command:**
-
-Внешний starter не нужно копировать как первый implementation step. Первый implementation story должен создать scaffold прямо в существующем проекте:
-
-```bash
-mkdir -p app/{api,core,db,models,schemas,services,workflow,bots,workers,evals}
-mkdir -p tests docker scripts data/{knowledge_base,demo_cases,artifacts}
-touch app/__init__.py app/main.py
-```
-
-Если во время implementation понадобится отдельный LangGraph prototype, его можно создать как reference вне основного app и затем осознанно интегрировать:
-
-```bash
-pip install "langgraph-cli[inmem]"
-langgraph new langgraph_reference --template react-agent
-```
-
-**Architectural Decisions Provided by Starter:**
-
-**Language & Runtime:**
-Python backend с `FastAPI`, `Pydantic` schemas и явными async boundaries для I/O-heavy work.
-
-**Styling Solution:**
-В MVP нет frontend styling solution. Telegram является UI channel. Будущий web dashboard сможет выбрать frontend stack независимо от core backend architecture.
-
-**Build Tooling:**
-Project-local Python packaging, Docker Compose, environment-based configuration и отдельные services для API, bot processes, database и optional worker.
-
-**Testing Framework:**
-`pytest` для backend unit и integration tests. Eval fixtures для extraction, groundedness и safety behavior должны быть first-class test artifacts.
-
-**Code Organization:**
-Организация по backend capability boundaries:
-
-- `app/api`: internal API routes и OpenAPI surface.
-- `app/bots`: `patient_bot` и `doctor_bot` adapters.
-- `app/core`: settings, logging, security helpers и shared configuration.
-- `app/db`: database session, migrations и persistence helpers.
-- `app/models`: persistence models.
-- `app/schemas`: Pydantic contracts для API и AI outputs.
-- `app/services`: case management, documents, RAG, summary, safety и audit services.
-- `app/workflow`: LangGraph orchestration и workflow state transitions.
-- `app/workers`: background processing entrypoints.
-- `app/evals`: extraction, groundedness и safety eval runners.
-
-**Development Experience:**
-Scaffold должен поддерживать local execution через Docker Compose, generated FastAPI OpenAPI docs, focused `pytest` runs, seed demo cases, seed knowledge base и stable artifact output by `case_id`.
-
-**Note:** Project initialization using this scaffold should be the first implementation story.
+Использовать сторонние шаблоны можно как reference для patterns, но не как основу продукта.
 
 ## Ключевые архитектурные решения
 
-### Анализ приоритетов решений
+### ADR-001: Runtime и framework stack
 
-**Критические решения, без которых нельзя начинать реализацию:**
+Зафиксированный стек:
 
-- Runtime: `Python 3.13`.
-- Backend framework: `FastAPI`.
-- Telegram integration: `aiogram 3.x`.
-- Workflow orchestration: `LangGraph 1.1.x`.
-- Основная relational database: `PostgreSQL 18`.
-- Vector database для RAG: `Qdrant`.
-- Контракты данных: `Pydantic 2.13.x`.
-- Тестирование: `pytest 9.x`.
-- API style: internal REST API с generated OpenAPI docs.
-- Background processing: отдельный worker process поверх явных case states; в MVP queue abstraction может быть in-process, а позже перейти на Redis/RQ/Celery без изменения domain contracts.
-- Security model: Telegram identity для пациентов, doctor allowlist для врачей, local/static token для debug/admin routes.
-- Safety model: ни один doctor-facing AI output не показывается без safety validation.
+- `Python 3.13`
+- `FastAPI`
+- `aiogram 3.x`
+- `LangGraph 1.1.x`
+- `Pydantic 2.x`
+- `PostgreSQL 18`
+- `Qdrant`
+- `pytest`
 
-**Важные решения, которые сильно формируют архитектуру:**
+Обоснование: стек покрывает внутренний API, отдельные bot runtimes, stateful orchestration, typed validation и explicit retrieval boundary без лишней full-stack поверхности.
 
-- Использовать domain-oriented modules, а не структуру только по техническим слоям.
-- Хранить все case-linked artifacts под стабильным `case_id`.
-- Сохранять AI intermediate outputs, необходимые для demo traceability.
-- Держать Telegram adapters тонкими, а core workflow независимым от Telegram.
-- Использовать recoverable workflow states вместо silent failures или raw exceptions.
-- Использовать curated RAG knowledge с provenance и applicability metadata.
-- Разделить relational case storage и vector retrieval storage.
+### ADR-002: Runtime topology как отдельные процессы
 
-**Отложенные решения для Post-MVP:**
+Обязательная runtime topology для `operational profile`:
 
-- Web dashboard framework.
-- Production-grade identity provider, SSO, MFA.
-- Полный queue stack: Redis/RQ/Celery/Arq.
-- Cloud hosting provider.
-- Production compliance architecture для real patient data.
-- Интеграции с МИС, ЕГИСЗ, laboratory APIs, payments или scheduling.
+- `api`
+- `patient_bot`
+- `doctor_bot`
+- optional `worker`
+- `PostgreSQL`
+- `Qdrant`
 
-### ADR-резюме ключевых решений
+Дополнительно допускается document storage boundary, но она не должна менять core topology. В базовом operational deployment документы могут храниться на shared persistent volume или в S3-compatible storage adapter, а metadata и ссылки живут в `PostgreSQL`.
 
-#### ADR-001: Использовать `Python 3.13` как среду выполнения
+Роли процессов:
 
-**Рассмотренные варианты:**
-- `Python 3.14`: самый свежий stable runtime.
-- `Python 3.13`: зрелый актуальный runtime с хорошей совместимостью библиотек.
-- `Python 3.12`: более консервативный runtime, но уже менее привлекательный для нового проекта.
+- `api`: внутренний HTTP backend, orchestration entrypoints, health/readiness endpoints, persistence, auth checks.
+- `patient_bot`: Telegram runtime для пациента; вызывает backend API и отображает статусы.
+- `doctor_bot`: Telegram runtime для врача; получает doctor-facing case card из backend API.
+- `worker`: фоновая обработка OCR/extraction/retrieval/summary/safety. Может отсутствовать на старте, если queue abstraction встроена в `api`, но process boundary должен быть предусмотрен.
+- `PostgreSQL`: transactional state, auditability, case lifecycle, provider outcome records.
+- `Qdrant`: embeddings, retrieval collections и payload metadata для curated knowledge base.
 
-**Решение:** использовать `Python 3.13`.
+### ADR-003: Telegram как thin interface поверх backend capabilities
 
-**Обоснование:** проект зависит от AI/backend ecosystem: `FastAPI`, `Pydantic`, `aiogram`, `LangGraph`, OCR/parsing libraries и eval tooling. Для portfolio MVP важнее совместимость и предсказуемость, чем самый новый runtime. `Python 3.13` дает современный runtime без лишнего риска ранней несовместимости `3.14`.
+`patient_bot` и `doctor_bot` не работают напрямую с БД, workflow nodes или provider SDK.
 
-**Последствия:** implementation должен фиксировать runtime в `pyproject.toml`, Docker image и README. Переход на `Python 3.14` можно рассмотреть позже, когда зависимости проекта подтвердят совместимость.
+Допустимая граница взаимодействия:
 
-#### ADR-002: Использовать `Qdrant` как отдельную векторную базу данных для RAG
+- bots вызывают internal backend API;
+- backend API вызывает services;
+- services инициируют worker/queue boundary;
+- worker выполняет workflow graph;
+- workflow nodes обращаются к integrations через interfaces.
 
-**Рассмотренные варианты:**
-- `PostgreSQL + pgvector`.
-- Отдельная vector DB: `Qdrant`, Weaviate, Milvus или аналог.
-- Только файловая/static knowledge base без vector search.
+Недопустимо:
 
-**Решение:** использовать `Qdrant` как отдельную vector database для RAG, а `PostgreSQL` оставить основным relational хранилищем для case data, workflow state, audit records и metadata.
+- business logic в Telegram handlers;
+- прямой доступ bots к `PostgreSQL` или `Qdrant`;
+- прямой вызов providers из bot processes;
+- doctor-facing summary, собранный целиком внутри `doctor_bot`.
 
-**Обоснование:** проект является portfolio-grade AI backend, и отдельная vector database лучше демонстрирует зрелую RAG architecture: разделение relational case data и retrieval layer, явные collections, payload metadata, filtering, embeddings lifecycle и возможность независимой настройки retrieval. `Qdrant` хорошо подходит для MVP, потому что его можно поднять в Docker Compose, использовать локально без managed cloud и показать в README как отдельный AI infrastructure component.
+Это сохраняет Telegram заменяемым интерфейсом и позволяет позже подключить web UI или другой channel без переписывания core workflow.
 
-`PostgreSQL + pgvector` проще, но для этого проекта может выглядеть как слишком скрытый retrieval layer: интервьюеру сложнее увидеть границу RAG storage и retrieval behavior. Отдельный `Qdrant` повышает демонстрационную ценность архитектуры, если scope держать строго ограниченным.
+### ADR-004: Отдельные relational и retrieval boundaries
 
-**Последствия:** knowledge sources, embeddings и retrieval payload metadata живут в `Qdrant`; canonical source metadata и audit/provenance records должны сохраняться в `PostgreSQL`, чтобы doctor-facing summary можно было трассировать по `case_id`. Docker Compose должен включать `qdrant` service. Нужно явно документировать collection schema, payload fields и seed process для curated knowledge base.
+`PostgreSQL` и `Qdrant` остаются отдельными системами ответственности.
 
-#### ADR-003: Начать с внутрипроцессной абстракции очереди, но выделить границу worker
+`PostgreSQL` хранит:
 
-**Рассмотренные варианты:**
-- Полноценная очередь с первого дня: Redis/RQ, Celery, Arq.
-- In-process background tasks без явной worker boundary.
-- Явная worker boundary с простой MVP-реализацией.
+- cases и lifecycle state;
+- consent records;
+- document metadata и storage references;
+- extracted facts;
+- summary drafts и safety results;
+- audit records;
+- provider outcome metadata;
+- retry/recovery markers.
 
-**Решение:** выделить worker boundary, но в MVP разрешить простую in-process реализацию queue abstraction.
+`Qdrant` хранит:
 
-**Обоснование:** document processing и LLM calls являются long-running operations, поэтому архитектура не должна блокировать Telegram interactions. Но полноценный queue stack на старте может отвлечь от главной portfolio value: AI workflow, safety, provenance и evals. Явная boundary позволяет начать просто и перейти на настоящую очередь без переписывания domain contracts.
+- embeddings curated knowledge base;
+- collection payloads;
+- metadata для retrieval filtering;
+- retrieval-ready representation источников.
 
-**Последствия:** case state machine должна быть источником правды. Bots читают статусы, а не ждут completion синхронно. Worker entrypoint можно заменить на Redis/RQ/Celery позже.
+Причина: retrieval boundary должен быть явной operational capability, а не скрытым побочным полем в relational storage.
 
-#### ADR-004: Держать Telegram как адаптер, а не ядро домена
+### ADR-005: Provider contracts обязательны и typed
 
-**Рассмотренные варианты:**
-- Встроить workflow прямо в bot handlers.
-- Сделать bots тонкими adapters поверх backend services.
-- Сразу строить web dashboard и оставить Telegram вторичным каналом.
+Архитектура фиксирует три provider boundaries:
 
-**Решение:** `patient_bot` и `doctor_bot` являются тонкими adapters поверх backend capabilities.
+- `LLMClient`
+- `RetrievalClient`
+- `OCRClient`
 
-**Обоснование:** PRD явно требует, чтобы Telegram был demo UX channel, а core workflow мог позже подключаться к web dashboard или другому UI. Если logic попадет в handlers, проект быстро станет Telegram-bound и потеряет архитектурную демонстрационную ценность.
+Они должны быть заменяемыми adapter interfaces в `app/integrations`, а не vendor-specific code, размазанным по services.
 
-**Последствия:** bot handlers должны вызывать backend services/API и не владеть business workflow. Case lifecycle, safety, RAG, extraction и audit должны жить вне Telegram layer.
+Базовые контракты:
 
-#### ADR-005: Проверять safety как обязательный этап перед doctor handoff
+```python
+class LLMClient(Protocol):
+    async def generate_structured(self, request: LLMRequest) -> LLMResult: ...
 
-**Рассмотренные варианты:**
-- Safety как post-processing warning.
-- Safety как blocking gate перед doctor-facing output.
-- Safety только через prompt instructions без отдельной проверки.
+class RetrievalClient(Protocol):
+    async def retrieve(self, request: RetrievalRequest) -> RetrievalResult: ...
 
-**Решение:** safety validation является blocking gate перед doctor handoff.
-
-**Обоснование:** медицинский домен и PRD запрещают diagnosis, treatment recommendations и unsupported clinical certainty. Prompt-only safety недостаточен: implementation agents должны строить отдельный проверяемый step, который может заблокировать, переписать или отправить case в manual review.
-
-**Последствия:** doctor-facing summary не может быть показан до `SafetyCheckResult`. Safety failures становятся recoverable workflow states. Evals должны проверять safety behavior отдельно от summary generation.
-
-### Архитектура данных
-
-Основное relational хранилище: `PostgreSQL 18`.
-
-Обоснование: PRD требует хранить case lifecycle, consent records, document metadata, extracted indicators, summaries, safety decisions, audit records и eval/demo artifacts. `PostgreSQL` закрывает transactional state и auditability.
-
-Vector database: `Qdrant`.
-
-Обоснование: RAG layer является важной частью portfolio demonstration. Отдельный `Qdrant` делает retrieval boundary явной: collections, embeddings, payload metadata, filtering и retrieval behavior можно показать отдельно от relational case storage.
-
-Data modeling approach: persistence models отдельно от `Pydantic` schemas для API и AI contracts.
-
-Migration approach: `Alembic` для `PostgreSQL`. Для `Qdrant` collection setup должен быть идемпотентным seed/setup step.
-
-Validation strategy: каждый AI structured output валидируется через `Pydantic` до сохранения или downstream use.
-
-Caching strategy: distributed cache в MVP не нужен. Сначала используем explicit persistence и deterministic retrieval; cache добавляется только если profiling покажет реальную необходимость.
-
-### Аутентификация и безопасность
-
-Patient identity: Telegram `user_id` / `chat_id`, привязанный к patient cases.
-
-Doctor identity: configured Telegram ID allowlist.
-
-Debug/admin access: local-only routes или static development token.
-
-Authorization pattern: role checks на API/service boundary. Patient не может открывать doctor views; doctor не может менять patient intake вне предусмотренных review actions.
-
-Data protection: synthetic/anonymized demo data по умолчанию, минимизация sensitive logs, поддержка demo-case deletion, привязка source documents/artifacts к `case_id`.
-
-Safety gate: summary нельзя передать врачу, пока safety validation не пройдена.
-
-### API и коммуникационные паттерны
-
-API style: REST поверх `FastAPI`, versioned under `/api/v1`.
-
-Documentation: generated OpenAPI docs из `FastAPI`.
-
-Internal communication: bots вызывают backend services/API; workflow и worker обновляют case state.
-
-Error handling: domain-level error codes мапятся в recoverable case states: unsupported file, unreadable document, partial OCR, extraction validation failed, missing units, RAG source not applicable, safety failure, timeout, manual review required.
-
-Rate limits: MVP должен задавать operational limits через configuration: max file size, max documents per case, supported file types, processing timeout, LLM timeout, retry limits и max summary length.
-
-### Frontend-архитектура
-
-Web frontend в MVP отсутствует.
-
-Telegram является UI channel, но не core architecture boundary. `patient_bot` и `doctor_bot` должны оставаться adapters поверх backend capabilities.
-
-Future web dashboard откладывается и должен будет использовать те же backend case/card APIs.
-
-### Инфраструктура и deployment
-
-Local demo: Docker Compose.
-
-Services: backend API, patient bot, doctor bot, PostgreSQL, Qdrant, optional worker.
-
-Configuration: environment variables через settings module.
-
-Observability: structured logs с `case_id`, selected demo artifacts, source provenance, safety decisions и eval outputs.
-
-CI/CD: GitHub Actions может запускать lint/tests/evals позже, но первая реализация должна сначала обеспечить локально работающие project commands.
-
-Scaling: MVP рассчитан на low-concurrency demo use. Архитектура должна позволять перенести document processing в настоящую queue после MVP.
-
-### Анализ влияния решений
-
-**Последовательность реализации:**
-
-1. Создать custom FastAPI scaffold.
-2. Добавить settings, logging и conventions для `case_id`.
-3. Добавить database models и migrations.
-4. Добавить Pydantic schemas для patient, case, documents, extraction, RAG, summary и safety.
-5. Добавить case lifecycle service и recoverable states.
-6. Добавить Telegram adapters.
-7. Добавить document processing и extraction pipeline.
-8. Добавить Qdrant client, collection setup, seed knowledge base и retrieval service.
-9. Добавить summary generation и safety validation.
-10. Добавить audit/demo artifacts и eval suite.
-
-**Cross-component dependencies:**
-
-- `case_id` должен появиться до document processing, RAG, summary, safety и artifacts.
-- Pydantic schemas должны появиться до AI workflow implementation.
-- Qdrant collection schema должна быть согласована с `KnowledgeSource` / `RAGCitation` contracts.
-- Safety validation зависит от summary generation и extracted facts.
-- Doctor handoff зависит от успешной обработки и passed safety check.
-- Telegram bots зависят от backend case states, а не от внутренних деталей workflow.
-
-## Паттерны реализации и правила согласованности
-
-### Определенные категории паттернов
-
-**Критические точки возможных конфликтов:**
-Выявлены 10 областей, где разные AI agents могут принять несовместимые решения:
-
-- именование таблиц, колонок, индексов и внешних ключей в базе данных;
-- именование API endpoints, route params и query params;
-- именование Python modules, classes, functions и variables;
-- структура модулей, tests, services, schemas и workflows;
-- форматы API responses и error responses;
-- именование JSON fields и формат date/time values;
-- именование case states и правила переходов между ними;
-- logging, trace IDs и audit artifacts;
-- retry/error recovery patterns;
-- момент и место validation для API inputs, AI outputs и persistence.
-
-### Правила именования
-
-**Именование в базе данных:**
-
-- Имена таблиц: `snake_case`, plural nouns.
-  - Хорошо: `patient_cases`, `medical_documents`, `extracted_indicators`, `safety_check_results`
-  - Избегать: `PatientCase`, `patientCase`, `case`
-- Имена колонок: `snake_case`.
-  - Хорошо: `case_id`, `telegram_user_id`, `created_at`, `source_document_id`
-  - Избегать: `caseId`, `telegramUserId`
-- Primary keys: `id`, если только domain identifier не должен быть явно exposed.
-- Foreign keys: `{referenced_singular}_id`.
-  - Хорошо: `case_id`, `document_id`, `patient_id`
-- Имена индексов: `ix_{table}_{columns}`.
-  - Хорошо: `ix_patient_cases_status`, `ix_medical_documents_case_id`
-- Unique constraints: `uq_{table}_{columns}`.
-- Check constraints: `ck_{table}_{meaning}`.
-
-**Именование API:**
-
-- REST endpoints используют plural nouns и `kebab-case` только там, где он действительно нужен.
-  - Хорошо: `/api/v1/cases`, `/api/v1/cases/{case_id}/documents`
-  - Избегать: `/api/v1/case`, `/api/v1/getCaseDocuments`
-- Route params используют `snake_case`.
-  - Хорошо: `{case_id}`, `{document_id}`
-- Query params используют `snake_case`.
-  - Хорошо: `?case_status=processing&include_artifacts=true`
-- Custom headers используют conventional HTTP header casing.
-  - Хорошо: `X-Request-ID`, `X-Debug-Token`
-
-**Именование в коде:**
-
-- Python modules и files: `snake_case.py`.
-  - Хорошо: `case_service.py`, `safety_service.py`, `rag_service.py`
-- Python classes и Pydantic models: `PascalCase`.
-  - Хорошо: `PatientCase`, `CaseSummary`, `SafetyCheckResult`
-- Functions, methods и variables: `snake_case`.
-  - Хорошо: `create_case`, `run_safety_check`, `case_id`
-- Constants: `UPPER_SNAKE_CASE`.
-  - Хорошо: `MAX_DOCUMENTS_PER_CASE`
-- Enum values, которые сохраняются в базе или отдаются через API: lowercase `snake_case`.
-  - Хорошо: `processing`, `ready_for_doctor`, `safety_failed`
-
-### Правила структуры
-
-**Организация проекта:**
-
-- `app/api`: FastAPI routers и request/response boundary.
-- `app/bots`: только Telegram adapters.
-- `app/core`: settings, logging, security helpers и shared configuration.
-- `app/db`: DB session, migrations integration и persistence utilities.
-- `app/models`: persistence models.
-- `app/schemas`: Pydantic contracts для API, AI outputs и internal DTOs.
-- `app/services`: business services и domain operations.
-- `app/workflow`: LangGraph orchestration и workflow state transitions.
-- `app/workers`: background processing entrypoints.
-- `app/evals`: eval runners и fixtures.
-- `tests`: unit и integration tests, зеркалирующие app modules.
-- `data/knowledge_base`: curated source files для RAG seed data.
-- `data/demo_cases`: prepared synthetic demo cases.
-- `data/artifacts`: local generated demo artifacts, сгруппированные по `case_id`.
-
-**Правила размещения файлов:**
-
-- Один service на одну capability boundary.
-  - Хорошо: `case_service.py`, `document_service.py`, `safety_service.py`
-- Не размещать business logic в FastAPI routers или Telegram handlers.
-- Shared helpers размещать в самом узком подходящем module. Использовать `app/core` только для действительно cross-cutting utilities.
-- Tests должны зеркалировать module under test.
-  - Хорошо: `tests/services/test_case_service.py`
-  - Хорошо: `tests/workflow/test_case_workflow.py`
-
-### Правила форматов
-
-**Форматы API responses:**
-
-Successful responses должны возвращать typed domain payload напрямую, если metadata не нужна.
-
-Для list endpoints:
-
-```json
-{
-  "items": [],
-  "total": 0
-}
+class OCRClient(Protocol):
+    async def extract_document(self, request: OCRRequest) -> OCRResult: ...
 ```
 
-Для error responses:
+Требования к результатам:
 
-```json
-{
-  "error": {
-    "code": "unsupported_file_type",
-    "message": "Тип файла не поддерживается.",
-    "details": {
-      "allowed_types": ["pdf", "jpg", "png"]
-    },
-    "request_id": "req_..."
-  }
-}
-```
+- возвращать typed payload;
+- включать `provider_name`, `provider_request_id`, `model_or_engine`, `started_at`, `finished_at`;
+- включать `status` и machine-readable failure reason;
+- не скрывать fallback внутри integration layer.
 
-**Форматы обмена данными:**
+Правила `operational profile`:
 
-- JSON fields используют `snake_case`.
-- Date/time values используют ISO 8601 strings with timezone.
-- Money, timezone и localization assumptions не должны быть implicit.
-- Optional unknown values используют `null`, а не empty strings.
-- AI confidence values представлены float от `0.0` до `1.0`.
-- User-facing Russian text должен находиться в bot/message layer, а не в low-level domain enums.
+- summary generation и doctor-facing generation используют configured real `LLM` provider;
+- retrieval выполняется через real `Qdrant`;
+- OCR/document processing использует configured real `OCR` provider boundary;
+- `mock`/`stub` не допускаются silently;
+- любой fallback должен быть явным профилем, задокументирован и видим downstream.
 
-### Правила коммуникации и workflow
+### ADR-006: Safety boundary обязательна перед doctor-facing handoff
 
-**Правила case states:**
+Ни один doctor-facing AI output не должен быть показан без safety validation.
 
-Case statuses должны быть explicit и recoverable:
+Safety layer обязан:
+
+- блокировать diagnosis и treatment recommendations;
+- блокировать unsupported certainty;
+- добавлять uncertainty и limitations, когда они нужны;
+- учитывать upstream retrieval/provider failures;
+- запрещать presentation как fully grounded, если grounding не удался.
+
+Если retrieval/provider/OCR failure нарушает надежность handoff, case переводится в recoverable state, а не silently доставляется врачу как обычный успешный summary.
+
+### ADR-007: Failure является explicit workflow state
+
+Минимальный набор case states:
 
 - `draft`
 - `awaiting_consent`
 - `collecting_intake`
 - `documents_uploaded`
 - `processing_documents`
-- `extraction_failed`
+- `ocr_failed`
 - `partial_extraction`
 - `ready_for_summary`
+- `retrieval_failed`
 - `summary_failed`
 - `safety_failed`
+- `manual_review_required`
 - `ready_for_doctor`
 - `doctor_reviewed`
 - `deletion_requested`
 - `deleted`
 
-Agents не должны придумывать новые statuses без обновления schemas, persistence model, workflow transitions, tests и docs.
+Допускается расширение, но только с синхронным обновлением schemas, persistence, transitions, tests и docs.
 
-**Именование events и workflow commands:**
+Правила failure-state handling:
 
-- Internal events используют past-tense или command-style lowercase `snake_case`.
-  - Event: `document_uploaded`, `extraction_completed`, `safety_check_failed`
-  - Command: `process_case`, `generate_summary`, `delete_case`
-- Event payloads должны включать `case_id`, `event_type`, `created_at` и relevant entity IDs.
-- Workflow transitions должны быть централизованы в `app/workflow`, а не размазаны по services и handlers.
+- `OCR` failure переводит case в `ocr_failed` или `manual_review_required`;
+- retrieval failure переводит case в `retrieval_failed` или `manual_review_required`;
+- `LLM` generation failure переводит case в `summary_failed`;
+- safety violation переводит case в `safety_failed`;
+- ботам и API запрещено маскировать эти состояния как обычный success.
 
-**Logging и audit patterns:**
+### ADR-008: Operational deployment assumptions зафиксированы явно
 
-- Каждый log, связанный с case, должен включать `case_id`.
-- External calls должны включать `request_id` или trace identifier.
-- Logs не должны включать полный medical document text по умолчанию.
-- Audit artifacts должны группироваться по `case_id`.
-- Safety decisions и source provenance должны сохраняться, а не только логироваться.
+MVP рассматривается как low-concurrency operational pet project, а не enterprise production platform.
 
-### Процессные правила
+Зафиксированные assumptions:
 
-**Error handling:**
+- deployment по умолчанию: один хост или один VM-class environment с Docker Compose или эквивалентом;
+- `api`, bots и worker могут быть подняты как отдельные containers/services;
+- `PostgreSQL` и `Qdrant` поднимаются как persistent services;
+- secrets передаются через environment variables или secret manager, но не через committed config files;
+- обезличенные данные используются по умолчанию;
+- для реальных чувствительных персональных данных требуется отдельная legal/security assessment вне scope MVP.
 
-- Infrastructure exceptions переводятся в domain errors на service boundary.
-- Domain errors мапятся в recoverable case states, когда это возможно.
-- User-facing bot messages не раскрывают stack traces, raw LLM errors или raw OCR/parser errors.
-- Safety failures не являются system errors; это ожидаемые workflow outcomes.
-- Low-confidence extraction не считается полноценным success, если uncertainty явно не представлена.
+Это operational runtime, но не обещание enterprise HA, geo-redundancy или formal compliance program.
 
-**Loading/status handling:**
+### ADR-009: Observability и audit являются first-class capability
 
-- Bots не должны синхронно ждать long-running document processing.
-- Patient-facing status должен выводиться из case state.
-- Doctor-facing visibility начинается только после `ready_for_doctor`.
-- Если processing partial, doctor-facing card должен показывать uncertainty markers.
+Система обязана фиксировать:
 
-**Validation:**
+- `case_id`;
+- state transitions;
+- provider call outcomes;
+- retrieval provenance;
+- safety decisions;
+- doctor handoff readiness;
+- retry/recovery events.
 
-- API input валидируется на FastAPI/Pydantic boundary.
-- AI structured outputs валидируются сразу после model call.
-- Persistence constraints валидируются до commit workflow state.
-- Doctor-facing summary валидируется через safety service до handoff.
-- Invalid AI output должен становиться `extraction_failed`, `summary_failed` или `manual_review_required`, а не unhandled exception.
+Observability должна быть достаточной, чтобы оператор понимал:
 
-### Правила enforcement
+- какой runtime process деградировал;
+- какой provider вызов не удался;
+- можно ли безопасно продолжить case;
+- почему doctor-facing output blocked или marked degraded.
 
-**Все AI agents обязаны:**
+## Архитектура данных и домена
 
-- Использовать существующие schemas/enums перед добавлением новых.
-- Держать Telegram handlers тонкими и свободными от business workflow logic.
-- Держать API routers тонкими и делегировать работу в services.
-- Использовать `case_id` в logs, audit records и artifacts.
-- Сохранять `Pydantic` validation до persistence/downstream use.
-- Добавлять или обновлять tests при введении нового status, schema, service или workflow transition.
-- Обновлять этот architecture document или follow-up ADR при введении нового architectural pattern.
+### Core domain entities
 
-**Проверка соблюдения паттернов:**
+Основные сущности:
 
-- Code review должен проверять naming, module boundaries, response formats и state transitions.
-- Tests должны покрывать case state transitions и safety gate behavior.
-- New workflow states требуют schema, model, transition и test updates в одном change.
-- Pattern violations должны фиксироваться как follow-up issues или исправляться до merge.
+- `PatientCase`
+- `ConsentRecord`
+- `PatientProfile`
+- `MedicalDocument`
+- `DocumentExtraction`
+- `ExtractedIndicator`
+- `KnowledgeSource`
+- `RAGCitation`
+- `DoctorSummary`
+- `SafetyCheckResult`
+- `AuditTrace`
+- `ProviderCallRecord`
 
-### Примеры паттернов
+Принципы модели:
 
-**Хорошие примеры:**
+- все case-linked сущности содержат `case_id`;
+- source provenance связывает документ, extracted fact, retrieval source и summary;
+- summary и safety живут отдельно, чтобы было видно границу между generation и validation;
+- provider metadata сохраняется отдельно от human-facing text.
 
-- `POST /api/v1/cases/{case_id}/documents`
-- `case_status = "processing_documents"`
-- `SafetyCheckResult(blocked=True, reasons=[...])`
-- `tests/services/test_safety_service.py`
-- Log line с `case_id`, `request_id`, `event_type`
+### Data retention и privacy posture
 
-**Антипаттерны:**
+По умолчанию система ориентирована на обезличенные кейсы.
 
-- Business logic внутри `patient_bot` handler.
-- Новый case status добавлен только как string literal.
-- AI output сохранен до schema validation.
-- Doctor summary показан после generation, но до safety validation.
-- Full OCR text записан в обычные application logs.
-- `caseId` в JSON response при том, что остальной API использует `case_id`.
+Правила:
+
+- хранить минимально необходимый объем данных;
+- не писать полный OCR text в обычные application logs;
+- document binaries хранить за отдельной storage boundary;
+- удаление кейса должно удалять связанные metadata, artifacts и storage references в соответствии с retention policy;
+- audit trail должен сохранять enough context для объяснимости без раскрытия лишних данных в логах.
+
+## Аутентификация, авторизация и секреты
+
+### Auth model
+
+- пациенты идентифицируются через Telegram chat/user identity;
+- врачи допускаются через configured allowlist;
+- внутренние service routes защищаются internal auth boundary;
+- debug/admin access, если существует, должен быть отдельным и ограниченным operationally.
+
+Архитектура не предполагает открытый public API для произвольных third-party clients в MVP.
+
+### Secret injection model
+
+Секреты и токены приходят из environment/secret management:
+
+- `DATABASE_URL`
+- `QDRANT_URL`
+- `PATIENT_BOT_TOKEN`
+- `DOCTOR_BOT_TOKEN`
+- `LLM_PROVIDER`
+- `LLM_API_KEY`
+- `OCR_PROVIDER`
+- `OCR_API_KEY`
+- `APP_RUNTIME_PROFILE`
+- `DOCTOR_ALLOWLIST`
+
+Правила:
+
+- значения не хранятся в git;
+- `.env.example` документирует shape переменных, но не содержит реальных значений;
+- local `.env` допустим только как developer convenience;
+- production-like deployment должен использовать secret injection механизмы платформы;
+- rotation bot tokens и provider credentials не должна требовать изменения кода.
+
+## API и коммуникационные паттерны
+
+### Internal communication boundary
+
+Предпочтительный паттерн для раздельных процессов:
+
+- bots общаются с backend через internal HTTP API;
+- `api` публикует routes для case creation, consent, document upload, status polling, doctor handoff и health;
+- worker читает persisted jobs или queue abstraction и обновляет case state в `PostgreSQL`.
+
+Логическая схема:
+
+```text
+patient_bot -> api -> services -> worker/workflow -> integrations
+doctor_bot  -> api -> services -> worker/workflow -> integrations
+```
+
+`patient_bot` и `doctor_bot` не должны иметь собственных версий case lifecycle rules. Они отображают состояния, определенные backend.
+
+### API style
+
+- internal REST API;
+- `snake_case` во всех JSON payloads;
+- typed request/response schemas через `Pydantic`;
+- machine-readable error codes для recoverable failures;
+- отдельные doctor-facing endpoints не возвращают blocked summary как success without warning.
+
+### Provider-facing communication rules
+
+Services не должны обращаться к SDK напрямую. Только через `app/integrations/*`.
+
+Каждый provider adapter обязан:
+
+- логировать request/response metadata без чувствительного payload-by-default;
+- возвращать typed outcome;
+- отделять transport failure от semantic failure;
+- поддерживать timeout и retry policy на boundary;
+- публиковать failure reason, пригодный для workflow transition.
+
+## Инфраструктура и deployment
+
+### Runtime topology
+
+Базовая topology для operational runtime:
+
+```text
+┌─────────────┐      ┌───────────┐      ┌──────────────┐
+│ patient_bot │ ---> │    api    │ ---> │ PostgreSQL   │
+└─────────────┘      └───────────┘      └──────────────┘
+        │                    │
+        │                    ├---------> Qdrant
+        │                    │
+┌─────────────┐              └---------> worker (optional separate process)
+│ doctor_bot  │ ----------------------> /
+└─────────────┘
+```
+
+Пояснения:
+
+- `api` является единственной backend entrypoint для bots;
+- `worker` может быть отдельным процессом или временно встроенным, но архитектурно отделен;
+- `PostgreSQL` обязателен для lifecycle state и audit;
+- `Qdrant` обязателен в `operational profile` для retrieval;
+- провайдеры `LLM` и `OCR` являются внешними integrations и не изображаются как локальные mocks по умолчанию.
+
+### Deployment assumptions
+
+- default deployment: single-node Docker Compose или эквивалентный low-scale runtime;
+- процессы развертываются независимо и могут рестартовать отдельно;
+- persistent storage для `PostgreSQL`, `Qdrant` и document storage не должен быть ephemeral;
+- migrations применяются до перевода `api` в ready state;
+- `Qdrant` collection setup выполняется идемпотентно;
+- network boundary между bots и `api` считается internal/private.
+
+### Health и readiness expectations
+
+Для каждого процесса требуются health semantics.
+
+`api`:
+
+- liveness: процесс принимает HTTP;
+- readiness: settings загружены, `PostgreSQL` доступен, schema/migrations совместимы;
+- dependency health: отдельный endpoint или structured status для `Qdrant`, `LLM` и `OCR`, чтобы деградация была видна без ложного `healthy`.
+
+`patient_bot`:
+
+- liveness: event loop/polling активен;
+- readiness: может аутентифицироваться в Telegram и достучаться до `api`;
+- degraded mode: если `api` недоступен, бот отвечает пользователю controlled error/status message и ретраит соединение.
+
+`doctor_bot`:
+
+- liveness: polling/webhook loop активен;
+- readiness: доступен `api` и загружен doctor allowlist;
+- degraded mode: не показывает устаревшие или непроверенные summaries из локального кеша.
+
+`worker`:
+
+- liveness: background loop/process активен;
+- readiness: доступен `PostgreSQL`, инициализирован queue/work dispatcher;
+- degraded mode: не теряет незавершенные cases и может подхватить их после рестарта.
+
+`PostgreSQL` и `Qdrant`:
+
+- используются стандартные health checks контейнеров/сервисов;
+- readiness проверяется до запуска workloads, которые от них зависят.
+
+### Restart и recovery behavior
+
+Система должна восстанавливаться без ручного скрытого вмешательства.
+
+Правила:
+
+- bots при рестарте заново подключаются к Telegram и продолжают работу без изменения business state;
+- worker подхватывает незавершенные cases по persisted state и идемпотентным job markers;
+- case не должен переходить в success-state только из-за рестарта процесса;
+- если provider вызов упал посередине этапа, после timeout/retry case остается в explicit recoverable state;
+- operator должен видеть, какой этап нужно перезапустить: OCR, retrieval, summary или manual review;
+- restart process не должен активировать mock fallback в `operational profile`.
+
+### Failure-state handling
+
+Обязательные сценарии:
+
+- `OCR` provider unavailable -> `ocr_failed` или `manual_review_required`;
+- OCR confidence too low -> `partial_extraction` или `manual_review_required`;
+- retrieval timeout/no applicable sources -> `retrieval_failed`;
+- `LLM` timeout/provider error -> `summary_failed`;
+- safety reject -> `safety_failed`;
+- repeated transient failure after retry budget -> остается recoverable state с explicit operator action.
+
+Для doctor-facing output:
+
+- если retrieval failed, summary не должен выглядеть grounded;
+- если provider failed до summary completion, handoff не выдается как completed case;
+- если explicit `fallback` profile включен сознательно, doctor-facing output маркируется как degraded/unverified и это видно в audit.
+
+## Паттерны реализации и правила согласованности
+
+### Naming и structure rules
+
+- `snake_case` для Python modules, API fields и workflow events;
+- typed enums для case states;
+- integrations в `app/integrations`;
+- services в `app/services`;
+- workflow transitions в `app/workflow`;
+- Telegram-specific code только в `app/bots`.
+
+### Logging и observability rules
+
+Каждый log/event, связанный с кейсом, должен включать:
+
+- `case_id`
+- `event_type`
+- `process_name`
+- `request_id` или `trace_id`
+- `provider_name`, если событие связано с provider call
+
+Запрещено по умолчанию:
+
+- логировать полный OCR text;
+- логировать полные медицинские документы;
+- логировать provider secrets;
+- возвращать raw stack traces в bot messages.
+
+### Audit expectations
+
+Audit layer сохраняет:
+
+- state transitions;
+- provider outcomes;
+- retrieval citations;
+- safety decision;
+- final doctor handoff decision;
+- retry/recovery attempts.
+
+Audit trail должен позволять объяснить:
+
+- почему case оказался в `ready_for_doctor`;
+- почему case был остановлен на `ocr_failed`, `retrieval_failed`, `summary_failed` или `safety_failed`;
+- был ли использован normal operational profile или explicit fallback profile.
+
+### Validation rules
+
+- API input валидируется на boundary `FastAPI`/`Pydantic`;
+- provider outputs валидируются сразу после adapter call;
+- invalid structured output не должен записываться как success;
+- safety validation происходит после generation и до doctor handoff;
+- recovery transition выбирается на service/workflow boundary, а не в handler.
 
 ## Структура проекта и архитектурные границы
 
-### Полная структура директорий проекта
+### Рекомендуемая структура директорий
 
 ```text
 medical-ai-agent/
@@ -668,70 +563,50 @@ medical-ai-agent/
 ├── pyproject.toml
 ├── uv.lock
 ├── .env.example
-├── .gitignore
 ├── docker-compose.yml
 ├── Dockerfile
 ├── alembic.ini
 ├── app/
-│   ├── __init__.py
 │   ├── main.py
 │   ├── api/
-│   │   ├── __init__.py
-│   │   ├── deps.py
-│   │   ├── errors.py
 │   │   └── v1/
-│   │       ├── __init__.py
 │   │       ├── router.py
 │   │       ├── cases.py
 │   │       ├── documents.py
 │   │       ├── doctor.py
-│   │       ├── artifacts.py
-│   │       └── health.py
+│   │       ├── health.py
+│   │       └── artifacts.py
 │   ├── bots/
-│   │   ├── __init__.py
 │   │   ├── patient_bot.py
 │   │   ├── doctor_bot.py
 │   │   ├── keyboards.py
 │   │   └── messages.py
 │   ├── core/
-│   │   ├── __init__.py
 │   │   ├── settings.py
 │   │   ├── logging.py
 │   │   ├── security.py
-│   │   ├── ids.py
-│   │   └── time.py
+│   │   └── ids.py
 │   ├── db/
-│   │   ├── __init__.py
 │   │   ├── session.py
-│   │   ├── base.py
 │   │   └── migrations/
-│   │       ├── env.py
-│   │       ├── script.py.mako
-│   │       └── versions/
 │   ├── models/
-│   │   ├── __init__.py
-│   │   ├── patient.py
 │   │   ├── case.py
 │   │   ├── document.py
 │   │   ├── extraction.py
-│   │   ├── knowledge.py
 │   │   ├── summary.py
 │   │   ├── safety.py
-│   │   └── audit.py
+│   │   ├── audit.py
+│   │   └── provider_call.py
 │   ├── schemas/
-│   │   ├── __init__.py
-│   │   ├── patient.py
 │   │   ├── case.py
 │   │   ├── document.py
 │   │   ├── extraction.py
-│   │   ├── knowledge.py
 │   │   ├── rag.py
 │   │   ├── summary.py
 │   │   ├── safety.py
 │   │   ├── audit.py
-│   │   └── errors.py
+│   │   └── provider.py
 │   ├── services/
-│   │   ├── __init__.py
 │   │   ├── case_service.py
 │   │   ├── consent_service.py
 │   │   ├── document_service.py
@@ -742,482 +617,132 @@ medical-ai-agent/
 │   │   ├── handoff_service.py
 │   │   └── audit_service.py
 │   ├── workflow/
-│   │   ├── __init__.py
 │   │   ├── graph.py
 │   │   ├── state.py
 │   │   ├── transitions.py
 │   │   └── nodes/
-│   │       ├── __init__.py
 │   │       ├── parse_document.py
 │   │       ├── extract_indicators.py
 │   │       ├── retrieve_knowledge.py
 │   │       ├── generate_summary.py
 │   │       └── validate_safety.py
 │   ├── workers/
-│   │   ├── __init__.py
 │   │   ├── process_case_worker.py
 │   │   └── queue.py
-│   ├── integrations/
-│   │   ├── __init__.py
-│   │   ├── llm_client.py
-│   │   ├── ocr_client.py
-│   │   └── qdrant_client.py
-│   └── evals/
-│       ├── __init__.py
-│       ├── extraction_eval.py
-│       ├── groundedness_eval.py
-│       └── safety_eval.py
+│   └── integrations/
+│       ├── llm_client.py
+│       ├── ocr_client.py
+│       ├── qdrant_client.py
+│       └── document_storage.py
+├── scripts/
+│   ├── setup_qdrant_collections.py
+│   ├── seed_knowledge_base.py
+│   ├── run_evals.py
+│   └── export_case_artifacts.py
 ├── data/
 │   ├── knowledge_base/
-│   │   ├── index.yaml
-│   │   └── checkup_sources/
-│   ├── demo_cases/
-│   │   ├── anna_checkup/
-│   │   └── poor_quality_document/
+│   ├── anonymized_cases/
 │   └── artifacts/
-│       └── .gitkeep
-├── scripts/
-│   ├── seed_knowledge_base.py
-│   ├── seed_demo_cases.py
-│   ├── setup_qdrant_collections.py
-│   ├── run_evals.py
-│   └── export_demo_artifacts.py
-├── tests/
-│   ├── conftest.py
-│   ├── api/
-│   │   ├── test_cases_api.py
-│   │   ├── test_documents_api.py
-│   │   └── test_doctor_api.py
-│   ├── services/
-│   │   ├── test_case_service.py
-│   │   ├── test_document_service.py
-│   │   ├── test_rag_service.py
-│   │   ├── test_summary_service.py
-│   │   └── test_safety_service.py
-│   ├── workflow/
-│   │   ├── test_transitions.py
-│   │   └── test_case_workflow.py
-│   ├── bots/
-│   │   ├── test_patient_bot.py
-│   │   └── test_doctor_bot.py
-│   └── evals/
-│       ├── test_extraction_eval.py
-│       ├── test_groundedness_eval.py
-│       └── test_safety_eval.py
-└── docs/
-    ├── architecture-diagram.md
-    ├── demo-guide.md
-    ├── safety-boundaries.md
-    └── known-limitations.md
+├── docs/
+│   ├── operations-guide.md
+│   ├── safety-boundaries.md
+│   └── known-limitations.md
+└── tests/
+    ├── api/
+    ├── services/
+    ├── workflow/
+    ├── integrations/
+    ├── bots/
+    └── evals/
 ```
 
-### Архитектурные границы
+### Границы ответственности по модулям
 
-**API boundaries:**
+- `app/api`: только transport boundary и auth/deps.
+- `app/bots`: только Telegram UX и mapping messages <-> backend API.
+- `app/services`: domain operations и orchestration entrypoints.
+- `app/workflow`: state transitions и long-running flow.
+- `app/integrations`: provider and storage adapters.
+- `app/models` / `app/schemas`: persistence и contract layer.
 
-- `app/api/v1` является HTTP boundary для backend capabilities.
-- API routers не содержат business logic и делегируют работу в `app/services`.
-- Все API inputs и outputs проходят через `app/schemas`.
-- Ошибки API форматируются через `app/api/errors.py`.
-- Debug/admin routes не смешиваются с patient/doctor routes.
+## Соответствие ключевым требованиям
 
-**Component boundaries:**
+### Runtime и role separation
 
-- `app/bots` содержит только Telegram adapters: handlers, keyboards и user-facing messages.
-- `app/services` содержит domain operations: case lifecycle, consent, documents, RAG, summary, safety, handoff и audit.
-- `app/workflow` содержит orchestration: LangGraph graph, workflow state, transitions и nodes.
-- `app/integrations` содержит внешние технические clients: LLM, OCR и Qdrant.
-- `app/models` отвечает за persistence models.
-- `app/schemas` отвечает за API contracts, AI structured outputs и internal DTOs.
+- отдельные `patient_bot` и `doctor_bot` сохраняют separation of concerns;
+- bots не владеют lifecycle state;
+- `api` и worker являются центром backend capabilities.
 
-**Service boundaries:**
+### Safety boundary
 
-- `case_service.py` управляет созданием case, статусами и lifecycle.
-- `consent_service.py` управляет consent records.
-- `document_service.py` управляет upload metadata, supported file checks и document references.
-- `extraction_service.py` управляет structured extraction и confidence markers.
-- `rag_service.py` управляет retrieval из Qdrant и сборкой `RAGCitation`.
-- `summary_service.py` создает doctor-facing summary из grounded facts.
-- `safety_service.py` проверяет summary и блокирует unsafe outputs.
-- `handoff_service.py` готовит doctor notification и case card.
-- `audit_service.py` сохраняет provenance, safety decisions и demo artifacts.
+- safety validation вынесена в отдельный сервис и workflow step;
+- doctor-facing output blocked до positive safety outcome;
+- upstream failures влияют на допустимость handoff.
 
-**Data boundaries:**
+### Case lifecycle
 
-- `PostgreSQL` хранит transactional data: cases, consent, document metadata, extraction results, summaries, safety results, audit records.
-- `Qdrant` хранит embeddings, vector collections и retrieval payload для curated knowledge base.
-- `data/knowledge_base` является source-of-truth для seed knowledge content.
-- `data/artifacts` хранит local demo artifacts, сгруппированные по `case_id`.
-- Полный OCR text и medical document content не должны попадать в обычные logs.
+- case state machine документирована явно;
+- recoverable failures являются first-class states;
+- restart/recovery не ломают lifecycle semantics.
 
-### Соответствие требований структуре
+### Provider и adapter boundaries
 
-**Intake пациента и согласие:**
-- API: `app/api/v1/cases.py`
-- Bot: `app/bots/patient_bot.py`, `app/bots/messages.py`
-- Services: `app/services/case_service.py`, `app/services/consent_service.py`
-- Schemas: `app/schemas/patient.py`, `app/schemas/case.py`
-- Models: `app/models/patient.py`, `app/models/case.py`
+- `LLM`, `RAG`, `OCR` инкапсулированы в integrations;
+- `operational profile` требует real providers;
+- `mock/stub` возможны только в `dev/test` или explicit fallback profile.
 
-**Case management и workflow:**
-- Services: `app/services/case_service.py`
-- Workflow: `app/workflow/state.py`, `app/workflow/transitions.py`, `app/workflow/graph.py`
-- Worker: `app/workers/process_case_worker.py`
-- Tests: `tests/workflow/test_transitions.py`, `tests/services/test_case_service.py`
+### Telegram как thin interface
 
-**Document processing и extraction:**
-- API: `app/api/v1/documents.py`
-- Services: `app/services/document_service.py`, `app/services/extraction_service.py`
-- Workflow nodes: `app/workflow/nodes/parse_document.py`, `app/workflow/nodes/extract_indicators.py`
-- Integrations: `app/integrations/ocr_client.py`
-- Schemas: `app/schemas/document.py`, `app/schemas/extraction.py`
-
-**RAG и knowledge grounding:**
-- Services: `app/services/rag_service.py`
-- Integration: `app/integrations/qdrant_client.py`
-- Workflow node: `app/workflow/nodes/retrieve_knowledge.py`
-- Schemas: `app/schemas/knowledge.py`, `app/schemas/rag.py`
-- Scripts: `scripts/setup_qdrant_collections.py`, `scripts/seed_knowledge_base.py`
-- Data: `data/knowledge_base`
-
-**Doctor handoff:**
-- API: `app/api/v1/doctor.py`
-- Bot: `app/bots/doctor_bot.py`
-- Services: `app/services/handoff_service.py`, `app/services/summary_service.py`
-- Schemas: `app/schemas/summary.py`, `app/schemas/case.py`
-
-**Safety и медицинские границы:**
-- Service: `app/services/safety_service.py`
-- Workflow node: `app/workflow/nodes/validate_safety.py`
-- Schema: `app/schemas/safety.py`
-- Tests: `tests/services/test_safety_service.py`, `tests/evals/test_safety_eval.py`
-- Docs: `docs/safety-boundaries.md`
-
-**Demo, portfolio и evaluation:**
-- Evals: `app/evals`
-- Tests: `tests/evals`
-- Scripts: `scripts/run_evals.py`, `scripts/export_demo_artifacts.py`
-- Data: `data/demo_cases`, `data/artifacts`
-- Docs: `docs/demo-guide.md`, `docs/known-limitations.md`
-
-**Auditability:**
-- Service: `app/services/audit_service.py`
-- Model: `app/models/audit.py`
-- Schema: `app/schemas/audit.py`
-- API: `app/api/v1/artifacts.py`
-- Data: `data/artifacts`
-
-### Точки интеграции
-
-**Internal communication:**
-
-- Telegram bots вызывают backend API или service boundary, но не вызывают workflow nodes напрямую.
-- API routers вызывают services.
-- Services могут запускать worker/queue через `app/workers/queue.py`.
-- Worker запускает `app/workflow/graph.py`.
-- Workflow nodes вызывают services и integrations через явные interfaces.
-- Audit service принимает события от services/workflow и сохраняет traceable artifacts.
-
-**External integrations:**
-
-- Telegram Bot API через `aiogram`.
-- LLM provider через `app/integrations/llm_client.py`.
-- OCR/parser provider через `app/integrations/ocr_client.py`.
-- Qdrant через `app/integrations/qdrant_client.py`.
-- PostgreSQL через `app/db/session.py`.
-
-**Data flow:**
-
-1. Patient создает case через `patient_bot`.
-2. Backend создает `PatientCase`, `ConsentRecord` и intake data в PostgreSQL.
-3. Patient загружает document; metadata сохраняется в PostgreSQL.
-4. Worker запускает workflow по `case_id`.
-5. OCR/parser извлекает text и confidence.
-6. Extraction node создает validated structured indicators.
-7. RAG node получает relevant knowledge из Qdrant.
-8. Summary node создает doctor-facing draft.
-9. Safety node валидирует draft.
-10. Audit service сохраняет provenance, safety decision и selected artifacts.
-11. Handoff service делает case доступным для `doctor_bot`.
-
-### Правила организации файлов
-
-**Configuration files:**
-
-- `.env.example`: documented required environment variables.
-- `pyproject.toml`: dependencies, tooling, pytest config, lint config.
-- `docker-compose.yml`: local demo services.
-- `alembic.ini`: migration config.
-- `app/core/settings.py`: typed application settings.
-
-**Source organization:**
-
-- `app/main.py`: FastAPI app factory / entrypoint.
-- `app/api/v1/router.py`: API router aggregation.
-- `app/bots/*.py`: bot entrypoints and handlers.
-- `app/workflow/graph.py`: LangGraph graph assembly.
-- `app/workflow/nodes/*.py`: individual workflow steps.
-- `app/services/*.py`: domain service boundaries.
-
-**Test organization:**
-
-- `tests/api`: HTTP/API contract tests.
-- `tests/services`: domain service tests.
-- `tests/workflow`: workflow transition and orchestration tests.
-- `tests/bots`: Telegram adapter behavior tests.
-- `tests/evals`: eval behavior and fixture tests.
-
-**Asset organization:**
-
-- `data/knowledge_base`: curated knowledge seed sources.
-- `data/demo_cases`: synthetic input documents and expected outputs.
-- `data/artifacts`: generated local artifacts by `case_id`; should not contain real patient data.
-
-### Интеграция с workflow разработки
-
-**Local development structure:**
-
-- `docker-compose.yml` должен поднимать PostgreSQL, Qdrant и необходимые app services.
-- API можно запускать отдельно для backend development.
-- Bots можно запускать отдельно, чтобы не мешать API tests.
-- Evals запускаются отдельной командой через `scripts/run_evals.py`.
-
-**Build process structure:**
-
-- Docker image должен использовать `Python 3.13`.
-- Dependencies фиксируются через `pyproject.toml` и lockfile.
-- Migrations применяются перед demo run.
-- Qdrant collections создаются идемпотентно через setup script.
-
-**Deployment structure:**
-
-- MVP deployment ориентирован на local demo через Docker Compose.
-- Production hosting provider не выбирается в MVP.
-- Структура должна позволять позже разделить API, bots и worker на отдельные runtime processes.
+- Telegram используется как operational interface;
+- backend logic остается channel-agnostic;
+- возможна последующая замена/добавление UI channels.
 
 ## Результаты валидации архитектуры
 
-### Валидация связности
+### Согласованность с PRD и change proposal
 
-**Совместимость решений:**
-Архитектурные решения согласованы между собой.
+Архитектура приведена в соответствие с новым product mode:
 
-- `Python 3.13`, `FastAPI`, `Pydantic 2.13.x`, `aiogram 3.x`, `LangGraph 1.1.x`, `PostgreSQL 18`, `Qdrant` и `pytest 9.x` образуют совместимый backend-first стек.
-- `FastAPI` закрывает internal REST API и generated OpenAPI docs.
-- `aiogram` используется только в Telegram adapters и не проникает в core domain logic.
-- `LangGraph` отвечает за orchestration long-running AI workflow.
-- `PostgreSQL` отвечает за transactional state, auditability и lifecycle data.
-- `Qdrant` отвечает за vector retrieval и делает RAG boundary явной.
-- `Pydantic` используется как общий validation layer для API contracts и AI structured outputs.
+- прежнее showcase framing устранено;
+- runtime topology описана как operational, а не showcase-only;
+- provider contracts переписаны под real provider assumptions;
+- `Qdrant` закреплен как обязательный retrieval backend для `operational profile`;
+- OCR/LLM/retrieval failures переведены в explicit recoverable states;
+- secret injection и process health expectations зафиксированы явно.
 
-Противоречивых решений не найдено. Самое важное уточнение уже внесено: `Qdrant` выбран вместо `pgvector`, поэтому relational storage и vector retrieval разделены явно.
+### Что считается готовым к реализации
 
-**Согласованность паттернов:**
-Паттерны реализации поддерживают принятые архитектурные решения.
+Документ теперь достаточно конкретен, чтобы запускать implementation stories по следующим направлениям:
 
-- Naming rules используют `snake_case`, что соответствует Python, SQL и JSON conventions проекта.
-- API response/error formats согласованы с `FastAPI` и Pydantic schemas.
-- Case states и workflow transitions согласованы с LangGraph orchestration.
-- Safety gate отражен в workflow, services, tests и requirements mapping.
-- Правила logging/audit поддерживают требование traceability через `case_id`.
+- runtime entrypoints и compose topology;
+- settings/env/secret wiring;
+- internal API contracts для bots;
+- worker/recovery logic;
+- provider adapters и failure transitions;
+- health/readiness endpoints;
+- audit/observability instrumentation.
 
-**Соответствие структуры архитектуре:**
-Структура проекта поддерживает все ключевые границы.
+### Открытые решения, не блокирующие архитектуру
 
-- `app/bots` отделяет Telegram adapters.
-- `app/api` отделяет HTTP boundary.
-- `app/services` содержит domain operations.
-- `app/workflow` содержит orchestration.
-- `app/integrations` содержит технические clients для LLM, OCR и Qdrant.
-- `app/models` и `app/schemas` разделяют persistence models и contracts.
-- `tests` зеркалируют основные runtime modules.
-- `data/knowledge_base`, `data/demo_cases` и `data/artifacts` поддерживают demo, RAG seed и auditability.
+Неблокирующие gaps:
 
-### Валидация покрытия требований
+1. Не выбран конкретный vendor для `LLM`.
+2. Не выбран конкретный vendor для `OCR`.
+3. Не выбран точный queue implementation beyond abstraction boundary.
+4. Не выбрана окончательная document storage backend implementation.
 
-**Покрытие feature areas:**
-Все основные feature areas из PRD имеют архитектурную поддержку.
+Эти вопросы не меняют архитектурные границы, пока сохраняются typed contracts и operational rules из этого документа.
 
-- Patient intake и consent покрыты `patient_bot`, `case_service`, `consent_service`, `PatientProfile`, `ConsentRecord` и case API.
-- Case lifecycle покрыт `case_service`, `workflow/state.py`, `workflow/transitions.py`, worker boundary и persisted case states.
-- Document processing покрыт `document_service`, OCR integration, workflow nodes и extraction schemas.
-- Structured extraction покрыт `extraction_service`, `MedicalIndicator`, confidence markers и validation rules.
-- RAG grounding покрыт `rag_service`, `Qdrant`, `KnowledgeSource`, `RAGCitation`, seed scripts и provenance requirements.
-- Doctor handoff покрыт `doctor_bot`, `handoff_service`, doctor API и case card boundary.
-- Safety покрыт `safety_service`, `SafetyCheckResult`, workflow safety node, safety gate и eval tests.
-- Demo/evals покрыты `app/evals`, `tests/evals`, `scripts/run_evals.py`, `data/demo_cases` и `data/artifacts`.
-- Auditability покрыта `audit_service`, `AuditTrace`, persisted provenance, safety decisions и artifacts by `case_id`.
+## Передача в реализацию
 
-**Покрытие функциональных требований:**
-50 функциональных требований архитектурно поддержаны.
+Приоритетные implementation темы:
 
-- FR1-FR8: intake, consent, profile, goal capture, upload, status и deletion поддержаны bot/API/service boundaries.
-- FR9-FR13: case lifecycle, связность данных, recoverable states и handoff gating поддержаны workflow/state/service design.
-- FR14-FR22: document upload, validation, OCR, retry, partial processing, source references и uncertainty поддержаны document/extraction boundaries.
-- FR23-FR27: curated knowledge, provenance, grounded facts, citations и applicability limits поддержаны RAG/Qdrant design.
-- FR28-FR34: doctor notification, case card, extracted facts, uncertainty, source documents и AI boundary labeling поддержаны doctor/handoff design.
-- FR35-FR39: safety validation, blocking diagnosis/treatment, uncertainty и human-in-the-loop поддержаны safety gate.
-- FR40-FR46: reproducible demo, examples, evals и portfolio outputs поддержаны Docker Compose, data folders, scripts и eval modules.
-- FR47-FR50: stable case identifier, provenance, intermediate outputs и role separation поддержаны `case_id`, audit service и auth/security model.
+1. Поднять отдельные entrypoints для `api`, `patient_bot`, `doctor_bot` и optional worker.
+2. Зафиксировать `settings.py` и environment/secret injection model.
+3. Реализовать internal API boundary между bots и backend.
+4. Реализовать typed provider adapters для `LLM`, `Qdrant` retrieval и `OCR`.
+5. Ввести health/readiness endpoints и dependency status reporting.
+6. Зафиксировать case states и retry/recovery transitions в workflow.
+7. Встроить audit trail для provider outcomes, grounding и safety.
 
-**Покрытие нефункциональных требований:**
-30 NFR архитектурно поддержаны.
-
-- Performance: bot interactions не блокируются long-running workflow; processing вынесен за worker boundary.
-- Privacy/security: synthetic demo data, role separation, doctor allowlist, deletion flow и controlled logging зафиксированы.
-- Safety: doctor-facing summary требует safety validation; highlighted indicators traceable к facts/sources.
-- Reliability: recoverable case states покрывают unsupported files, unreadable documents, failed extraction и safety failures.
-- Maintainability: typed schemas, tests, evals, Docker Compose и documented boundaries заданы.
-- Scalability: MVP low-concurrency, но worker boundary позволяет перейти к real queue позже.
-- Integrations: Telegram изолирован как replaceable adapter; МИС/ЕГИСЗ/lab integrations отложены.
-
-### Валидация готовности к реализации
-
-**Полнота решений:**
-Критические решения документированы достаточно для начала реализации.
-
-- Runtime, backend framework, bot framework, orchestration, storage, vector database, validation, testing, API style, worker boundary, security и safety gate выбраны.
-- Для ключевых спорных решений есть ADR rationale.
-- Отложенные решения явно помечены как Post-MVP.
-
-**Полнота структуры:**
-Структура проекта достаточно конкретна для AI agents.
-
-- Даны root files, source modules, tests, scripts, data folders и docs.
-- Requirements mapping показывает, куда помещать каждую feature area.
-- Integration points и data flow описывают взаимодействие компонентов.
-
-**Полнота паттернов:**
-Паттерны снижают риск конфликтов между implementation agents.
-
-- Naming conventions заданы для DB, API и Python code.
-- Response/error formats заданы.
-- Case states перечислены.
-- Validation timing определен.
-- Logging/audit rules определены.
-- Антипаттерны явно перечислены.
-
-### Анализ gaps
-
-**Критические gaps:**
-Критических gaps, блокирующих implementation, не найдено.
-
-**Важные gaps:**
-
-1. Не выбран конкретный LLM provider.
-   - Решение: оставить provider за `app/integrations/llm_client.py`; implementation может начать с interface + mock/stub и подключить provider через settings.
-   - Причина: архитектура не должна зависеть от конкретного провайдера на этапе design.
-
-2. Не выбран конкретный OCR/parser provider.
-   - Решение: оставить provider за `app/integrations/ocr_client.py`; MVP может использовать локальный parser или external provider через adapter.
-   - Причина: PRD требует OCR/parsing capability, но не требует конкретный vendor.
-
-3. Queue stack отложен.
-   - Решение: worker boundary зафиксирован; MVP может начать с in-process queue abstraction.
-   - Причина: это осознанный trade-off для снижения инфраструктурной сложности.
-
-4. Не описана точная схема Qdrant collection.
-   - Решение: добавить в first implementation story setup script и schema для collection payload.
-   - Причина: достаточно знать boundary сейчас; конкретные payload fields должны вытекать из `KnowledgeSource` и `RAGCitation` schemas.
-
-**Некритичные gaps:**
-
-- README/demo commands еще не определены.
-- Architecture diagram еще нужно создать.
-- Production deployment strategy намеренно отложена.
-- Web dashboard намеренно отложен.
-
-### Найденные вопросы и решения
-
-**Вопрос:** не конфликтует ли выбор `Qdrant` с MVP simplicity?  
-**Решение:** нет, если держать scope ограниченным: один Qdrant service в Docker Compose, один collection setup script, curated seed knowledge base. Отдельный vector store оправдан portfolio value и явной RAG boundary.
-
-**Вопрос:** достаточно ли in-process queue abstraction для long-running workflow?  
-**Решение:** для MVP да, если case state machine является источником правды, а Telegram bots не ждут completion синхронно. Реальная queue остается Post-MVP заменой implementation detail.
-
-**Вопрос:** не смешиваются ли Telegram и domain logic?  
-**Решение:** структура и паттерны явно запрещают business logic в handlers. Core workflow живет в services/workflow.
-
-### Чеклист полноты архитектуры
-
-**Requirements analysis**
-
-- [x] Проектный контекст проанализирован.
-- [x] Масштаб и сложность оценены.
-- [x] Технические ограничения выявлены.
-- [x] Сквозные concerns mapped.
-
-**Architectural decisions**
-
-- [x] Критические решения документированы с версиями.
-- [x] Technology stack задан.
-- [x] Integration patterns определены.
-- [x] Performance и async considerations учтены.
-- [x] Safety gate зафиксирован.
-- [x] RAG storage decision зафиксирован через `Qdrant`.
-
-**Implementation patterns**
-
-- [x] Naming conventions определены.
-- [x] Structure patterns определены.
-- [x] Communication/workflow patterns определены.
-- [x] Process patterns для errors, loading и validation описаны.
-- [x] Enforcement rules заданы.
-
-**Project structure**
-
-- [x] Complete directory structure определена.
-- [x] Component boundaries заданы.
-- [x] Integration points mapped.
-- [x] Requirements-to-structure mapping выполнен.
-
-### Оценка готовности архитектуры
-
-**Overall status:** ready for implementation.
-
-**Confidence level:** high.
-
-Основание: архитектура покрывает все FR/NFR categories, фиксирует critical decisions, определяет boundaries, задает consistency rules и дает concrete project structure. Оставшиеся gaps являются осознанно отложенными implementation details или Post-MVP decisions.
-
-**Ключевые сильные стороны:**
-
-- Четкое разделение Telegram adapters, backend services, workflow orchestration и integrations.
-- Явный safety gate перед doctor handoff.
-- Traceability через `case_id`, audit records и artifacts.
-- Разделение `PostgreSQL` для transactional data и `Qdrant` для vector retrieval.
-- Паттерны, которые уменьшают риск несовместимой работы разных AI agents.
-- Структура, напрямую mapped к PRD requirements.
-
-**Области для будущего усиления:**
-
-- Конкретный LLM provider и fallback strategy.
-- Конкретный OCR/parser provider и quality scoring.
-- Полноценная queue implementation.
-- Architecture diagram.
-- Production security/compliance model.
-- Web dashboard architecture.
-
-### Передача в реализацию
-
-**Guidelines для AI agents:**
-
-- Следовать архитектурным решениям как source of truth.
-- Не менять technology choices без нового ADR.
-- Не добавлять новые case statuses без обновления schemas, transitions, tests и документации.
-- Не размещать business logic в Telegram handlers или API routers.
-- Валидировать AI outputs через `Pydantic` до persistence/downstream use.
-- Не показывать doctor-facing summary без `SafetyCheckResult`.
-- Использовать `case_id` в logs, audit records и artifacts.
-- Сохранять Telegram как replaceable adapter.
-
-**Первый implementation priority:**
-
-Создать custom FastAPI scaffold согласно структуре проекта:
-
-```bash
-mkdir -p app/{api,bots,core,db,models,schemas,services,workflow,workers,integrations,evals}
-mkdir -p data/{knowledge_base,demo_cases,artifacts} scripts tests docs
-touch app/__init__.py app/main.py
-```
-
-После scaffold первым meaningful implementation slice должен быть `case_id`, settings/logging, базовые schemas, case lifecycle и тесты state transitions.
+Главный implementation guardrail: никакой silent mock fallback в `operational profile`, никакого doctor-facing output как fully grounded при upstream failure, никакой business logic внутри Telegram adapters.

@@ -7,1116 +7,788 @@ stepsCompleted:
 inputDocuments:
   - "_bmad-output/planning-artifacts/prd.md"
   - "_bmad-output/planning-artifacts/architecture.md"
+  - "_bmad-output/planning-artifacts/sprint-change-proposal-2026-05-02.md"
+  - "_bmad-output/planning-artifacts/epics.md"
+status: "complete"
+completedAt: "2026-05-02"
 ---
 
 # medical-ai-agent - Epic Breakdown
 
 ## Overview
 
-This document provides the complete epic and story breakdown for medical-ai-agent, decomposing the requirements from the PRD and Architecture requirements into implementable stories.
+Этот документ пересобирает backlog `medical-ai-agent` под режим `operational pet project`. Telegram остается thin interface, а основная ценность находится в backend runtime: `api`, `patient_bot`, `doctor_bot`, optional `worker`, `PostgreSQL`, `Qdrant`, provider boundaries, safety validation, auditability и recoverable behavior.
+
+Backlog сознательно убирает `demo-first`, `portfolio-first`, `reviewer-first`, `seed demo case` и `local demo bootstrap as main success path`. MVP теперь определяется как работающий operational runtime с обезличенными данными по умолчанию, реальными provider integrations в `operational profile` и явным поведением при сбоях upstream-зависимостей.
 
 ## Requirements Inventory
 
 ### Functional Requirements
 
-FR1: Пациент может начать новый medical intake case через `patient_bot`.
-FR2: Пациент может прочитать понятное объяснение, что система подготавливает информацию для врача и не ставит диагноз и не назначает лечение.
-FR3: Пациент может дать явное согласие перед отправкой персональных или медицинских данных.
-FR4: Пациент может указать базовые профильные данные, необходимые для demo case.
-FR5: Пациент может описать цель консультации или check-up запроса.
+FR1: Пациент может начать новый case через `patient_bot`.
+FR2: Пациент до отправки данных видит понятное объяснение границы: AI подготавливает материалы для врача и не ставит диагноз и не назначает лечение.
+FR3: Пациент может дать явное consent перед передачей медицинских или персональных данных.
+FR4: Пациент может указать базовые профильные данные, достаточные для operational intake.
+FR5: Пациент может описать цель обращения или check-up запроса.
 FR6: Пациент может загрузить медицинские документы в активный case.
-FR7: Пациент может видеть текущий статус обработки своего case.
-FR8: Пациент может запросить удаление demo case и связанных отправленных материалов.
-FR9: Система может создавать и поддерживать lifecycle case от начала intake до завершения doctor handoff.
-FR10: Система может связывать patient profile, consent, documents, extracted facts, summaries и audit records с одним case.
-FR11: Система может представлять recoverable case states для partial processing, low confidence, unsupported files и safety failures.
-FR12: Система может предотвращать doctor-facing handoff, пока обязательные intake, processing и safety checks не завершены.
-FR13: Система может показывать статус case в patient-facing и doctor-facing интерфейсах.
-FR14: Система может принимать поддерживаемые medical document files для case.
-FR15: Система может отклонять unsupported или invalid files с recoverable reason.
-FR16: Система может извлекать текст из поддерживаемых PDF или image-based medical documents.
-FR17: Система может определять недостаточное качество document extraction.
-FR18: Система может попросить пациента повторно загрузить документ при недостаточном качестве extraction.
-FR19: Система может извлекать medical indicators в structured fields.
-FR20: Система может фиксировать indicator value, unit, source document reference и extraction confidence.
-FR21: Система может маркировать uncertain или incomplete extracted facts вместо того, чтобы считать их надежными.
-FR22: Система может сохранять original documents или document references для просмотра врачом в demo workflow.
-FR23: Система может находить релевантные curated knowledge entries для extracted medical indicators.
-FR24: Система может связывать reference ranges с provenance, applicability notes и limitations.
-FR25: Система может отличать grounded facts от generated summary text.
-FR26: Система может показывать, какие источники использованы в doctor-facing summary content.
-FR27: Система может избегать использования knowledge entries, которые неприменимы к контексту extracted indicator при недостаточных applicability metadata.
-FR28: Врач может получить уведомление, когда case готов к review.
-FR29: Врач может открыть structured case card для ready case.
-FR30: Врач может просмотреть цель пациента, отправленные документы, extracted facts, possible deviations и uncertainty markers.
-FR31: Врач может просмотреть AI-prepared questions для уточнения у пациента.
-FR32: Врач может открыть source document references для extracted facts.
-FR33: Врач может видеть явную маркировку, что AI output не является clinical decision.
-FR34: Врач может определить low-confidence или partial-processing cases перед использованием summary.
-FR35: Система может валидировать AI outputs до того, как они станут doctor-facing.
-FR36: Система может блокировать или маркировать outputs, содержащие diagnosis, treatment recommendations или unsupported clinical certainty.
-FR37: Система может включать uncertainty и limitation markers в AI-prepared summaries.
-FR38: Система может поддерживать non-goals и safety boundaries согласованно в patient, doctor и README/demo materials.
-FR39: Система может требовать human doctor review до того, как medical decision будет представлено как финальное.
-FR40: Интервьюер может запустить воспроизводимое local demo по документированным setup instructions.
-FR41: Интервьюер может пройти end-to-end happy path от patient intake до doctor case review.
-FR42: Интервьюер может просмотреть примеры structured extraction outputs.
-FR43: Интервьюер может просмотреть примеры safety check results.
-FR44: Интервьюер может просмотреть пример RAG/source provenance для generated summary.
-FR45: Система может запускать minimal eval set для extraction quality, groundedness и safety boundary behavior.
-FR46: Система может показывать minimal eval results в форме, пригодной для portfolio review.
-FR47: Система может связывать каждый case со stable case identifier.
-FR48: Система может сохранять source provenance и safety decisions для doctor-facing summaries.
-FR49: Система может показывать достаточно intermediate output в demo artifacts, чтобы объяснить происхождение case summary.
-FR50: Система может разделять patient-facing и doctor-facing capabilities по ролям.
+FR7: Пациент может видеть статус case и следующий доступный шаг.
+FR8: Пациент может запросить удаление case и связанных материалов.
+FR9: Система поддерживает явный lifecycle case от создания до doctor handoff или recoverable stop-state.
+FR10: Все документы, extracted facts, summaries, safety results, provider outcomes и audit events связаны со stable `case_id`.
+FR11: `patient_bot` и `doctor_bot` разделены по ролям и не раскрывают возможности друг друга.
+FR12: `api` является backend entrypoint для bot-процессов и operational tooling.
+FR13: `patient_bot` и `doctor_bot` запускаются как отдельные runtime processes.
+FR14: Long-running обработка может выполняться через optional отдельный `worker` без переноса business logic в bots.
+FR15: Система валидирует поддерживаемые типы документов, размеры и базовые ограничения upload.
+FR16: В `operational profile` document processing использует configured `OCR` provider boundary.
+FR17: Система распознает низкое качество OCR или недоступность OCR provider и переводит case в recoverable state.
+FR18: Система извлекает структурированные medical indicators с value, unit, reference context, provenance и confidence.
+FR19: Система маркирует uncertain или partial extraction вместо ложной полноты.
+FR20: В `operational profile` retrieval выполняется через real `Qdrant`.
+FR21: Retrieval возвращает citations с источником, applicability metadata, limitations и датой/контекстом доступа.
+FR22: В `operational profile` summary generation использует configured real `LLM` provider.
+FR23: Provider failure, retrieval failure и OCR failure переводят case в explicit recoverable state.
+FR24: В `operational profile` запрещен silent fallback на `mock`/`stub`; fallback допускается только как explicit profile.
+FR25: Ни один doctor-facing AI output не публикуется без safety validation.
+FR26: Safety validation блокирует diagnosis, treatment recommendations и unsupported certainty.
+FR27: Doctor-facing output содержит uncertainty/limitations, если extraction, retrieval или provider behavior ухудшили надежность результата.
+FR28: Врач получает уведомление, когда case готов к review.
+FR29: Врач может открыть doctor-facing case card в `doctor_bot`.
+FR30: Врач видит цель пациента, документы, extracted facts, possible deviations и вопросы для уточнения.
+FR31: Врач видит source provenance, ссылки на документы и итог safety check.
+FR32: Doctor-facing output не должен выглядеть fully grounded, если retrieval/provider failed или был включен explicit degraded profile.
+FR33: Audit trail сохраняет state transitions, provider outcomes, retry/recovery events и решение о handoff.
+FR34: Operator может проверить health/readiness `api`, `patient_bot`, `doctor_bot`, optional `worker`, `PostgreSQL` и `Qdrant`.
+FR35: Runtime получает tokens, URLs, provider credentials, allowlist и profile settings из environment/secret handling.
+FR36: Startup order, restart behavior и recovery path задокументированы и воспроизводимы.
+FR37: Система предоставляет operational verification checks для migrations, `Qdrant` setup и dependency availability.
+FR38: Обезличенные данные являются default operational path.
+FR39: `mock`/`stub` режимы допустимы только для `dev/test` или explicit fallback profile с явной маркировкой downstream.
+FR40: Internal API и workflow boundaries возвращают machine-readable причины recoverable failures.
+FR41: Summary и safety artifacts можно просмотреть по `case_id` для operational review.
+FR42: Система не зависит от enterprise legal/compliance stack для MVP, но сохраняет non-goals и ограничения видимыми в runtime surfaces и docs.
+FR43: Operator может прогнать prepared anonymized verification case через operational runtime и подтвердить full happy path.
+FR44: Система может запускать minimal eval suite для extraction, groundedness и safety и показывать reviewable results.
+FR45: Maintainer может получить generated API/runtime reference artifacts с примерами payloads для core case lifecycle, extraction, safety и doctor handoff.
+FR46: Case deletion path удаляет metadata, artifacts и storage references по MVP policy, а не только принимает deletion request.
 
 ### NonFunctional Requirements
 
-NFR1: Patient-facing и doctor-facing bot interactions, не требующие document processing, должны ощущаться отзывчивыми в local demo environment.
-NFR2: Long-running document processing должен показывать status updates, чтобы Telegram interactions не выглядели зависшими.
-NFR3: Prepared demo cases должны завершать document processing в практичном demo window, пригодном для interview review.
-NFR4: README должен документировать ожидаемое demo processing time и факторы, влияющие на него: OCR quality, LLM latency и производительность локальной машины.
-NFR5: Система должна использовать synthetic или обезличенные demo cases по умолчанию.
-NFR6: Система не должна требовать реальные patient medical documents для portfolio demonstration.
-NFR7: Patient-facing и doctor-facing capabilities должны быть разделены по ролям.
-NFR8: Doctor access в MVP должен быть ограничен configured Telegram IDs или эквивалентным allowlist.
-NFR9: Submitted documents, extracted facts и summaries должны быть удаляемыми для demo case.
-NFR10: Logs и demo artifacts не должны без необходимости раскрывать sensitive patient data.
-NFR11: README должен явно указывать, что production use с реальными patient data в РФ требует отдельной legal, security и compliance review.
-NFR12: Doctor-facing AI summaries должны проходить safety check перед показом.
-NFR13: Safety checks должны отклонять diagnosis, treatment recommendations и unsupported clinical certainty.
-NFR14: AI summaries должны включать uncertainty markers, когда source extraction или grounding неполные.
-NFR15: Каждый highlighted indicator в doctor-facing summary должен трассироваться к extracted fact или curated knowledge source.
-NFR16: Использование reference ranges должно сохранять source provenance и applicability notes.
-NFR17: Система должна делать human-in-the-loop boundary видимой в patient-facing, doctor-facing и README/demo materials.
-NFR18: Unsupported files, unreadable documents, failed extraction и failed safety checks должны приводить к recoverable case states, а не silent failure.
-NFR19: Patient-facing errors должны объяснять следующее доступное действие без раскрытия internal stack traces или raw model errors.
-NFR20: Partial extraction допустим только когда unreliable fields явно marked as uncertain или исключены из summary generation.
-NFR21: Failed document-processing step не должен повреждать case record или удалять ранее отправленные case data.
-NFR22: Проект должен запускаться локально по документированным setup steps.
-NFR23: Demo должен включать seed data или prepared test case, покрывающий full happy path.
-NFR24: Core AI contracts должны быть представлены typed schemas и валидироваться перед downstream use.
-NFR25: Репозиторий должен включать minimal eval cases для extraction, groundedness и safety.
-NFR26: README должен объяснять architecture, safety boundaries, known limitations и trade-offs достаточно подробно для portfolio review.
-NFR27: MVP должен поддерживать только single-user или low-concurrency portfolio demo usage.
-NFR28: Архитектура не должна препятствовать переносу document processing в background jobs или queues после MVP.
-NFR29: MVP не должен зависеть от МИС, ЕГИСЗ, laboratory APIs, payment systems или scheduling integrations.
-NFR30: Telegram должен рассматриваться как заменяемый interface поверх core backend capabilities.
+NFR1: Telegram interactions, не требующие long-running processing, должны оставаться отзывчивыми.
+NFR2: Long-running processing должен обновлять status без блокировки bot interaction loop.
+NFR3: Runtime должен быть restartable без потери business state.
+NFR4: Worker/process retry semantics должны быть идемпотентны относительно `case_id`.
+NFR5: Секреты не хранятся в git; `.env.example` описывает shape переменных без реальных значений.
+NFR6: Health и readiness semantics различают process liveness и dependency degradation.
+NFR7: `api` не считается fully ready, пока settings, schema compatibility и `PostgreSQL` connectivity не подтверждены.
+NFR8: Зависимость `Qdrant`, `LLM` и `OCR` должна быть observable отдельно от общего health статуса.
+NFR9: Default path использует обезличенные данные и минимизацию хранения.
+NFR10: Logs по умолчанию не содержат полный OCR text, полные документы или provider secrets.
+NFR11: Role separation должна предотвращать доступ patient users к doctor views и наоборот.
+NFR12: Любой upstream failure должен быть видим как explicit state или structured warning, а не silent success.
+NFR13: Invalid structured output не записывается как успешный результат.
+NFR14: Doctor-facing output без grounding не должен маскироваться под fully grounded conclusion.
+NFR15: Все AI contracts валидируются typed schemas на boundary.
+NFR16: Qdrant collections и knowledge-base setup должны быть идемпотентными.
+NFR17: Case deletion path должен затрагивать metadata, artifacts и storage references в рамках MVP policy.
+NFR18: Runtime assumptions ориентированы на low-concurrency single-node deployment, а не enterprise HA.
+NFR19: External integrations с МИС, ЕГИСЗ, payments и scheduling остаются out of scope.
+NFR20: Telemetry и audit trail должны позволять объяснить, почему case готов или остановлен.
+NFR21: Startup/recovery docs должны описывать expected order запуска и последствия degraded dependencies.
+NFR22: Fallback profile, если включен, должен быть documented, explicit и виден врачу и оператору.
+NFR23: Safety boundary и non-goals должны быть согласованы в patient-facing, doctor-facing и ops docs.
+NFR24: Stories и implementation не должны предполагать `seed demo case` как основной operational success path.
+NFR25: Operational limits для uploads, processing timeouts, retries и doctor-facing summary size должны быть явно определены и задокументированы.
 
 ### Additional Requirements
 
-- Первый implementation story должен создать custom FastAPI backend scaffold в существующем проекте, а не копировать внешний starter целиком.
-- Scaffold должен включать `app/{api,bots,core,db,models,schemas,services,workflow,workers,integrations,evals}`, `data/{knowledge_base,demo_cases,artifacts}`, `scripts`, `tests`, `docs`, `app/__init__.py` и `app/main.py`.
-- Runtime должен быть `Python 3.13`; backend framework - `FastAPI`; Telegram adapters - `aiogram 3.x`; workflow orchestration - `LangGraph 1.1.x`; relational storage - `PostgreSQL 18`; vector retrieval - `Qdrant`; contracts - `Pydantic 2.13.x`; tests - `pytest 9.x`.
-- Official FastAPI Full Stack Template и LangGraph CLI Template используются как reference patterns, но не как прямой starter из-за лишней frontend/auth/deployment surface и недостаточного backend coverage соответственно.
-- Internal API должен быть REST API с generated OpenAPI docs и versioning через `/v1`/schema version fields where needed.
-- Telegram bots должны быть thin adapters; business logic не должна жить в bot handlers или API routers.
-- Core workflow должен быть независим от Telegram, чтобы future web dashboard, CLI demo или другой UI могли переиспользовать backend capabilities.
-- Workflow должен поддерживать explicit case states, state transitions и recoverable failures вместо silent failures или raw exceptions.
-- Background processing должен идти через отдельный worker boundary; MVP может начать с in-process queue abstraction, но domain contracts не должны зависеть от конкретной queue технологии.
-- Safety gate обязателен: doctor-facing AI output нельзя показывать без `SafetyCheckResult`.
-- Все AI structured outputs должны валидироваться Pydantic/JSON Schema до persistence или downstream use.
-- RAG storage должен быть отделен от relational case storage: `Qdrant` для vector retrieval, `PostgreSQL` для cases, workflow state, audit records и metadata.
-- Knowledge base должна быть curated, seedable и содержать provenance, applicability metadata, limitations и source metadata.
-- Case-linked artifacts должны храниться или экспортироваться под stable `case_id`: extraction, retrieved sources, summary draft/final, safety decision и selected demo artifacts.
-- Logs, audit records и artifacts должны использовать `case_id` и не раскрывать sensitive data без необходимости.
-- Security model MVP: Telegram identity для patient, doctor allowlist для врачей, local/static token для debug/admin routes.
-- Deletion flow должен удалять или маркировать удаленными demo case data, submitted documents, extracted facts и summaries.
-- Qdrant collections должны создаваться идемпотентным setup script, а knowledge base seeded отдельным script.
-- Evals должны быть first-class artifacts: extraction, groundedness и safety behavior должны запускаться через scripts/tests и иметь demo-readable results.
-- README/demo docs должны описывать setup, Docker Compose, expected demo processing time, architecture, safety boundaries, known limitations и trade-offs.
-- Architecture diagram должен быть создан как portfolio artifact.
-- External integrations с МИС, ЕГИСЗ, laboratory APIs, payments и scheduling остаются out of MVP.
-- Production-grade compliance для real patient data явно out of MVP, но architecture не должна мешать будущей privacy/security/compliance работе.
-- Конкретный LLM provider и OCR/parser provider остаются behind `app/integrations/llm_client.py` и `app/integrations/ocr_client.py`; implementation может стартовать со stub/mock interface.
+- Обязательная operational topology: `api`, `patient_bot`, `doctor_bot`, optional `worker`, `PostgreSQL`, `Qdrant`.
+- `Telegram` остается thin interface; business logic не живет в bot handlers.
+- `PostgreSQL` хранит cases, lifecycle state, audit records, provider outcomes и doctor handoff metadata.
+- `Qdrant` является обязательной retrieval boundary для `operational profile`.
+- Provider boundaries фиксируются typed interfaces: `LLMClient`, `RetrievalClient`, `OCRClient`.
+- `operational profile` обязан использовать real `LLM`, real `Qdrant` retrieval и configured `OCR` provider boundary.
+- `mock`/`stub` допустимы только в `dev/test` или explicit fallback profile; silent substitution запрещена.
+- Failure-state model должен включать как минимум `ocr_failed`, `partial_extraction`, `retrieval_failed`, `summary_failed`, `safety_failed`, `manual_review_required`, `ready_for_doctor`.
+- Doctor-facing output не выдается как normal success, если upstream provider или retrieval failed.
+- `case_id`, state transitions, provider outcomes, citations и retry/recovery events являются first-class audit artifacts.
+- Secrets приходят из environment или secret management: `DATABASE_URL`, `QDRANT_URL`, `PATIENT_BOT_TOKEN`, `DOCTOR_BOT_TOKEN`, provider keys, runtime profile, allowlist.
+- `api`, bots и worker должны иметь отдельные expectations для liveness/readiness/degraded mode.
+- Startup order, migrations, Qdrant collection setup и recovery behavior должны быть задокументированы и проверяемы.
+- Обезличенные данные являются default path; full legal/compliance production stack остается out of MVP.
 
 ### UX Design Requirements
 
-UX Design документ не найден. Отдельные UX-DR не извлекались.
+UX Design документ не использовался как вход в этой пересборке backlog. UX-требования отражены только там, где они прямо следуют из PRD, architecture и operational runtime constraints.
 
 ### FR Coverage Map
 
-FR1: Epic 2 - start patient intake case.
-FR2: Epic 2 - AI boundary explanation.
-FR3: Epic 2 - explicit consent.
-FR4: Epic 2 - patient profile data.
-FR5: Epic 2 - consultation goal.
-FR6: Epic 3 - document upload.
-FR7: Epic 2 - patient-visible case status.
-FR8: Epic 2 - demo case deletion request.
-FR9: Epic 1 - case lifecycle foundation.
-FR10: Epic 1 - case-linked patient, consent, document, extraction, summary and audit data.
-FR11: Epic 1 - recoverable case states.
-FR12: Epic 1 - handoff gating before required checks complete.
-FR13: Epic 1 - shared patient-facing and doctor-facing status model.
-FR14: Epic 3 - supported medical document intake.
-FR15: Epic 3 - unsupported or invalid file rejection.
-FR16: Epic 3 - PDF/image document text extraction.
-FR17: Epic 3 - document extraction quality detection.
-FR18: Epic 3 - retry request for poor-quality extraction.
-FR19: Epic 3 - structured medical indicator extraction.
-FR20: Epic 3 - indicator value, unit, source reference and confidence capture.
-FR21: Epic 3 - uncertain or incomplete fact marking.
-FR22: Epic 3 - original document or document reference retention for doctor review.
-FR23: Epic 4 - relevant curated knowledge retrieval.
-FR24: Epic 4 - reference range provenance, applicability and limitations.
-FR25: Epic 4 - grounded facts separated from generated summary text.
-FR26: Epic 4 - source visibility in doctor-facing summary.
-FR27: Epic 4 - applicability checks for knowledge entries.
-FR28: Epic 5 - doctor notification for ready case.
-FR29: Epic 5 - structured doctor case card.
-FR30: Epic 5 - doctor view of patient goal, documents, facts, deviations and uncertainty.
-FR31: Epic 5 - AI-prepared questions for doctor follow-up.
-FR32: Epic 5 - source document references for extracted facts.
-FR33: Epic 5 - doctor-visible AI boundary labeling.
-FR34: Epic 5 - low-confidence or partial-processing visibility for doctors.
-FR35: Epic 4 - AI output validation before doctor-facing use.
-FR36: Epic 4 - blocking or marking diagnosis, treatment recommendations and unsupported certainty.
-FR37: Epic 4 - uncertainty and limitation markers in AI summaries.
-FR38: Epic 4 - consistent non-goals and safety boundaries across product/demo materials.
-FR39: Epic 4 - human doctor review requirement before final medical decision.
-FR40: Epic 6 - reproducible local demo setup.
-FR41: Epic 6 - end-to-end happy path from patient intake to doctor review.
-FR42: Epic 6 - structured extraction output examples.
-FR43: Epic 6 - safety check result examples.
-FR44: Epic 6 - RAG/source provenance example.
-FR45: Epic 6 - minimal eval set for extraction, groundedness and safety behavior.
-FR46: Epic 6 - portfolio-readable eval results.
-FR47: Epic 1 - stable case identifier.
-FR48: Epic 4 - source provenance and safety decisions for summaries.
-FR49: Epic 6 - intermediate demo artifacts explaining summary origin.
-FR50: Epic 1 - patient-facing and doctor-facing role separation.
+FR1: Epic 2 - старт patient intake через `patient_bot`.
+FR2: Epic 2 - объяснение AI boundary до consent.
+FR3: Epic 2 - явное consent capture.
+FR4: Epic 2 - сбор patient profile.
+FR5: Epic 2 - capture consultation goal.
+FR6: Epic 3 - upload документов в active case.
+FR7: Epic 2 - patient-visible status model.
+FR8: Epic 2 - deletion request.
+FR9: Epic 1 - lifecycle state model.
+FR10: Epic 1 - stable `case_id` и core record linking.
+FR11: Epic 1 - role separation foundation.
+FR12: Epic 1 - `api` как backend entrypoint.
+FR13: Epic 1 - отдельные bot runtimes.
+FR14: Epic 3 - optional worker boundary для processing.
+FR15: Epic 3 - upload validation.
+FR16: Epic 3 - operational OCR boundary.
+FR17: Epic 3 - OCR failure and low-confidence recovery.
+FR18: Epic 3 - structured extraction with provenance.
+FR19: Epic 3 - uncertainty and partial extraction handling.
+FR20: Epic 4 - `Qdrant` retrieval in operational profile.
+FR21: Epic 4 - citations and applicability metadata.
+FR22: Epic 4 - real `LLM` summary generation.
+FR23: Epic 4 - explicit recoverable states on upstream failure.
+FR24: Epic 4 - no silent mock fallback.
+FR25: Epic 4 - safety validation gate.
+FR26: Epic 4 - blocking diagnosis/treatment/unsupported certainty.
+FR27: Epic 4 - limitations and uncertainty in doctor-facing output.
+FR28: Epic 5 - doctor notification.
+FR29: Epic 5 - doctor case card.
+FR30: Epic 5 - doctor review of case package.
+FR31: Epic 5 - provenance and safety status for doctor.
+FR32: Epic 4 - degraded/not-fully-grounded presentation rules.
+FR33: Epic 5 - audit trail for runtime outcomes.
+FR34: Epic 6 - health/readiness operational checks.
+FR35: Epic 1 - env/secret/config handling.
+FR36: Epic 6 - startup, restart and recovery docs.
+FR37: Epic 6 - migrations, Qdrant setup and dependency verification.
+FR38: Epic 2 - anonymized-data default path in intake.
+FR39: Epic 4 - explicit fallback profile rules.
+FR40: Epic 1 - machine-readable recoverable errors.
+FR41: Epic 5 - case-scoped audit and artifact review.
+FR42: Epic 6 - non-goals and out-of-scope production compliance visibility.
+FR43: Epic 6 - prepared anonymized operational verification case.
+FR44: Epic 6 - minimal eval suite and reviewable results.
+FR45: Epic 6 - generated API/runtime reference artifacts and example payloads.
+FR46: Epic 2 - deletion execution under MVP policy.
 
 ## Epic List
 
-### Epic 1: Demo-Ready Case Foundation
+### Epic 1: Operational Runtime Foundation
+Оператор и система получают backend-first runtime foundation: отдельные процессы, `api` boundary, lifecycle state, stable `case_id`, env/secret handling и machine-readable failure semantics, на которых могут безопасно строиться intake и doctor workflows.
+**FRs covered:** FR9, FR10, FR11, FR12, FR13, FR35, FR40
 
-Пользователь и система получают базовый backend foundation: case lifecycle, stable `case_id`, роли, статусы, audit hooks, API scaffold и локальный запуск, достаточные для последующих patient/doctor workflows.
+### Epic 2: Patient Intake and Case Control
+Пациент может начать обезличенный case в `patient_bot`, понять границы AI, дать consent, указать базовый контекст, видеть статус и управлять жизненным циклом своего обращения без demo-centric допущений.
+**FRs covered:** FR1, FR2, FR3, FR4, FR5, FR7, FR8, FR38, FR46
 
-**FRs covered:** FR9, FR10, FR11, FR12, FR13, FR47, FR50
+### Epic 3: Document Processing and Reliable Extraction
+Система принимает поддерживаемые документы, обрабатывает их через operational OCR boundary и превращает в структурированные факты с uncertainty и recoverable processing behavior.
+**FRs covered:** FR6, FR14, FR15, FR16, FR17, FR18, FR19
 
-### Epic 2: Patient Intake and Consent
+### Epic 4: Grounded Summary and Safety-Orchestrated AI Output
+Backend обогащает extracted facts через `Qdrant` retrieval, генерирует doctor-facing summary через real `LLM`, запрещает silent mock fallback и применяет safety gate до handoff.
+**FRs covered:** FR20, FR21, FR22, FR23, FR24, FR25, FR26, FR27, FR32, FR39
 
-Пациент может начать обращение в `patient_bot`, понять границы AI, дать consent, указать профильные данные и цель консультации, видеть статус case и запросить удаление demo case.
+### Epic 5: Doctor Handoff and Auditability
+Врач получает готовый case package в `doctor_bot`, видит факты, источники, safety outcome и может проверить происхождение результата по `case_id`.
+**FRs covered:** FR28, FR29, FR30, FR31, FR33, FR41
 
-**FRs covered:** FR1, FR2, FR3, FR4, FR5, FR7, FR8
+### Epic 6: Operational Verification, Startup, and Recovery
+Maintainer может поднять runtime, проверить dependencies, увидеть degraded components, понять recovery path и работать в рамках operational/non-production ограничений проекта.
+**FRs covered:** FR34, FR36, FR37, FR42, FR43, FR44, FR45
 
-### Epic 3: Document Upload and Reliable Extraction
+## Epic 1: Operational Runtime Foundation
 
-Пациент может загрузить медицинские документы, а система принимает поддерживаемые файлы, обрабатывает PDF/image documents, извлекает structured medical indicators, маркирует uncertainty и поддерживает retry/partial-processing flow.
+Оператор и система получают backend-first runtime foundation: отдельные процессы, `api` boundary, lifecycle state, stable `case_id`, env/secret handling и machine-readable failure semantics, на которых могут безопасно строиться intake и doctor workflows.
 
-**FRs covered:** FR6, FR14, FR15, FR16, FR17, FR18, FR19, FR20, FR21, FR22
+### Story 1.1: Runtime Scaffold and Process Topology
 
-### Epic 4: Grounded Medical Knowledge and Safe Summary
+As a operator,
+I want a backend scaffold with explicit runtime entrypoints for `api`, `patient_bot`, `doctor_bot`, and optional `worker`,
+So that the system can run as an operational multi-process runtime instead of a demo-only script bundle.
 
-Система связывает extracted indicators с curated knowledge base, reference ranges и provenance, отличает grounded facts от generated text и валидирует doctor-facing AI output через safety gate.
+**Acceptance Criteria:**
 
-**FRs covered:** FR23, FR24, FR25, FR26, FR27, FR35, FR36, FR37, FR38, FR39, FR48
+**Given** a fresh checkout of the repository
+**When** the runtime scaffold is initialized
+**Then** the project contains dedicated entrypoints or modules for `api`, `patient_bot`, `doctor_bot`, and optional `worker`
+**And** the runtime topology explicitly includes `PostgreSQL` and `Qdrant` as external dependencies.
 
-### Epic 5: Doctor Handoff and Case Review
+**Given** the scaffolded runtime exists
+**When** a developer inspects the structure
+**Then** Telegram-specific code is confined to bot modules
+**And** business logic is not implemented inside bot handlers.
 
-Врач получает уведомление о готовом case, открывает structured case card, видит цель пациента, документы, extracted facts, possible deviations, uncertainty markers, source references, AI-prepared questions и явную границу “not a clinical decision”.
+### Story 1.2: Case Lifecycle and Stable Identity Model
 
-**FRs covered:** FR28, FR29, FR30, FR31, FR32, FR33, FR34
+As a backend system,
+I want typed case lifecycle states and a stable `case_id`,
+So that every artifact and transition in the workflow can be traced and recovered safely.
 
-### Epic 6: Portfolio Demo, Evals, and Explainability
+**Acceptance Criteria:**
 
-Интервьюер может локально запустить end-to-end demo, пройти happy path, посмотреть structured extraction examples, safety check results, RAG/source provenance, minimal eval results и intermediate artifacts, объясняющие происхождение summary.
+**Given** a new case is created
+**When** the backend persists it
+**Then** the case receives a stable `case_id`
+**And** the initial state is represented through a typed lifecycle model.
 
-**FRs covered:** FR40, FR41, FR42, FR43, FR44, FR45, FR46, FR49
+**Given** an existing case
+**When** the workflow attempts a state transition
+**Then** only allowed transitions succeed
+**And** invalid transitions return a machine-readable domain error instead of a raw exception.
 
-## Epic 1: Demo-Ready Case Foundation
+### Story 1.3: Environment, Secret, and Runtime Profile Handling
 
-Пользователь и система получают базовую backend-основу: жизненный цикл case, стабильный `case_id`, роли, статусы, audit hooks, API scaffold и локальный запуск, достаточные для следующих patient/doctor workflows.
+As a operator,
+I want runtime configuration to come from environment and secret handling,
+So that bot tokens, provider credentials, allowlists, and profile settings can be managed without code changes.
 
-### Story 1.1: Backend Scaffold и Health API
+**Acceptance Criteria:**
 
-**Требования:** FR9, FR13, FR47, FR50
+**Given** the runtime starts in any profile
+**When** settings are loaded
+**Then** `DATABASE_URL`, `QDRANT_URL`, bot tokens, provider settings, allowlists, and runtime profile values are read from typed configuration
+**And** real secrets are not committed to the repository.
 
-Как разработчик,
-я хочу минимальный FastAPI backend scaffold с документированным локальным запуском,
-чтобы будущие case, bot, workflow и demo features имели согласованную основу.
+**Given** the `operational profile` is selected
+**When** provider settings are validated
+**Then** missing real provider configuration fails readiness
+**And** the runtime does not silently downgrade to a `mock` or `stub` implementation.
 
-**Критерии приемки:**
+### Story 1.4: Internal API and Role-Separated Runtime Boundaries
 
-**Дано** свежая копия репозитория
-**Когда** разработчик запускает backend локально
-**Тогда** FastAPI app предоставляет health endpoint и generated OpenAPI docs
-**И** проект содержит архитектурно заданные директории для API, bots, core, db, models, schemas, services, workflow, workers, integrations, evals, scripts, tests, docs и data.
+As a system operator,
+I want bots to interact with backend capabilities only through the internal `api`,
+So that patient and doctor roles stay separated and Telegram remains a replaceable interface.
 
-**Дано** backend scaffold существует
-**Когда** запускаются тесты
-**Тогда** проходит как минимум один health/API smoke test
-**И** configuration загружается через typed settings, а не через hardcoded runtime values.
+**Acceptance Criteria:**
 
-### Story 1.2: Case Identity и Lifecycle Model
+**Given** a bot needs to create, update, or inspect a case
+**When** it performs the action
+**Then** it does so through the internal backend boundary
+**And** bots do not access `PostgreSQL`, `Qdrant`, or provider SDKs directly.
 
-**Требования:** FR9, FR11, FR47
+**Given** a caller with patient, doctor, or admin/debug role
+**When** it requests a protected capability
+**Then** authorization permits only the role-appropriate action
+**And** unauthorized requests return structured errors without stack traces.
 
-Как backend system,
-я хочу стабильные case identifiers и явные lifecycle states,
-чтобы каждый patient case отслеживался от intake до handoff без неоднозначных статусов.
+### Story 1.5: Core Error Contract for Recoverable Failures
 
-**Критерии приемки:**
+As a maintainer,
+I want recoverable backend failures to be expressed through machine-readable codes and reasons,
+So that bots, workers, and ops tooling can react consistently without guessing from free-form text.
 
-**Дано** запрос на создание case
-**Когда** case service создает case
-**Тогда** case получает стабильный `case_id`
-**И** initial lifecycle state представлен через typed domain model.
+**Acceptance Criteria:**
 
-**Дано** case существует
-**Когда** система переводит его между allowed states
-**Тогда** valid transitions выполняются успешно
-**И** invalid transitions завершаются recoverable domain error, а не raw exception.
+**Given** a recoverable failure such as invalid transition, unsupported action, or missing dependency state
+**When** the backend returns the error
+**Then** the response includes a stable error code and structured reason payload
+**And** the same semantics can be reused by bot messages and operational checks.
 
-### Story 1.3: Case-Linked Core Records
+**Given** a non-recoverable internal error
+**When** it reaches the transport boundary
+**Then** the user-facing surface receives a controlled generic error
+**And** sensitive internal details are kept in logs rather than exposed to the bot user.
 
-**Требования:** FR10, FR47
+## Epic 2: Patient Intake and Case Control
 
-Как backend system,
-я хочу связывать patient, consent, document, extraction, summary и audit references с одним case,
-чтобы будущие workflow outputs трассировались к правильному medical intake case.
+Пациент может начать обезличенный case в `patient_bot`, понять границы AI, дать consent, указать базовый контекст, видеть статус и управлять жизненным циклом своего обращения без demo-centric допущений.
 
-**Критерии приемки:**
+### Story 2.1: Start Intake Through `patient_bot`
 
-**Дано** существующий case
-**Когда** базовые records прикрепляются к нему
-**Тогда** каждый доступный record связан с тем же `case_id`
-**И** typed contracts определяют только минимальные references/placeholders для будущих document, extraction, summary и audit records, не создавая полноценные persistence models или AI output schemas раньше соответствующих epics.
+As a patient,
+I want to start a new case in `patient_bot`,
+So that I can begin a real operational intake flow without developer assistance.
 
-**Дано** case запрашивается
-**Когда** часть downstream records еще не реализована
-**Тогда** система возвращает case aggregate или structured representation с явно пустыми или pending references
-**И** отсутствие будущих records не требует premature schema/persistence implementation и не считается corrupted state.
+**Acceptance Criteria:**
 
-### Story 1.4: Role Separation и Access Foundation
+**Given** a patient opens `patient_bot`
+**When** the patient starts a new intake flow
+**Then** the bot requests case creation through the backend
+**And** the patient receives confirmation that a new case has started.
 
-**Требования:** FR50
+**Given** the backend is unavailable
+**When** the patient tries to start intake
+**Then** the bot returns a recoverable user-facing message
+**And** it does not expose raw transport or stack-trace details.
 
-Как system operator,
-я хочу разделить patient, doctor и debug/admin capabilities на backend boundary,
-чтобы будущие Telegram adapters и API routes не раскрывали doctor-facing или debug функции неправильной роли.
+### Story 2.2: AI Boundary Explanation and Explicit Consent
 
-**Критерии приемки:**
+As a patient,
+I want to understand the role of the system before I submit medical information,
+So that consent is informed and consistent with the product's non-goals.
 
-**Дано** запрос к protected backend route или service boundary
-**Когда** caller role равна patient, doctor или debug/admin
-**Тогда** authorization logic разрешает только capabilities этой роли
-**И** doctor access поддерживает configured allowlist или эквивалентный MVP control.
+**Acceptance Criteria:**
 
-**Дано** выполняется unauthorized access attempt
-**Когда** система отклоняет запрос
-**Тогда** error response является structured
-**И** response не раскрывает internal stack traces.
+**Given** a patient begins intake
+**When** the bot presents the introduction
+**Then** it clearly states that AI prepares information for a doctor and does not diagnose or prescribe treatment
+**And** the wording does not imply a fully autonomous medical conclusion.
 
-### Story 1.5: Handoff Readiness Gate и Shared Status View
+**Given** the patient has not provided consent
+**When** the patient attempts to proceed to medical data submission
+**Then** the flow is blocked
+**And** the bot returns the patient to the consent step.
 
-**Требования:** FR12, FR13
+### Story 2.3: Consent Record for Operational Intake
 
-Как doctor-facing workflow,
-я хочу блокировать handoff до выполнения обязательных intake, processing и safety conditions,
-чтобы incomplete или unsafe cases не отображались как ready for review.
+As a patient,
+I want my consent decision to be recorded against my case,
+So that the system can enforce intake boundaries before data collection.
 
-**Критерии приемки:**
+**Acceptance Criteria:**
 
-**Дано** case без обязательных intake, processing или safety readiness markers
-**Когда** оценивается handoff readiness
-**Тогда** case не помечается как ready for doctor review
-**И** response содержит structured reason, который можно показать как status в будущих patient или doctor interfaces.
+**Given** a patient accepts consent
+**When** the backend records the decision
+**Then** a `ConsentRecord` is linked to the active `case_id`
+**And** the case becomes eligible for intake data collection.
 
-**Дано** case удовлетворяет readiness rules, определенным для текущего MVP stage
-**Когда** оценивается handoff readiness
-**Тогда** case может перейти в ready-for-review state
-**И** patient-facing и doctor-facing status values берутся из одной typed status model.
+**Given** a patient declines consent
+**When** the refusal is submitted
+**Then** the intake flow does not continue to profile or document collection
+**And** the patient receives a clear explanation of why the flow stops.
 
-### Story 1.6: Audit Events и Case-Scoped Artifacts Foundation
+### Story 2.4: Profile and Consultation Goal Capture with Anonymized Default
 
-**Требования:** FR10, FR47
+As a patient,
+I want to provide the minimum profile context and consultation goal for my case,
+So that the doctor receives a useful intake package while anonymized handling remains the default path.
 
-Как разработчик или reviewer,
-я хочу case-scoped audit events и artifact paths,
-чтобы будущие extraction, RAG, summary и safety outputs объяснялись через `case_id`.
+**Acceptance Criteria:**
 
-**Критерии приемки:**
+**Given** a patient has completed consent
+**When** profile fields are requested
+**Then** the bot collects only the required MVP fields through typed validation
+**And** the flow encourages anonymized/default-safe input rather than unnecessary personal detail.
 
-**Дано** lifecycle event по case
-**Когда** audit service записывает событие
-**Тогда** audit event включает `case_id`, event type, timestamp и safe metadata
-**И** logs/artifacts не раскрывают sensitive data без необходимости.
+**Given** the patient submits the consultation goal
+**When** the backend saves it
+**Then** the goal is linked to the current case
+**And** invalid or empty input triggers a clear correction prompt.
 
-**Дано** case имеет generated demo artifacts в будущих эпиках
-**Когда** вызывается artifact path builder
-**Тогда** он возвращает стабильную case-scoped location под configured artifacts directory
-**И** implementation покрыта тестами.
+### Story 2.5: Patient Status and Deletion Control
 
-## Epic 2: Patient Intake and Consent
+As a patient,
+I want to see the status of my case and request its deletion,
+So that I can understand progress and control my submitted materials.
 
-Пациент может начать обращение в `patient_bot`, понять границы AI, дать consent, указать профильные данные и цель консультации, видеть статус case и запросить удаление demo case.
+**Acceptance Criteria:**
 
-### Story 2.1: Старт Patient Intake через `patient_bot`
+**Given** a patient has an active or stopped case
+**When** the patient requests status
+**Then** the bot shows a patient-friendly status derived from the shared lifecycle model
+**And** the next available action is explained without leaking internal implementation details.
 
-**Требования:** FR1
+**Given** the patient requests deletion
+**When** the backend accepts the request
+**Then** the case enters the deletion path defined by MVP policy
+**And** an audit event records the deletion request against the `case_id`.
 
-Как пациент,
-я хочу начать новый medical intake case через `patient_bot`,
-чтобы подготовить обращение к врачу без ручной координации.
+**Given** a case enters the deletion path
+**When** the deletion workflow completes successfully
+**Then** case metadata, derived artifacts, and storage references linked by the MVP deletion policy are removed or marked deleted consistently
+**And** the system does not leave doctor-facing artifacts accessible as active case data.
 
-**Критерии приемки:**
+## Epic 3: Document Processing and Reliable Extraction
 
-**Дано** пациент открывает `patient_bot`
-**Когда** он запускает intake flow
-**Тогда** бот создает или запрашивает создание нового case через backend boundary
-**И** пациент получает понятное подтверждение начала intake.
+Система принимает поддерживаемые документы, обрабатывает их через operational OCR boundary и превращает в структурированные факты с uncertainty и recoverable processing behavior.
 
-**Дано** backend недоступен или создание case не удалось
-**Когда** пациент запускает intake flow
-**Тогда** бот показывает recoverable user-facing error
-**И** не раскрывает internal stack traces или raw model errors.
+### Story 3.1: Document Upload and Processing Dispatch
 
-### Story 2.2: AI Boundary Explanation перед Consent
+As a patient,
+I want to upload a medical document into my active case,
+So that the backend can start document processing without putting workflow logic inside the bot.
 
-**Требования:** FR2, FR3
+**Acceptance Criteria:**
 
-Как пациент,
-я хочу увидеть понятное объяснение границ AI до отправки данных,
-чтобы понимать, что система готовит информацию для врача, но не ставит диагноз и не назначает лечение.
+**Given** a patient has an eligible active case
+**When** the patient uploads a document in `patient_bot`
+**Then** the bot sends the file or file metadata through the backend boundary
+**And** the backend links the document metadata to the current `case_id`.
 
-**Критерии приемки:**
+**Given** document metadata has been accepted
+**When** processing is scheduled
+**Then** the backend dispatches work through its processing boundary
+**And** the patient-visible status reflects that the case is being processed.
 
-**Дано** пациент начал intake flow
-**Когда** бот переходит к объяснению сервиса
-**Тогда** пациент видит краткое patient-facing сообщение о роли AI, human doctor review и non-goals
-**И** сообщение не обещает diagnosis, treatment recommendations или final medical decision.
+### Story 3.2: Supported File Validation and Recoverable Rejection
 
-**Дано** пациент еще не дал consent
-**Когда** он пытается перейти к отправке персональных или медицинских данных
-**Тогда** бот не продолжает сбор данных
-**И** сначала возвращает пациента к consent step.
+As a patient,
+I want unsupported or invalid files to be rejected clearly,
+So that I can correct the upload without corrupting my case.
 
-### Story 2.3: Explicit Consent Capture
+**Acceptance Criteria:**
 
-**Требования:** FR3
+**Given** a patient uploads an unsupported file type, oversized file, or invalid document
+**When** the backend validates the upload
+**Then** the document is not accepted for processing
+**And** the case remains in a recoverable state with a machine-readable reason.
 
-Как пациент,
-я хочу явно подтвердить согласие на обработку demo data,
-чтобы система могла продолжить intake только после осознанного consent.
+**Given** the upload is rejected
+**When** the bot reports the outcome
+**Then** the patient receives a clear explanation of the supported next action
+**And** raw parser or stack-trace details are not exposed.
 
-**Критерии приемки:**
+**Given** operational limits are configured
+**When** upload validation runs
+**Then** supported file types, maximum file size, and per-case document-count limits are enforced explicitly
+**And** the rejection reason is stable enough to document and test.
 
-**Дано** пациент видит consent prompt
-**Когда** он подтверждает согласие
-**Тогда** backend связывает `ConsentRecord` с текущим `case_id`
-**И** case может перейти к сбору patient profile.
+### Story 3.3: Operational OCR Provider Boundary
 
-**Дано** пациент отказывается от consent
-**Когда** отказ сохранен или обработан
-**Тогда** intake не продолжается к сбору данных
-**И** пациент получает понятное сообщение о невозможности продолжить без consent.
+As a backend system,
+I want document text extraction to run through a configured `OCR` provider boundary,
+So that operational processing uses a real provider and keeps mock behavior out of the default runtime path.
 
-### Story 2.4: Сбор Patient Profile и Consultation Goal
+**Acceptance Criteria:**
 
-**Требования:** FR4, FR5
+**Given** the runtime is in `operational profile`
+**When** OCR processing starts
+**Then** the workflow uses the configured real `OCR` provider boundary
+**And** provider metadata is captured with the case artifact or provider-call record.
 
-Как пациент,
-я хочу указать базовые профильные данные и цель консультации,
-чтобы врач получил контекст для будущей case card.
+**Given** the runtime lacks valid OCR provider configuration in `operational profile`
+**When** readiness or processing is evaluated
+**Then** the runtime fails readiness or the case enters a recoverable stop-state
+**And** it does not silently switch to a `mock` or `stub` OCR implementation.
 
-**Критерии приемки:**
+### Story 3.4: Structured Medical Extraction with Provenance and Confidence
 
-**Дано** пациент дал consent
-**Когда** бот собирает базовые profile fields
-**Тогда** backend сохраняет patient profile в связи с `case_id`
-**И** обязательные поля валидируются через typed schema.
+As a doctor,
+I want extracted indicators to include provenance and confidence,
+So that I can understand what was found and how reliable it is before reading the summary.
 
-**Дано** пациент вводит цель консультации или check-up запроса
-**Когда** цель отправлена
-**Тогда** backend сохраняет consultation goal в текущем case
-**И** пустой или некорректный ввод возвращает понятную просьбу исправить данные.
+**Acceptance Criteria:**
 
-### Story 2.5: Patient-Facing Case Status
+**Given** OCR or parsed text is available for a supported document
+**When** structured extraction runs
+**Then** extracted indicators include value, unit, relevant reference context, provenance to the source document, and confidence markers
+**And** invalid structured output is rejected rather than stored as success.
 
-**Требования:** FR7
+**Given** extraction returns incomplete or uncertain fields
+**When** the result is persisted
+**Then** those fields are explicitly marked uncertain or omitted from grounded downstream use
+**And** the system does not pretend the document was fully understood.
 
-Как пациент,
-я хочу видеть текущий статус моего case,
-чтобы понимать, что уже принято и какой следующий шаг доступен.
+### Story 3.5: Recoverable OCR and Extraction Failure Handling
 
-**Критерии приемки:**
+As a patient and operator,
+I want OCR and extraction failures to become explicit recoverable states,
+So that the workflow can retry, request a better document, or escalate to manual review safely.
 
-**Дано** у пациента есть активный case
-**Когда** он запрашивает status в `patient_bot`
-**Тогда** бот показывает patient-facing status из shared typed status model
-**И** сообщение объясняет следующий доступный шаг без технических деталей.
+**Acceptance Criteria:**
 
-**Дано** case находится в recoverable state
-**Когда** пациент запрашивает status
-**Тогда** бот показывает понятное действие для восстановления flow
-**И** не показывает raw internal state или stack trace.
+**Given** OCR is unavailable, times out, or returns too little reliable content
+**When** the processing step completes
+**Then** the case transitions to `ocr_failed`, `partial_extraction`, or `manual_review_required`
+**And** the reason is visible to downstream bot or operator surfaces.
 
-### Story 2.6: Demo Case Deletion Request
+**Given** extraction fails after OCR succeeded
+**When** retries are exhausted or validation fails
+**Then** the case enters a recoverable non-success state
+**And** previously accepted case data remains intact instead of being overwritten by a false success.
 
-**Требования:** FR8
+## Epic 4: Grounded Summary and Safety-Orchestrated AI Output
 
-Как пациент,
-я хочу запросить удаление demo case и связанных материалов,
-чтобы контролировать отправленные demo data.
+Backend обогащает extracted facts через `Qdrant` retrieval, генерирует doctor-facing summary через real `LLM`, запрещает silent mock fallback и применяет safety gate до handoff.
 
-**Критерии приемки:**
+### Story 4.1: Operational Retrieval Through `Qdrant`
 
-**Дано** у пациента есть demo case
-**Когда** он запрашивает deletion через `patient_bot`
-**Тогда** backend помечает case и связанные submitted materials для удаления или удаляет их согласно MVP deletion policy
-**И** audit event фиксирует deletion request без лишнего раскрытия sensitive data.
+As a backend system,
+I want grounded retrieval to run through `Qdrant` in the `operational profile`,
+So that doctor-facing reasoning is based on real retrieval rather than simulated citations.
 
-**Дано** deletion request обработан
-**Когда** пациент повторно запрашивает status
-**Тогда** бот показывает, что case удален или недоступен
-**И** дальнейшие intake actions по этому case блокируются.
+**Acceptance Criteria:**
 
-## Epic 3: Document Upload and Reliable Extraction
+**Given** extracted indicators are ready for grounding
+**When** retrieval is executed in `operational profile`
+**Then** the workflow queries the configured `Qdrant` retrieval boundary
+**And** the result captures source metadata, applicability notes, and limitations.
 
-Пациент может загрузить медицинские документы, а система принимает поддерживаемые файлы, обрабатывает PDF/image documents, извлекает structured medical indicators, маркирует uncertainty и поддерживает retry/partial-processing flow.
+**Given** retrieval cannot access `Qdrant` or finds no applicable sources
+**When** the step completes
+**Then** the case enters `retrieval_failed` or an equivalent recoverable state
+**And** the workflow does not silently fabricate grounded citations.
 
-### Story 3.1: Document Upload в Active Case
+### Story 4.2: Real `LLM` Summary Generation with Grounding Inputs
 
-**Требования:** FR6, FR14
+As a doctor,
+I want the summary generation step to use real `LLM` infrastructure in the operational runtime,
+So that the produced case package reflects actual runtime behavior and provider constraints.
 
-Как пациент,
-я хочу загрузить medical document в активный case через `patient_bot`,
-чтобы система могла подготовить документы для обработки.
+**Acceptance Criteria:**
 
-**Критерии приемки:**
+**Given** the runtime is in `operational profile`
+**When** summary generation is triggered
+**Then** the workflow uses the configured real `LLM` provider
+**And** the generation step receives extracted facts and retrieval context as structured inputs.
 
-**Дано** у пациента есть active case после consent и profile steps
-**Когда** он отправляет файл в `patient_bot`
-**Тогда** bot передает файл или metadata через backend boundary
-**И** backend связывает document metadata с текущим `case_id`.
+**Given** the `LLM` provider is unavailable or invalidly configured
+**When** generation is attempted
+**Then** the case enters `summary_failed` or an equivalent recoverable state
+**And** the system does not silently replace the provider with a `mock` or `stub`.
 
-**Дано** document upload принят
-**Когда** backend сохраняет metadata
-**Тогда** case status обновляется на состояние, понятное для patient-facing status
-**И** пациент получает подтверждение, что документ принят в обработку.
+### Story 4.3: Safety Validation Before Doctor-Facing Output
 
-### Story 3.2: Supported File Validation и Recoverable Rejection
+As a product owner,
+I want every doctor-facing summary to pass a safety validation step,
+So that diagnosis, treatment recommendations, and unsupported certainty are blocked before handoff.
 
-**Требования:** FR15
+**Acceptance Criteria:**
 
-Как пациент,
-я хочу получить понятную ошибку при неподдерживаемом или некорректном файле,
-чтобы исправить upload без потери текущего case.
+**Given** a draft doctor-facing summary exists
+**When** safety validation runs
+**Then** the output is checked for diagnosis, treatment recommendation, unsupported certainty, and missing limitations
+**And** the result is stored as a separate `SafetyCheckResult`.
 
-**Критерии приемки:**
+**Given** the safety check fails
+**When** handoff readiness is evaluated
+**Then** the case does not move to `ready_for_doctor`
+**And** the case enters `safety_failed` or another explicit recoverable state.
 
-**Дано** пациент отправляет unsupported file type, слишком большой файл или invalid document
-**Когда** backend валидирует upload
-**Тогда** document не допускается к processing
-**И** case переходит или остается в recoverable state с reason code.
+### Story 4.4: Degraded and Fallback Profile Presentation Rules
 
-**Дано** upload отклонен
-**Когда** бот сообщает пациенту результат
-**Тогда** сообщение объясняет, какие форматы или действия доступны
-**И** не раскрывает internal parser errors или stack traces.
+As a doctor,
+I want degraded or fallback-generated outputs to be marked explicitly,
+So that I do not mistake an upstream-failed result for a fully grounded summary.
 
-### Story 3.3: Text Extraction из PDF/Image Documents
+**Acceptance Criteria:**
 
-**Требования:** FR16
+**Given** retrieval, OCR, or provider behavior reduced the reliability of the case package
+**When** a downstream doctor-facing output is prepared
+**Then** uncertainty and limitation markers are included
+**And** the output is not presented as fully grounded.
 
-Как backend workflow,
-я хочу извлечь текст из поддерживаемых PDF или image-based medical documents,
-чтобы получить входные данные для structured extraction.
+**Given** an explicit fallback profile is enabled outside the normal `operational profile`
+**When** doctor-facing content is generated
+**Then** the content is marked degraded or unverified
+**And** the chosen profile is visible in audit artifacts.
 
-**Критерии приемки:**
+## Epic 5: Doctor Handoff and Auditability
 
-**Дано** uploaded document имеет supported type
-**Когда** worker запускает document processing
-**Тогда** OCR/parser integration возвращает extracted text и confidence metadata
-**И** результат связывается с `case_id` и source document reference.
+Врач получает готовый case package в `doctor_bot`, видит факты, источники, safety outcome и может проверить происхождение результата по `case_id`.
 
-**Дано** OCR/parser step завершается ошибкой
-**Когда** workflow обрабатывает failure
-**Тогда** case получает recoverable processing state
-**И** ранее сохраненные case data и document metadata не повреждаются.
+### Story 5.1: Doctor Runtime and Access Allowlist
 
-### Story 3.4: Extraction Quality Detection и Retry Flow
+As a doctor,
+I want a dedicated `doctor_bot` runtime with allowlisted access,
+So that doctor-facing case review stays separate from patient intake behavior.
 
-**Требования:** FR17, FR18
+**Acceptance Criteria:**
 
-Как пациент,
-я хочу получить просьбу повторно загрузить документ при плохом качестве распознавания,
-чтобы система не делала уверенные выводы из ненадежного OCR.
+**Given** the `doctor_bot` runtime starts
+**When** access control is evaluated
+**Then** only configured doctor identities can use doctor-facing functions
+**And** patient users cannot reach the same views through the doctor runtime.
 
-**Критерии приемки:**
+**Given** the bot cannot load its token, allowlist, or backend dependency
+**When** readiness is checked
+**Then** the runtime reports not-ready or degraded status
+**And** it does not serve stale local-only case data as a substitute.
 
-**Дано** extracted text имеет low confidence или недостаточный объем данных
-**Когда** workflow оценивает quality
-**Тогда** case получает low-confidence или partial-processing state
-**И** unreliable fields не используются как reliable facts.
+### Story 5.2: Ready-for-Doctor Notification and Case Card
 
-**Дано** case требует retry
-**Когда** пациент запрашивает status или получает update
-**Тогда** `patient_bot` просит загрузить более четкое изображение или PDF
-**И** показывает recovery action без технических деталей OCR.
+As a doctor,
+I want to be notified when a case is ready and open a structured case card,
+So that I can review the intake package efficiently.
 
-### Story 3.5: Structured Medical Indicator Extraction
+**Acceptance Criteria:**
 
-**Требования:** FR19, FR20
+**Given** a case has completed required intake, processing, retrieval, summary, and safety conditions
+**When** handoff readiness is confirmed
+**Then** the doctor runtime receives or can fetch a ready notification
+**And** the case is available through a structured doctor-facing case card.
 
-Как backend workflow,
-я хочу извлечь medical indicators в typed structured fields,
-чтобы downstream RAG, summary и doctor review могли работать с проверяемыми фактами.
+**Given** a case is not ready because of recoverable failure or blocked safety outcome
+**When** doctor-facing retrieval is attempted
+**Then** the backend does not expose it as a normal completed handoff
+**And** the reason is surfaced as structured status information.
 
-**Критерии приемки:**
+### Story 5.3: Doctor Review Surface for Facts, Questions, and Provenance
 
-**Дано** document text прошел minimum quality threshold
-**Когда** extraction service обрабатывает текст
-**Тогда** система создает structured indicators с name, value, unit, source document reference и extraction confidence
-**И** output валидируется через typed schema до persistence или downstream use.
+As a doctor,
+I want to see facts, questions, document references, and safety status together,
+So that I can assess the case without assuming hidden grounding.
 
-**Дано** extraction output неполный или не проходит schema validation
-**Когда** workflow обрабатывает результат
-**Тогда** invalid fields отклоняются или маркируются uncertain
-**И** case не переходит к следующему reliable processing step с невалидными данными.
+**Acceptance Criteria:**
 
-### Story 3.6: Uncertainty Marking и Partial Processing
+**Given** a ready or degraded doctor-facing case card
+**When** the doctor opens it
+**Then** the card includes patient goal, document list, extracted facts, possible deviations, follow-up questions, and the current safety outcome
+**And** citations or source references are available for the doctor-facing claims.
 
-**Требования:** FR21
+**Given** the case has degraded grounding or uncertainty
+**When** the doctor views it
+**Then** those limitations are visible in the same review surface
+**And** the UI language does not imply a final clinical decision.
 
-Как врач в будущем doctor review,
-я хочу, чтобы uncertain или incomplete extracted facts были явно отмечены,
-чтобы не принять их за надежные медицинские факты.
+### Story 5.4: Case-Scoped Audit Review by `case_id`
 
-**Критерии приемки:**
+As a maintainer,
+I want to inspect audit and summary artifacts by `case_id`,
+So that I can explain how a doctor-facing output or stop-state was produced.
 
-**Дано** extraction нашел показатель без уверенной unit, value или source reference
-**Когда** факт сохраняется
-**Тогда** он маркируется как uncertain или incomplete
-**И** uncertainty reason доступен для будущей doctor-facing case card.
+**Acceptance Criteria:**
 
-**Дано** case содержит смесь reliable и uncertain facts
-**Когда** workflow формирует processing result
-**Тогда** reliable facts доступны для следующих этапов
-**И** uncertain facts сохраняются с маркировкой, но не используются как reliable evidence без явного правила.
+**Given** a `case_id` is known
+**When** audit review is requested
+**Then** the system can retrieve state transitions, provider outcomes, retrieval citations, retry events, summary artifacts, and safety decisions for that case
+**And** the records are linked coherently enough to explain why the case is ready or blocked.
 
-### Story 3.7: Original Document References для Doctor Review
+**Given** audit artifacts are returned
+**When** they are displayed or exported for operational review
+**Then** unnecessary sensitive payload is minimized
+**And** the selected runtime profile and degraded/fallback markers remain visible.
 
-**Требования:** FR22
+## Epic 6: Operational Verification, Startup, and Recovery
 
-Как врач в будущем doctor review,
-я хочу иметь ссылку на original document или document reference для каждого extracted fact,
-чтобы проверить спорные показатели вручную.
+Maintainer может поднять runtime, проверить dependencies, увидеть degraded components, понять recovery path и работать в рамках operational/non-production ограничений проекта.
 
-**Критерии приемки:**
+### Story 6.1: Runtime Health and Readiness Checks
 
-**Дано** medical indicator извлечен из uploaded document
-**Когда** indicator сохраняется
-**Тогда** он содержит source document reference
-**И** reference достаточно стабилен для будущего doctor-facing просмотра.
+As a maintainer,
+I want explicit health and readiness checks for all runtime components,
+So that I can tell whether the system is alive, ready, or degraded before relying on it.
 
-**Дано** document storage или reference недоступны
-**Когда** workflow сохраняет extraction result
-**Тогда** case получает recoverable warning или state
-**И** система не представляет extracted fact как полностью traceable.
+**Acceptance Criteria:**
 
-## Epic 4: Grounded Medical Knowledge and Safe Summary
+**Given** the runtime is deployed
+**When** health or readiness is checked
+**Then** `api`, `patient_bot`, `doctor_bot`, optional `worker`, `PostgreSQL`, and `Qdrant` each expose or contribute clear liveness/readiness semantics
+**And** dependency degradation is distinguishable from full process failure.
 
-Система связывает extracted indicators с curated knowledge base, reference ranges и provenance, отличает grounded facts от generated text и валидирует doctor-facing AI output через safety gate.
+**Given** `LLM` or `OCR` dependencies are unavailable while the process itself is alive
+**When** operational status is reviewed
+**Then** the runtime shows degraded dependency status
+**And** it does not report a misleading all-green state.
 
-### Story 4.1: Curated Knowledge Base Seed и Qdrant Collection
+### Story 6.2: Startup Verification for Migrations and Knowledge Base
 
-**Требования:** FR23, FR24
+As a operator,
+I want startup verification to confirm the runtime can actually process cases,
+So that broken schema, missing collections, or invalid setup are caught before handoff work begins.
 
-Как backend system,
-я хочу иметь curated medical knowledge base с seed data и Qdrant collection,
-чтобы extracted indicators можно было grounding на контролируемые источники.
+**Acceptance Criteria:**
 
-**Критерии приемки:**
+**Given** the runtime starts or a verification command is run
+**When** startup checks execute
+**Then** migrations/schema compatibility and required `Qdrant` collections are verified
+**And** failures are reported through structured operational output.
 
-**Дано** локальная demo environment запущена
-**Когда** выполняется knowledge base setup
-**Тогда** Qdrant collection создается идемпотентно
-**И** seed knowledge entries загружаются с source metadata, provenance и applicability fields.
+**Given** verification fails
+**When** readiness is evaluated
+**Then** the affected runtime component remains not-ready
+**And** the operator can see which setup step must be fixed next.
 
-**Дано** setup script запускается повторно
-**Когда** collection и seed data уже существуют
-**Тогда** script не создает дубликаты
-**И** результат остается пригодным для deterministic demo или test run.
+### Story 6.3: Restart and Recovery Behavior
 
-### Story 4.2: Retrieval релевантных Knowledge Entries
+As a maintainer,
+I want documented and testable restart behavior,
+So that bot restarts, worker restarts, and transient provider failures do not silently corrupt business state.
 
-**Требования:** FR23, FR27
+**Acceptance Criteria:**
 
-Как backend workflow,
-я хочу находить relevant curated knowledge entries для extracted medical indicators,
-чтобы downstream summary опирался на контролируемые sources.
+**Given** a bot or worker restarts during or after case processing
+**When** the runtime resumes
+**Then** the system reconnects and continues from persisted state or leaves the case in an explicit recoverable stop-state
+**And** a restart does not mark a case as successful by accident.
 
-**Критерии приемки:**
+**Given** a retry budget is exhausted or a transient failure becomes persistent
+**When** recovery is evaluated
+**Then** the case remains in an explicit operator-visible recoverable state
+**And** the next action is distinguishable as retry, re-upload, or manual review.
 
-**Дано** case содержит reliable extracted indicators
-**Когда** RAG retrieval запускается по indicator name/value/context
-**Тогда** система возвращает relevant knowledge entries
-**И** каждый result содержит source metadata и retrieval score или equivalent confidence signal.
+### Story 6.4: Operational Documentation and Profile Guardrails
 
-**Дано** релевантных entries не найдено
-**Когда** workflow обрабатывает retrieval result
-**Тогда** indicator помечается как not grounded или insufficient knowledge
-**И** case не использует неподтвержденные knowledge claims для summary.
+As a project maintainer,
+I want runtime docs and verification guidance aligned to operational mode,
+So that the project is operable without slipping back into demo-first assumptions.
 
-### Story 4.3: Reference Range Provenance и Applicability Checks
+**Acceptance Criteria:**
 
-**Требования:** FR24, FR27
+**Given** a maintainer reads the runtime and operations documentation
+**When** they follow the startup and verification guidance
+**Then** the docs describe startup order, secret/config expectations, health checks, restart behavior, and recovery paths
+**And** they define anonymized data as the default path.
 
-Как backend workflow,
-я хочу связывать reference ranges с provenance, applicability notes и limitations,
-чтобы система не применяла неподходящие источники к неверному контексту.
+**Given** the docs describe supported profiles
+**When** `operational`, `dev/test`, or explicit fallback behavior is explained
+**Then** the docs state that real providers and `Qdrant` are required in `operational profile`
+**And** they explicitly keep full production legal/compliance stack out of MVP scope.
 
-**Критерии приемки:**
+### Story 6.5: Prepared Anonymized Operational Verification Case
 
-**Дано** retrieved knowledge entry содержит reference range
-**Когда** система сопоставляет его с extracted indicator
-**Тогда** result включает source provenance, applicability notes и limitations
-**И** applicability metadata учитываются до использования reference range.
+As a maintainer,
+I want a prepared anonymized verification case for the operational runtime,
+So that startup and recovery checks can prove the real happy path end-to-end without using demo-centric assumptions or real patient data.
 
-**Дано** applicability metadata недостаточны или entry явно неприменим
-**Когда** workflow оценивает knowledge entry
-**Тогда** entry не используется как grounded evidence
-**И** reason сохраняется для audit или future doctor-facing explanation.
+**Acceptance Criteria:**
 
-### Story 4.4: Grounded Facts vs Generated Summary Contract
+**Given** the operational stack is started
+**When** a maintainer runs the documented verification flow
+**Then** a prepared anonymized case can pass through intake, document processing, grounding, summary generation, safety validation, and doctor handoff
+**And** the verification flow uses the same runtime boundaries as the real operational path.
 
-**Требования:** FR25, FR26
+**Given** the verification case fails at a dependency or workflow step
+**When** the outcome is reviewed
+**Then** the failure is visible through case state, operational logs, or verification output
+**And** the next remediation step is documented for the operator.
 
-Как врач в будущем doctor review,
-я хочу, чтобы grounded facts были отделены от generated summary text,
-чтобы понимать, где исходные факты, а где AI-prepared narrative.
+### Story 6.6: Minimal Eval Suite and Reviewable Quality Results
 
-**Критерии приемки:**
+As a project maintainer,
+I want a minimal eval suite with reviewable outputs,
+So that extraction quality, groundedness, and safety behavior can be checked before trusting operational changes.
 
-**Дано** case имеет extracted indicators и retrieved sources
-**Когда** summary service готовит draft
-**Тогда** output schema разделяет grounded facts, citations и generated narrative
-**И** каждый highlighted indicator трассируется к extracted fact или curated knowledge source.
+**Acceptance Criteria:**
 
-**Дано** generated text содержит claim без grounded support
-**Когда** output проходит validation
-**Тогда** claim маркируется как unsupported или отклоняется
-**И** downstream doctor-facing summary не представляет его как grounded fact.
+**Given** the maintainer runs the documented eval command or workflow
+**When** eval execution completes
+**Then** the project produces results for extraction quality, groundedness, and safety boundary behavior
+**And** the results are reviewable without reading raw provider traces by default.
 
-### Story 4.5: Doctor-Facing Summary Draft with Uncertainty Markers
+**Given** an eval fails or regresses
+**When** the result is reviewed
+**Then** the failing capability area is visible in structured output or summarized report
+**And** the outcome can be linked to the relevant case fixture, scenario, or capability under test.
 
-**Требования:** FR37, FR39
+### Story 6.7: Runtime/API Reference Artifacts and Operational Examples
 
-Как врач,
-я хочу получить AI-prepared summary draft с фактами, possible deviations, uncertainty и questions,
-чтобы быстрее понять case без подмены clinical decision.
+As a maintainer,
+I want generated API/runtime reference artifacts and example payloads,
+So that bots, operators, and future channels can integrate against the backend without reverse-engineering contracts.
 
-**Критерии приемки:**
+**Acceptance Criteria:**
 
-**Дано** case имеет reliable extracted facts и applicable knowledge sources
-**Когда** summary service генерирует draft
-**Тогда** draft включает patient goal context, key facts, possible deviations, uncertainty markers и questions for doctor
-**И** draft не формулирует diagnosis, treatment recommendations или final medical decision.
+**Given** the backend routes and schemas are available
+**When** reference artifacts are generated or documented
+**Then** OpenAPI or equivalent route documentation exists for the internal backend surface used by bots and ops tooling
+**And** example request/response payloads exist for case lifecycle, document processing status, extraction output, safety result, and doctor-facing handoff.
 
-**Дано** extraction или grounding неполные
-**Когда** summary draft создается
-**Тогда** draft явно включает uncertainty или limitation markers
-**И** low-confidence facts не подаются как надежные conclusions.
+**Given** a maintainer follows the operational docs
+**When** they inspect the integration examples
+**Then** they can identify required environment/config inputs, expected success responses, and recoverable error shapes
+**And** the examples remain aligned with typed schemas rather than ad hoc message text.
 
-### Story 4.6: Safety Validation и `SafetyCheckResult`
+### Story 6.8: Demo-Path Cleanup and Operational Verification Refactor
 
-**Требования:** FR35, FR36, FR39
+As a maintainer,
+I want the remaining demo-centric paths, names, and fixtures refactored to the operational verification path,
+So that the repository no longer teaches a stale demo-first workflow while preserving a prepared anonymized verification flow.
 
-Как backend system,
-я хочу валидировать AI outputs до doctor-facing показа,
-чтобы diagnosis, treatment recommendations и unsupported certainty блокировались или маркировались.
+**Acceptance Criteria:**
 
-**Критерии приемки:**
+**Given** the repository still contains demo-centric runtime/docs/test paths
+**When** the cleanup/refactor story is completed
+**Then** the canonical scripts, README guidance, eval flow, and fixture naming point to a prepared anonymized operational verification path
+**And** stale demo-first wording is removed from the active runtime guidance.
 
-**Дано** summary draft создан
-**Когда** safety service проверяет draft
-**Тогда** создается typed `SafetyCheckResult`
-**И** result фиксирует pass/fail, detected issues и decision rationale.
+**Given** legacy demo assets or references are no longer the canonical path
+**When** the repository is reviewed
+**Then** obsolete `_bmad-output` artifacts are archived rather than left mixed with active sprint artifacts
+**And** code, tests, and docs do not depend on `case_demo_happy_path` or `seed_demo_case` as the primary operational success path unless explicitly marked legacy.
 
-**Дано** draft содержит diagnosis, treatment recommendations или unsupported clinical certainty
-**Когда** safety validation выполняется
-**Тогда** draft блокируется или отправляется на recoverable correction path
-**И** case не становится ready for doctor-facing handoff с unsafe output.
-
-### Story 4.7: Safety Boundary Consistency Across Outputs
-
-**Требования:** FR38, FR39
-
-Как reviewer или system operator,
-я хочу, чтобы safety boundaries были одинаково представлены в patient, doctor и README/demo materials,
-чтобы проект не выглядел как autonomous AI doctor.
-
-**Критерии приемки:**
-
-**Дано** реализованные на текущий момент patient-facing, doctor-facing или demo/documentation outputs используют safety messaging
-**Когда** тексты проверяются
-**Тогда** доступные outputs согласованно говорят, что AI готовит информацию для врача, но не ставит диагноз и не назначает лечение
-**И** human doctor review остается явным обязательным boundary.
-
-**Дано** появляется новый patient-facing, doctor-facing или demo output/template после этой story
-**Когда** он добавляется в соответствующей downstream story
-**Тогда** эта downstream story должна включить AI boundary labeling
-**И** соответствующий test, fixture или checklist должен проверить отсутствие autonomous medical decision language.
-
-**Scope note:** Story 4.7 проверяет и закрепляет safety wording для уже существующих outputs/templates. Она не должна блокироваться отсутствием будущих doctor handoff или demo documentation templates; будущие stories наследуют этот safety boundary как acceptance constraint.
-
-### Story 4.8: Provenance и Safety Decisions в Audit Trail
-
-**Требования:** FR26, FR35, FR48
-
-Как разработчик или reviewer,
-я хочу сохранять source provenance и safety decisions для doctor-facing summaries,
-чтобы можно было объяснить происхождение AI-prepared output.
-
-**Критерии приемки:**
-
-**Дано** summary draft прошел grounding и safety validation
-**Когда** audit service сохраняет trace
-**Тогда** trace связывает `case_id`, extracted facts, retrieved sources, citations, summary output и `SafetyCheckResult`
-**И** sensitive data в trace ограничены необходимым для demo explainability минимумом.
-
-**Дано** summary blocked by safety или insufficient grounding
-**Когда** workflow фиксирует decision
-**Тогда** audit record сохраняет failure reason
-**И** case получает recoverable state вместо silent failure.
-
-## Epic 5: Doctor Handoff and Case Review
-
-Врач получает уведомление о готовом case, открывает structured case card, видит цель пациента, документы, extracted facts, possible deviations, uncertainty markers, source references, AI-prepared questions и явную границу "not a clinical decision".
-
-### Story 5.1: Doctor Ready-Case Notification
-
-**Требования:** FR28
-
-Как врач,
-я хочу получить уведомление в `doctor_bot`, когда case готов к review,
-чтобы быстро узнать о новом подготовленном обращении.
-
-**Критерии приемки:**
-
-**Дано** case прошел handoff readiness gate и safety validation
-**Когда** handoff service помечает case как ready for review
-**Тогда** `doctor_bot` отправляет уведомление разрешенному doctor Telegram ID
-**И** уведомление содержит безопасный идентификатор case и краткий статус без лишних sensitive details.
-
-**Дано** doctor Telegram ID не входит в allowlist
-**Когда** notification или доступ к case пытается использовать этот ID
-**Тогда** система блокирует doctor-facing access
-**И** audit event фиксирует rejected access attempt без раскрытия медицинских деталей.
-
-### Story 5.2: Structured Case Card для Ready Case
-
-**Требования:** FR29, FR30, FR33
-
-Как врач,
-я хочу открыть structured case card для ready case,
-чтобы увидеть подготовленную картину обращения вместо хаотичного набора файлов.
-
-**Критерии приемки:**
-
-**Дано** врач получил ready-case notification
-**Когда** он открывает case card через `doctor_bot`
-**Тогда** бот показывает structured case card, собранную через backend boundary
-**И** card включает `case_id`, patient goal, patient profile summary, document list и current case status.
-
-**Дано** case не ready или safety validation не пройдена
-**Когда** врач пытается открыть case card
-**Тогда** система не показывает doctor-facing summary
-**И** возвращает structured status reason.
-
-### Story 5.3: Extracted Facts, Deviations и Uncertainty View
-
-**Требования:** FR30, FR34
-
-Как врач,
-я хочу видеть extracted facts, possible deviations и uncertainty markers,
-чтобы понимать, какие данные надежны, а какие требуют проверки.
-
-**Критерии приемки:**
-
-**Дано** case card открыта для ready case
-**Когда** врач просматривает extracted facts section
-**Тогда** card показывает medical indicators с value, unit, reference context, source confidence и uncertainty markers
-**И** uncertain или partial-processing facts визуально или текстово отделены от reliable facts.
-
-**Дано** case содержит low-confidence или partial-processing results
-**Когда** врач просматривает case card
-**Тогда** card явно показывает предупреждение о качестве обработки
-**И** не представляет спорные данные как reliable conclusions.
-
-### Story 5.4: AI-Prepared Questions для Doctor Follow-Up
-
-**Требования:** FR31
-
-Как врач,
-я хочу видеть AI-prepared questions для уточнения у пациента,
-чтобы быстрее понять, каких данных не хватает для консультации.
-
-**Критерии приемки:**
-
-**Дано** summary draft прошел safety validation
-**Когда** case card отображает questions section
-**Тогда** врач видит список вопросов для уточнения
-**И** вопросы основаны на extracted facts, missing context или uncertainty markers.
-
-**Дано** generated question содержит diagnosis, treatment recommendation или unsupported certainty
-**Когда** safety validation или display validation обрабатывает questions
-**Тогда** question блокируется или маркируется как unsafe
-**И** не показывается врачу как допустимая подсказка.
-
-### Story 5.5: Source Document References в Doctor Bot
-
-**Требования:** FR32
-
-Как врач,
-я хочу открыть source document reference для extracted fact,
-чтобы вручную проверить исходный документ при сомнении.
-
-**Критерии приемки:**
-
-**Дано** extracted fact имеет source document reference
-**Когда** врач выбирает source reference в `doctor_bot`
-**Тогда** бот предоставляет доступный для MVP способ просмотра или идентификации исходного документа
-**И** reference связан с правильным `case_id` и document metadata.
-
-**Дано** source document reference недоступен
-**Когда** врач пытается открыть его
-**Тогда** бот показывает recoverable error или limitation message
-**И** case card не скрывает факт отсутствия traceability.
-
-### Story 5.6: Doctor-Facing AI Boundary Labeling
-
-**Требования:** FR33
-
-Как врач,
-я хочу видеть явную маркировку, что AI output не является clinical decision,
-чтобы использовать case card как подготовку информации, а не как диагноз или назначение.
-
-**Критерии приемки:**
-
-**Дано** doctor-facing case card или summary отображаются
-**Когда** врач просматривает AI-prepared content
-**Тогда** card явно показывает AI boundary label
-**И** label говорит, что итоговое медицинское решение остается за врачом.
-
-**Дано** doctor-facing output template изменяется
-**Когда** tests или checks запускаются
-**Тогда** проверяется наличие boundary label
-**И** template не содержит формулировок final diagnosis или treatment instruction.
-
-### Story 5.7: Doctor Case Status и Problem Cases
-
-**Требования:** FR30, FR34
-
-Как врач,
-я хочу понимать, какие cases готовы, partial или требуют ручной проверки,
-чтобы не полагаться на неполный AI output.
-
-**Критерии приемки:**
-
-**Дано** врач запрашивает список или статус cases
-**Когда** backend возвращает doctor-facing status
-**Тогда** `doctor_bot` показывает ready, partial, blocked или review-required status через shared status model
-**И** статус отражает handoff gate, extraction confidence и safety result.
-
-**Дано** case blocked by safety, low confidence или missing source references
-**Когда** врач смотрит status
-**Тогда** status объясняет проблему на doctor-facing уровне
-**И** не раскрывает internal stack traces или raw model errors.
-
-## Epic 6: Portfolio Demo, Evals, and Explainability
-
-Интервьюер может локально запустить end-to-end demo, пройти happy path, посмотреть structured extraction examples, safety check results, RAG/source provenance, minimal eval results и intermediate artifacts, объясняющие происхождение summary.
-
-### Story 6.1: Reproducible Local Demo Setup
-
-**Требования:** FR40
-
-Как интервьюер или reviewer,
-я хочу запустить проект локально по документированным setup steps,
-чтобы быстро увидеть working backend demo без ручной настройки разработчиком.
-
-**Критерии приемки:**
-
-**Дано** fresh checkout репозитория
-**Когда** reviewer следует README setup steps
-**Тогда** Docker Compose или documented local commands поднимают необходимые services для MVP demo
-**И** README перечисляет required env vars, startup commands и expected demo processing time.
-
-**Дано** reviewer не использует реальные medical documents
-**Когда** demo запускается
-**Тогда** проект использует synthetic или обезличенные demo data по умолчанию
-**И** README явно предупреждает, что production use с реальными patient data требует отдельной legal/security/compliance review.
-
-### Story 6.2: Seed Demo Case и End-to-End Happy Path
-
-**Требования:** FR41
-
-Как интервьюер,
-я хочу пройти happy path от patient intake до doctor case review,
-чтобы оценить end-to-end AI/backend workflow за 5-10 минут.
-
-**Критерии приемки:**
-
-**Дано** local demo environment запущена
-**Когда** reviewer запускает seed demo case или проходит scripted happy path
-**Тогда** система демонстрирует путь от patient intake до doctor case card
-**И** процесс не требует ручного вмешательства разработчика в середине demo.
-
-**Дано** happy path завершен
-**Когда** reviewer открывает doctor-facing result
-**Тогда** он видит prepared case card с extracted facts, grounded summary, safety boundary и source/provenance signals
-**И** demo time укладывается в documented practical demo window.
-
-### Story 6.3: Structured Extraction Examples
-
-**Требования:** FR42
-
-Как интервьюер,
-я хочу посмотреть примеры structured extraction outputs,
-чтобы понять качество document processing и typed AI contracts.
-
-**Критерии приемки:**
-
-**Дано** demo case обработан
-**Когда** reviewer открывает examples или exported artifacts
-**Тогда** он видит structured extraction output с indicators, values, units, confidence и source document references
-**И** формат соответствует typed schema, используемой runtime workflow.
-
-**Дано** extraction содержит uncertain или incomplete fields
-**Когда** reviewer смотрит example output
-**Тогда** uncertainty markers и reasons видны явно
-**И** unreliable fields не представлены как reliable facts.
-
-### Story 6.4: Safety Check Result Examples
-
-**Требования:** FR43
-
-Как интервьюер,
-я хочу посмотреть примеры safety check results,
-чтобы убедиться, что система блокирует diagnosis, treatment recommendations и unsupported certainty.
-
-**Критерии приемки:**
-
-**Дано** demo или eval run генерирует summary drafts
-**Когда** safety checks выполняются
-**Тогда** exported examples включают `SafetyCheckResult` с pass/fail, detected issues и rationale
-**И** unsafe examples демонстрируют блокировку или correction path.
-
-**Дано** reviewer смотрит README или demo guide
-**Когда** он читает safety section
-**Тогда** документация объясняет safety boundaries и known limitations
-**И** не позиционирует систему как autonomous diagnosis или treatment tool.
-
-### Story 6.5: RAG и Source Provenance Examples
-
-**Требования:** FR44
-
-Как интервьюер,
-я хочу посмотреть пример RAG/source provenance для generated summary,
-чтобы понять, на каких источниках основан AI-prepared output.
-
-**Критерии приемки:**
-
-**Дано** demo case имеет retrieved knowledge entries
-**Когда** artifacts export выполняется
-**Тогда** exported provenance показывает extracted indicator, matched knowledge source, citation metadata, applicability notes и summary reference
-**И** каждый highlighted indicator в summary трассируется к extracted fact или curated knowledge source.
-
-**Дано** knowledge entry не применим или не найден
-**Когда** reviewer смотрит provenance artifacts
-**Тогда** limitation или not-grounded reason виден явно
-**И** summary не скрывает отсутствие reliable grounding.
-
-### Story 6.6: Minimal Eval Suite for Extraction, Groundedness and Safety
-
-**Требования:** FR45, FR46
-
-Как разработчик или reviewer,
-я хочу запускать minimal eval set для extraction quality, groundedness и safety boundary behavior,
-чтобы видеть измеримые evidence качества pipeline.
-
-**Критерии приемки:**
-
-**Дано** репозиторий содержит eval fixtures
-**Когда** запускается eval command
-**Тогда** выполняются проверки extraction quality, groundedness и safety behavior
-**И** результаты выводятся в форме, пригодной для portfolio review.
-
-**Дано** eval обнаруживает regression
-**Когда** eval command завершается
-**Тогда** failure сообщает, какая категория провалилась
-**И** output достаточно конкретен для исправления fixture, prompt, parser или safety rule.
-
-### Story 6.7: Demo Artifacts Export by `case_id`
-
-**Требования:** FR49
-
-Как разработчик или interviewer,
-я хочу экспортировать intermediate outputs по `case_id`,
-чтобы объяснить происхождение doctor-facing summary без полноценной production observability платформы.
-
-**Критерии приемки:**
-
-**Дано** case прошел processing workflow
-**Когда** запускается artifacts export по `case_id`
-**Тогда** export включает selected intermediate outputs: intake snapshot, document metadata, extraction result, retrieved sources, summary draft/final и safety decision
-**И** artifacts сохраняются в configured case-scoped location.
-
-**Дано** artifacts содержат sensitive-like demo data
-**Когда** export выполняется
-**Тогда** output ограничен synthetic/anonymized dataset или documented demo-safe fields
-**И** README объясняет, что real patient data не должны использоваться без отдельного review.
-
-### Story 6.8: Portfolio README, Architecture Diagram и Known Limitations
-
-**Требования:** FR40, FR46
-
-Как интервьюер или AI lead,
-я хочу быстро понять architecture, trade-offs, safety boundaries и known limitations,
-чтобы оценить инженерную зрелость проекта без долгого reverse engineering.
-
-**Критерии приемки:**
-
-**Дано** reviewer открывает README или demo docs
-**Когда** он читает portfolio overview
-**Тогда** docs объясняют backend workflow, LangGraph orchestration, RAG grounding, structured schemas, safety pass, audit trail и doctor handoff
-**И** architecture diagram показывает ключевые components и data flow.
-
-**Дано** reviewer оценивает production readiness
-**Когда** он читает limitations section
-**Тогда** docs явно перечисляют MVP scope, non-goals, low-concurrency assumption, compliance limitations и отложенные integrations
-**И** trade-offs описаны честно и достаточно конкретно для portfolio review.
-
-### Story 6.9: Full Local Demo Bootstrap and Verification
-
-**Требования:** FR40, FR41, FR44, NFR22, NFR23, NFR26
-
-Как interviewer или reviewer,
-я хочу поднять локальное демо по одному documented path и получить working PostgreSQL, Qdrant, seeded knowledge base и happy path artifacts,
-чтобы проект действительно проходил portfolio demo с fresh checkout без скрытого developer state.
-
-**Критерии приемки:**
-
-**Дано** fresh checkout репозитория
-**Когда** reviewer следует documented `.env` и `docker compose` path
-**Тогда** поднимаются все обязательные MVP demo services: API, PostgreSQL и Qdrant
-**И** documented commands не требуют неявных ручных шагов разработчика.
-
-**Дано** local demo services запущены
-**Когда** reviewer выполняет documented bootstrap sequence
-**Тогда** Qdrant collection создается идемпотентно
-**И** curated knowledge base seed загружается без дубликатов.
-
-**Дано** knowledge base и supporting services готовы
-**Когда** reviewer запускает prepared demo flow
-**Тогда** stable seed demo case проходит documented happy path end-to-end
-**И** reviewer получает case-linked artifacts без ручного ремонта окружения.
-
-**Дано** reviewer использует `.env.example`, README и compose files
-**Когда** он настраивает окружение
-**Тогда** все required infrastructure variables, defaults и optional secrets описаны явно
-**И** README, compose и actual scripts не противоречат друг другу.
+**Given** operational verification remains part of MVP
+**When** a maintainer follows the updated docs and scripts
+**Then** they can run a prepared anonymized verification case, minimal evals, and supporting artifacts without relying on reviewer-first or portfolio-first framing
+**And** the resulting paths stay aligned with typed schemas, auditability, and recoverable behavior.

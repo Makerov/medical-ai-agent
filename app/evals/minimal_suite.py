@@ -41,7 +41,18 @@ class MinimalEvalSuite:
     def _build_extraction_check(self, *, case_id: str) -> EvalCheckResult:
         path = f"{case_id}/export/demo/structured-extraction-examples.json"
         payload = self._read_artifact(path)
-        indicators = payload["indicators"]
+        indicators = self._extract_indicators(payload)
+        if not indicators:
+            return EvalCheckResult(
+                category="extraction",
+                fixture_id="structured_extraction_examples",
+                case_id=case_id,
+                outcome="fail",
+                score=0.0,
+                threshold_signal="missing_required_fields",
+                failure_reason="Structured extraction example did not include any indicators",
+                source_artifact=path,
+            )
         missing = [
             field
             for field in ("name", "value", "unit", "confidence", "source_document_reference")
@@ -70,6 +81,26 @@ class MinimalEvalSuite:
             threshold_signal="required_fields_present",
             source_artifact=path,
         )
+
+    @staticmethod
+    def _extract_indicators(payload: object) -> list[dict[str, object]]:
+        if isinstance(payload, list):
+            indicators: list[dict[str, object]] = []
+            for entry in payload:
+                if not isinstance(entry, dict):
+                    continue
+                raw_indicators = entry.get("indicators")
+                if not isinstance(raw_indicators, list):
+                    continue
+                indicators.extend(
+                    indicator for indicator in raw_indicators if isinstance(indicator, dict)
+                )
+            return indicators
+        if isinstance(payload, dict):
+            raw_indicators = payload.get("indicators")
+            if isinstance(raw_indicators, list):
+                return [indicator for indicator in raw_indicators if isinstance(indicator, dict)]
+        return []
 
     def _build_groundedness_check(self, *, case_id: str) -> EvalCheckResult:
         path = f"{case_id}/export/demo/rag-provenance-examples.json"

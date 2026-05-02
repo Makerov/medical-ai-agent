@@ -1,0 +1,7 @@
+{
+  "case_id": "case_demo_happy_path",
+  "correction_path": null,
+  "decision": "pass",
+  "decision_rationale": "Summary draft contains no blocked safety language.",
+  "issues": []
+}

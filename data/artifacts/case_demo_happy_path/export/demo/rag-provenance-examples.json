@@ -1,0 +1,445 @@
+{
+  "case_id": "case_demo_happy_path",
+  "data_classification": "synthetic_anonymized_demo",
+  "example_note": "Synthetic demo RAG provenance examples derived from the stable seed case and canonical grounding boundary.",
+  "examples": [
+    {
+      "applicability_decision": {
+        "applicability": {
+          "applicable_contexts": [
+            "hemoglobin review"
+          ],
+          "excluded_contexts": [],
+          "intended_use": "Ground extracted hemoglobin indicators.",
+          "limitations_summary": "Lab-specific reference ranges still govern final interpretation.",
+          "population_notes": "Adult-oriented demo content."
+        },
+        "applicable_context_notes": "Applicable contexts: hemoglobin review",
+        "knowledge_id": "medlineplus_hemoglobin_test",
+        "limitation_notes": "Lab-specific reference ranges still govern final interpretation.",
+        "provenance": {
+          "curation_method": "Manual curation.",
+          "curation_notes": null,
+          "evidence_basis": "Reference-range interpretation.",
+          "source_reference": "https://medlineplus.gov/lab-tests/hemoglobin-test/"
+        },
+        "provenance_summary": "Hemoglobin Test (medlineplus-hemoglobin-test)",
+        "reason": "indicator_context_matches_curated_applicability",
+        "source_metadata": {
+          "accessed_at": "2026-05-02",
+          "citation_key": "medlineplus-hemoglobin-test",
+          "publisher": "MedlinePlus / National Library of Medicine",
+          "source_id": "medlineplus_hemoglobin_test",
+          "source_title": "Hemoglobin Test",
+          "source_type": "medical_test_reference",
+          "source_url": "https://medlineplus.gov/lab-tests/hemoglobin-test/"
+        },
+        "status": "applicable"
+      },
+      "case_id": "case_demo_happy_path",
+      "example_id": "grounded_hemoglobin_provenance",
+      "grounded": true,
+      "grounded_summary": {
+        "citations": [
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": "claim_1",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
+            ],
+            "text": "Hemoglobin: 13.5 g/dL"
+          },
+          {
+            "claim_id": "claim_2",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose"
+            ],
+            "text": "Glucose: 5.6 mmol/L"
+          },
+          {
+            "claim_id": "claim_3",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+            ],
+            "text": "Creatinine: 88 umol/L"
+          },
+          {
+            "claim_id": "claim_4",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
+            ],
+            "text": "Ferritin: 42"
+          }
+        ],
+        "grounded_facts": [
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "human_readable_summary": "Hemoglobin: 13.5 g/dL",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 13.5,
+            "source_kind": "indicator"
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "human_readable_summary": "Glucose: 5.6 mmol/L",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 5.6,
+            "source_kind": "indicator"
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "human_readable_summary": "Creatinine: 88 umol/L",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 88,
+            "source_kind": "indicator"
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "human_readable_summary": "Ferritin: 42",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 42,
+            "source_kind": "indicator"
+          }
+        ],
+        "narrative": "Synthetic demo case summary with case-linked extracted facts and provenance.",
+        "validation": {
+          "grounded_fact_count": 4,
+          "status": "valid",
+          "supported_claims": [
+            {
+              "claim_id": "claim_1",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
+              ],
+              "text": "Hemoglobin: 13.5 g/dL"
+            },
+            {
+              "claim_id": "claim_2",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose"
+              ],
+              "text": "Glucose: 5.6 mmol/L"
+            },
+            {
+              "claim_id": "claim_3",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+              ],
+              "text": "Creatinine: 88 umol/L"
+            },
+            {
+              "claim_id": "claim_4",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
+              ],
+              "text": "Ferritin: 42"
+            }
+          ],
+          "unsupported_claims": []
+        }
+      },
+      "indicator": {
+        "name": "Hemoglobin",
+        "source_context": "case_demo_happy_path:telegram_document:unique_001",
+        "unit": "g/dL",
+        "value": 13.5
+      },
+      "limitation_notes": "Lab-specific reference ranges still govern final interpretation.",
+      "retrieval": {
+        "grounded": true,
+        "indicator": {
+          "name": "Hemoglobin",
+          "source_context": "case_demo_happy_path:telegram_document:unique_001",
+          "unit": "g/dL",
+          "value": 13.5
+        },
+        "matches": [
+          {
+            "applicability": {
+              "applicable_contexts": [
+                "hemoglobin review"
+              ],
+              "excluded_contexts": [],
+              "intended_use": "Ground extracted hemoglobin indicators.",
+              "limitations_summary": "Lab-specific reference ranges still govern final interpretation.",
+              "population_notes": "Adult-oriented demo content."
+            },
+            "knowledge_id": "medlineplus_hemoglobin_test",
+            "matched_terms": [
+              "medlineplus_hemoglobin_test"
+            ],
+            "provenance": {
+              "curation_method": "Manual curation.",
+              "curation_notes": null,
+              "evidence_basis": "Reference-range interpretation.",
+              "source_reference": "https://medlineplus.gov/lab-tests/hemoglobin-test/"
+            },
+            "retrieval_text": "Hemoglobin reference ranges vary by laboratory and patient factors.",
+            "score": 0.93,
+            "source_metadata": {
+              "accessed_at": "2026-05-02",
+              "citation_key": "medlineplus-hemoglobin-test",
+              "publisher": "MedlinePlus / National Library of Medicine",
+              "source_id": "medlineplus_hemoglobin_test",
+              "source_title": "Hemoglobin Test",
+              "source_type": "medical_test_reference",
+              "source_url": "https://medlineplus.gov/lab-tests/hemoglobin-test/"
+            }
+          }
+        ],
+        "reason": null,
+        "retrieved_at": "2026-05-02T10:29:20.913691Z"
+      },
+      "summary_reference": {
+        "case_id": "case_demo_happy_path",
+        "created_at": "2026-05-02T10:29:20.913709Z",
+        "record_id": "summary_demo_happy_path",
+        "record_kind": "summary"
+      }
+    },
+    {
+      "applicability_decision": null,
+      "case_id": "case_demo_happy_path",
+      "example_id": "not_grounded_creatinine_provenance",
+      "grounded": false,
+      "grounded_summary": {
+        "citations": [
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "indicator": null,
+            "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "provenance": null,
+            "source_kind": "indicator",
+            "source_metadata": null
+          }
+        ],
+        "claims": [
+          {
+            "claim_id": "claim_1",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
+            ],
+            "text": "Hemoglobin: 13.5 g/dL"
+          },
+          {
+            "claim_id": "claim_2",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose"
+            ],
+            "text": "Glucose: 5.6 mmol/L"
+          },
+          {
+            "claim_id": "claim_3",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+            ],
+            "text": "Creatinine: 88 umol/L"
+          },
+          {
+            "claim_id": "claim_4",
+            "rejection_reason": null,
+            "status": "supported",
+            "supported_citation_keys": [
+              "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
+            ],
+            "text": "Ferritin: 42"
+          }
+        ],
+        "grounded_facts": [
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+            "human_readable_summary": "Hemoglobin: 13.5 g/dL",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 13.5,
+            "source_kind": "indicator"
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+            "human_readable_summary": "Glucose: 5.6 mmol/L",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 5.6,
+            "source_kind": "indicator"
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+            "human_readable_summary": "Creatinine: 88 umol/L",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 88,
+            "source_kind": "indicator"
+          },
+          {
+            "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+            "human_readable_summary": "Ferritin: 42",
+            "indicator": null,
+            "knowledge_match": null,
+            "machine_value": 42,
+            "source_kind": "indicator"
+          }
+        ],
+        "narrative": "Synthetic demo case summary with case-linked extracted facts and provenance.",
+        "validation": {
+          "grounded_fact_count": 4,
+          "status": "valid",
+          "supported_claims": [
+            {
+              "claim_id": "claim_1",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
+              ],
+              "text": "Hemoglobin: 13.5 g/dL"
+            },
+            {
+              "claim_id": "claim_2",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose"
+              ],
+              "text": "Glucose: 5.6 mmol/L"
+            },
+            {
+              "claim_id": "claim_3",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+              ],
+              "text": "Creatinine: 88 umol/L"
+            },
+            {
+              "claim_id": "claim_4",
+              "rejection_reason": null,
+              "status": "supported",
+              "supported_citation_keys": [
+                "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
+              ],
+              "text": "Ferritin: 42"
+            }
+          ],
+          "unsupported_claims": []
+        }
+      },
+      "indicator": {
+        "name": "Creatinine",
+        "source_context": "case_demo_happy_path:telegram_document:unique_001",
+        "unit": null,
+        "value": null
+      },
+      "limitation_notes": "Retrieval failed because no trustworthy knowledge entries were found for the indicator.",
+      "retrieval": {
+        "grounded": false,
+        "indicator": {
+          "name": "Creatinine",
+          "source_context": "case_demo_happy_path:telegram_document:unique_001",
+          "unit": null,
+          "value": null
+        },
+        "matches": [],
+        "reason": "no_trustworthy_knowledge_entries_found",
+        "retrieved_at": "2026-05-02T10:29:20.913737Z"
+      },
+      "summary_reference": {
+        "case_id": "case_demo_happy_path",
+        "created_at": "2026-05-02T10:29:20.913741Z",
+        "record_id": "summary_demo_happy_path",
+        "record_kind": "summary"
+      }
+    }
+  ]
+}
