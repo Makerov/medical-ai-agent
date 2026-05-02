@@ -1,0 +1,29 @@
+{
+  "case_id": "case_demo_happy_path",
+  "doctor_review_reason": "Processing is partial and the case needs more work before review.",
+  "doctor_review_status": "partial",
+  "doctor_status": "processing_pending",
+  "handoff_readiness": {
+    "blocking_reasons": [
+      {
+        "code": "summary_missing",
+        "detail": "Summary reference is missing."
+      },
+      {
+        "code": "safety_clearance_missing",
+        "detail": "Safety clearance marker is not set."
+      },
+      {
+        "code": "case_status_not_ready",
+        "detail": "Case status 'processing_documents' is not eligible for handoff."
+      }
+    ],
+    "case_id": "case_demo_happy_path",
+    "doctor_status": "partial",
+    "doctor_status_reason": "Processing is partial and the case needs more work before review.",
+    "is_ready_for_doctor": false,
+    "shared_status": "processing_pending"
+  },
+  "lifecycle_status": "processing_documents",
+  "patient_status": "processing_pending"
+}

@@ -1,0 +1,38 @@
+[
+  {
+    "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+    "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+    "human_readable_summary": "Hemoglobin: 13.5 g/dL",
+    "indicator": null,
+    "knowledge_match": null,
+    "machine_value": 13.5,
+    "source_kind": "indicator"
+  },
+  {
+    "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+    "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+    "human_readable_summary": "Glucose: 5.6 mmol/L",
+    "indicator": null,
+    "knowledge_match": null,
+    "machine_value": 5.6,
+    "source_kind": "indicator"
+  },
+  {
+    "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+    "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+    "human_readable_summary": "Creatinine: 88 umol/L",
+    "indicator": null,
+    "knowledge_match": null,
+    "machine_value": 88,
+    "source_kind": "indicator"
+  },
+  {
+    "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+    "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+    "human_readable_summary": "Ferritin: 42",
+    "indicator": null,
+    "knowledge_match": null,
+    "machine_value": 42,
+    "source_kind": "indicator"
+  }
+]

@@ -1,3 +1,5 @@
+from uuid import NAMESPACE_URL, uuid5
+
 from app.integrations.qdrant_client import (
     QdrantClientError,
     QdrantHttpClient,
@@ -48,6 +50,9 @@ def test_qdrant_client_sends_collection_and_point_payloads() -> None:
         api_key="secret-token",
         opener=opener,
     )
+    expected_id = str(
+        uuid5(NAMESPACE_URL, "medical-ai-agent:knowledge:medlineplus_hemoglobin_test")
+    )
 
     assert client.collection_exists("curated_medical_knowledge_v1") is False
     created = client.create_collection(
@@ -59,7 +64,7 @@ def test_qdrant_client_sends_collection_and_point_payloads() -> None:
         collection_name="curated_medical_knowledge_v1",
         points=(
             {
-                "id": "medlineplus_hemoglobin_test",
+                "id": expected_id,
                 "vector": [0.1, 0.2, 0.3],
                 "payload": {"knowledge_id": "medlineplus_hemoglobin_test"},
             },
@@ -78,7 +83,8 @@ def test_qdrant_client_sends_collection_and_point_payloads() -> None:
     )
     assert "wait=true" in requests[2][1]
     assert "ordering=strong" in requests[2][1]
-    assert b'"medlineplus_hemoglobin_test"' in (requests[2][2] or b"")
+    assert expected_id.encode("utf-8") in (requests[2][2] or b"")
+    assert b'"knowledge_id": "medlineplus_hemoglobin_test"' in (requests[2][2] or b"")
     assert requests[2][3]["api-key"] == "secret-token"
 
 

@@ -47,7 +47,7 @@ Medical AI Agent - это Telegram-first UX поверх backend AI workflow, к
 
 ### Target Users
 
-Основные пользователи UX: пациент, врач и portfolio reviewer. Пациенту нужен понятный intake flow: согласие, базовые данные, цель обращения, загрузка документов, статус обработки и восстановление после ошибок. Врачу нужна structured case card с целью пациента, документами, extracted facts, possible deviations, uncertainty markers, source references и AI-prepared questions. Reviewer должен быстро увидеть end-to-end demo, архитектурную зрелость, safety boundaries, provenance и eval evidence.
+Основные пользователи UX: пациент, врач и operator/maintainer. Пациенту нужен понятный intake flow: согласие, базовые данные, цель обращения, загрузка документов, статус обработки и восстановление после ошибок. Врачу нужна structured case card с целью пациента, документами, extracted facts, possible deviations, uncertainty markers, source references и AI-prepared questions. Operator/maintainer должен быстро проверить operational status, happy path, safety boundaries, provenance и recoverable behavior без опоры на устаревшее showcase framing.
 
 ### Key Design Challenges
 
@@ -55,7 +55,7 @@ Medical AI Agent - это Telegram-first UX поверх backend AI workflow, к
 
 ### Design Opportunities
 
-Сильный UX может превратить проект из "бота с LLM" в демонстрацию ответственного AI intake workflow. Patient flow может снизить тревожность через предсказуемые шаги и честные ограничения. Doctor flow может сэкономить время через компактную карточку кейса с источниками и маркировкой надежности. Reviewer flow может усилить portfolio value через быстрый happy path, demo artifacts by `case_id`, safety examples и RAG/source provenance.
+Сильный UX может превратить проект из "бота с LLM" в operationally usable AI intake workflow. Patient flow может снизить тревожность через предсказуемые шаги и честные ограничения. Doctor flow может сэкономить время через компактную карточку кейса с источниками и маркировкой надежности. Operator flow может усилить operability через быстрый happy path, audit visibility по `case_id`, safety examples и RAG/source provenance.
 
 ## Core User Experience
 
@@ -69,7 +69,7 @@ Core experience Medical AI Agent строится вокруг загрузки 
 
 MVP использует Telegram как основной UX channel. `patient_bot` должен быть оптимизирован под mobile-first touch interaction: короткие сообщения, понятные кнопки, пошаговый intake, загрузка файлов и status updates. `doctor_bot` должен быть компактным review interface: case notification, structured case card, раскрытие деталей по необходимости и быстрый доступ к source references.
 
-Core backend workflow должен оставаться независимым от Telegram, чтобы будущий web dashboard или demo CLI могли использовать те же case, document, extraction, RAG, safety и handoff capabilities.
+Core backend workflow должен оставаться независимым от Telegram, чтобы будущий web dashboard, operational CLI или другой channel могли использовать те же case, document, extraction, RAG, safety и handoff capabilities.
 
 ### Effortless Interactions
 
@@ -210,7 +210,7 @@ Avoid:
 
 ### 1.1 Design System Choice
 
-Для MVP выбран custom lightweight Telegram UX system. Это не полноценная визуальная web design system, а компактная система reusable UX patterns для `patient_bot`, `doctor_bot` и demo/reviewer flows.
+Для MVP выбран custom lightweight Telegram UX system. Это не полноценная визуальная web design system, а компактная система reusable UX patterns для `patient_bot`, `doctor_bot` и operational support flows.
 
 Основные building blocks MVP design system:
 
@@ -222,7 +222,7 @@ Avoid:
 - uncertainty/confidence markers;
 - source reference presentation;
 - AI boundary labels;
-- demo artifact naming/display conventions.
+- operational artifact naming/display conventions.
 
 Web dashboard design system откладывается на Post-MVP. Когда появится web dashboard, можно выбрать отдельную themeable component system, но MVP не должен преждевременно проектировать web UI, которого еще нет в scope.
 
@@ -260,7 +260,7 @@ Customization должна быть минимальной и функциона
 - Status labels: понятные пользователю, но mapped к backend case states.
 - Uncertainty markers: заметные рядом с конкретными facts, а не спрятанные в общем disclaimer.
 - Doctor card sections: одинаковый порядок и названия во всех ready/partial/problem case states.
-- Safety labels: одинаковая формулировка границы AI в patient, doctor и demo contexts.
+- Safety labels: одинаковая формулировка границы AI в patient, doctor и operational docs contexts.
 
 Для будущего web dashboard эта Telegram UX system должна стать источником product semantics: статусы, секции карточки, labels, safety copy и uncertainty patterns можно перенести в web design system без изменения core UX logic.
 
@@ -402,7 +402,7 @@ UX должен быть readable и predictable даже в Telegram constraint
 2. Clinical Case Card - doctor-facing structured card с compact sections, reliable/uncertain facts и AI boundary.
 3. Status Timeline - patient-facing processing state model, показывающий движение case без технического шума.
 4. Triage Review - doctor-facing view для partial/problem cases, где сразу видно, что требует проверки.
-5. Dense Portfolio Demo - reviewer-facing presentation для workflow, evals, safety и provenance.
+5. Operational Verification View - maintainer-facing presentation для workflow status, evals, safety и provenance.
 6. Source-First Detail - provenance-oriented detail view, где каждый highlighted fact связан с source и limitation.
 
 ### Chosen Direction
@@ -419,7 +419,7 @@ Trust/provenance UX берет основу из Source-First Detail: кажды
 
 Комбинированное направление лучше соответствует core experience: "из хаотичных документов в проверяемую карточку кейса". Оно не пытается сделать Telegram визуально сложным, а усиливает понятность, контроль и доверие.
 
-Patient flow снижает тревогу через пошаговость и подтверждения. Doctor flow снижает когнитивную нагрузку через compact structured review. Source-first details защищают проект от ложной уверенности и помогают показать engineering maturity reviewer'у.
+Patient flow снижает тревогу через пошаговость и подтверждения. Doctor flow снижает когнитивную нагрузку через compact structured review. Source-first details защищают проект от ложной уверенности и помогают оператору быстро понять происхождение результата и причину деградации.
 
 ### Implementation Approach
 
@@ -430,9 +430,9 @@ Implementation should define reusable Telegram UX templates:
 - doctor case card section order from Clinical Case Card;
 - uncertainty/problem-state patterns from Triage Review;
 - provenance/source-reference detail patterns from Source-First Detail;
-- reviewer/demo artifact presentation patterns from Dense Portfolio Demo.
+- operational verification presentation patterns from Operational Verification View.
 
-В MVP основной runtime UI остается Telegram. HTML showcase используется как planning artifact и visual reference, не как обязательный product surface.
+В MVP основной runtime UI остается Telegram. HTML showcase может использоваться как planning artifact и visual reference, но не является обязательным operational surface.
 
 ## User Journey Flows
 
@@ -464,7 +464,7 @@ flowchart TD
 
 ### Poor Quality / Retry Recovery
 
-Если документ плохого качества, UX не должен звучать как технический сбой. Пациент должен понять, что часть данных нельзя надежно прочитать, и получить одно понятное действие: загрузить более четкий файл или продолжить с ограничениями, если это допустимо для demo flow.
+Если документ плохого качества, UX не должен звучать как технический сбой. Пациент должен понять, что часть данных нельзя надежно прочитать, и получить одно понятное действие: загрузить более четкий файл или продолжить с ограничениями, если это допускает operational workflow.
 
 ```mermaid
 flowchart TD
@@ -534,7 +534,7 @@ Reusable patterns across journeys:
 
 ### Design System Components
 
-Так как MVP использует custom lightweight Telegram UX system, готовой component library нет. Foundation components определяются как reusable message, button и layout patterns внутри `patient_bot`, `doctor_bot` и demo artifacts.
+Так как MVP использует custom lightweight Telegram UX system, готовой component library нет. Foundation components определяются как reusable message, button и layout patterns внутри `patient_bot`, `doctor_bot` и operational artifacts.
 
 Базовые components MVP:
 
@@ -592,7 +592,7 @@ Reusable patterns across journeys:
 #### Extracted Fact Row
 
 **Purpose:** Показать один медицинский показатель как проверяемый факт.  
-**Usage:** Doctor case card, demo artifacts, future dashboard.  
+**Usage:** Doctor case card, operational artifacts, future dashboard.  
 **Anatomy:** indicator name, value, unit, reference context, confidence, source document.  
 **States:** reliable, uncertain, missing unit, missing source, out of range, not grounded.  
 **Content Guidelines:** Не формулировать диагноз; не скрывать uncertainty.  
@@ -610,9 +610,9 @@ Reusable patterns across journeys:
 #### AI Boundary Label
 
 **Purpose:** Постоянно удерживать human-in-the-loop framing.  
-**Usage:** Patient explanation, consent, doctor case card, summary, README/demo.  
+**Usage:** Patient explanation, consent, doctor case card, summary, README/operations docs.  
 **Anatomy:** concise label plus one limitation statement.  
-**States:** patient-facing, doctor-facing, demo/reviewer-facing.  
+**States:** patient-facing, doctor-facing, operator-facing.  
 **Content Guidelines:** AI готовит информацию, врач принимает медицинское решение.  
 **Interaction Behavior:** Не требует действия, но должен быть видим в sensitive moments.
 
@@ -645,14 +645,14 @@ Phase 2 - Doctor review components:
 - Source Reference Action.
 - AI-Prepared Questions Section.
 
-Phase 3 - Portfolio/demo components:
+Phase 3 - Operational verification components:
 
-- Demo Artifact Reference.
+- Operational Artifact Reference.
 - Eval Result Summary.
 - Provenance Detail View.
 - Safety Check Result View.
 
-Priority should follow critical journeys: patient upload first, poor-quality retry second, doctor case review third, reviewer/demo artifacts after runtime flow is coherent.
+Priority should follow critical journeys: patient upload first, poor-quality retry second, doctor case review third, operational verification artifacts after runtime flow is coherent.
 
 ## UX Consistency Patterns
 
@@ -677,7 +677,7 @@ Secondary actions используются для альтернатив:
 
 Destructive actions требуют явного подтверждения:
 
-- удалить demo case;
+- удалить case;
 - отменить intake;
 - заменить документ.
 
@@ -794,7 +794,7 @@ AI boundary label должен появляться:
 - перед сбором medical documents;
 - в doctor case card;
 - рядом с AI-prepared summary/questions;
-- в README/demo materials.
+- в README/operations materials.
 
 Базовая формула: AI подготавливает и структурирует информацию для врача; диагноз, лечение и медицинское решение остаются за врачом.
 
@@ -843,7 +843,7 @@ Future web dashboard strategy:
 
 - Mobile: 320px-767px, single-column layout.
 - Tablet: 768px-1023px, single-column или narrow two-section layout только для secondary metadata.
-- Desktop: 1024px+, multi-column review layout допустим для doctor dashboard и demo artifacts.
+- Desktop: 1024px+, multi-column review layout допустим для doctor dashboard и operational artifacts.
 
 Основное правило: critical information должна оставаться доступной в single-column layout. Multi-column desktop не должен быть единственным способом понять case.
 

@@ -114,7 +114,7 @@ def seed_demo_case(
         settings=resolved_settings,
     )
 
-    artifact_root = Path(resolved_settings.artifact_root_dir)
+    artifact_root = Path(resolved_settings.artifact_root_dir).resolve(strict=False)
     case_artifact_root = artifact_root / fixture["case_id"]
     if reset_artifacts and case_artifact_root.exists():
         for path in sorted(case_artifact_root.rglob("*"), reverse=True):

@@ -1,5 +1,6 @@
 from collections.abc import Sequence
 from datetime import date
+from uuid import NAMESPACE_URL, uuid5
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
@@ -138,7 +139,9 @@ class KnowledgeSeedEntry(BaseModel):
 
     def to_qdrant_point(self, vector: Sequence[float]) -> dict[str, Any]:
         return {
-            "id": self.knowledge_id,
+            # Qdrant point IDs must be an int or UUID; keep knowledge_id in payload
+            # and derive a stable UUID from it for storage.
+            "id": str(uuid5(NAMESPACE_URL, f"medical-ai-agent:knowledge:{self.knowledge_id}")),
             "vector": [float(value) for value in vector],
             "payload": self.to_qdrant_payload(),
         }

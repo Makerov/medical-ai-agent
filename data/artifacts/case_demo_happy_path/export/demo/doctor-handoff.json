@@ -1,0 +1,12 @@
+{
+  "audit_event_id": "audit_f39010df785546cab0b03ba364f0e12d",
+  "case_id": "case_demo_happy_path",
+  "doctor_telegram_id": 123456,
+  "notification": {
+    "case_id": "case_demo_happy_path",
+    "doctor_telegram_id": 123456,
+    "shared_status": "ready_for_doctor",
+    "status_code": "ready_for_review"
+  },
+  "rejection": null
+}

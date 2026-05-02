@@ -1,0 +1,54 @@
+{
+  "case_id": "case_demo_happy_path",
+  "data_classification": "synthetic_anonymized_demo",
+  "example_note": "Synthetic demo safety examples derived from the stable seed case and canonical safety gate.",
+  "examples": [
+    {
+      "case_id": "case_demo_happy_path",
+      "correction_path": null,
+      "decision": "pass",
+      "decision_rationale": "Summary draft contains no blocked safety language.",
+      "issues": []
+    },
+    {
+      "case_id": "case_demo_happy_path",
+      "correction_path": "recoverable_correction",
+      "decision": "corrected",
+      "decision_rationale": "Borderline phrasing should be corrected before handoff.",
+      "issues": [
+        {
+          "category": "borderline_phrasing",
+          "evidence": "might",
+          "message": "Borderline phrasing should be corrected before handoff.",
+          "severity": "medium"
+        }
+      ]
+    },
+    {
+      "case_id": "case_demo_happy_path",
+      "correction_path": "manual_review_required",
+      "decision": "blocked",
+      "decision_rationale": "Unsafe clinical language requires blocking before handoff.",
+      "issues": [
+        {
+          "category": "diagnosis_language",
+          "evidence": "diagnosis",
+          "message": "Diagnosis language is not allowed in the doctor-facing summary draft.",
+          "severity": "high"
+        },
+        {
+          "category": "treatment_recommendation_language",
+          "evidence": "treatment recommendation",
+          "message": "Treatment recommendation language is not allowed in the doctor-facing summary draft.",
+          "severity": "high"
+        },
+        {
+          "category": "unsupported_clinical_certainty",
+          "evidence": "definitely",
+          "message": "Unsupported certainty language must be blocked.",
+          "severity": "high"
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 from datetime import date
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 from pydantic import ValidationError
@@ -59,6 +60,7 @@ def test_knowledge_seed_entry_validates_nested_metadata_and_normalizes_text() ->
     assert entry.source_identifier == "medlineplus_hemoglobin_test"
 
     payload = entry.to_qdrant_payload()
+    point = entry.to_qdrant_point((0.1, 0.2, 0.3))
 
     assert payload["knowledge_id"] == "medlineplus_hemoglobin_test"
     assert payload["source_identifier"] == "medlineplus_hemoglobin_test"
@@ -68,6 +70,9 @@ def test_knowledge_seed_entry_validates_nested_metadata_and_normalizes_text() ->
         "adult CBC review",
         "anemia screening",
     ]
+    assert point["id"] == str(
+        uuid5(NAMESPACE_URL, "medical-ai-agent:knowledge:medlineplus_hemoglobin_test")
+    )
 
 
 def test_knowledge_seed_entry_rejects_mismatched_source_identifier() -> None:

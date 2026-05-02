@@ -1,0 +1,40 @@
+{
+  "case_id": "case_demo_happy_path",
+  "case_status": "processing_documents",
+  "extraction": {
+    "confidence": 0.95,
+    "extracted_at": "2026-05-02T10:29:20.906700Z",
+    "extracted_text": "Hemoglobin: 13.5 g/dL\nGlucose: 5.6 mmol/L\nFerritin: 42\nCreatinine: 88 umol/L",
+    "provider_name": "synthetic_demo_fixture",
+    "source_document": {
+      "file_id": "demo_lab_panel_pdf",
+      "file_name": "synthetic-lab-panel.pdf",
+      "file_size": 4096,
+      "file_unique_id": "demo_lab_panel_pdf_v1",
+      "mime_type": "application/pdf"
+    }
+  },
+  "extraction_reference": {
+    "case_id": "case_demo_happy_path",
+    "created_at": "2026-05-02T10:29:20.906700Z",
+    "record_id": "extraction:telegram_document:demo_lab_panel_pdf_v1",
+    "record_kind": "extraction"
+  },
+  "failure_code": null,
+  "failure_message": null,
+  "is_recoverable_failure": false,
+  "source_document": {
+    "file_id": "demo_lab_panel_pdf",
+    "file_name": "synthetic-lab-panel.pdf",
+    "file_size": 4096,
+    "file_unique_id": "demo_lab_panel_pdf_v1",
+    "mime_type": "application/pdf"
+  },
+  "source_document_reference": {
+    "case_id": "case_demo_happy_path",
+    "created_at": "2026-05-02T10:29:20.906633Z",
+    "record_id": "telegram_document:demo_lab_panel_pdf_v1",
+    "record_kind": "document"
+  },
+  "was_duplicate": false
+}
