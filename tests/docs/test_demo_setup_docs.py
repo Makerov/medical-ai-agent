@@ -9,13 +9,16 @@ ARCHITECTURE_DIAGRAM_PATH = Path("docs/architecture-diagram.md")
 def test_readme_documents_canonical_fresh_checkout_bootstrap_path() -> None:
     readme = README_PATH.read_text(encoding="utf-8")
 
-    assert "## Local demo setup" in readme
+    assert "## Local operational verification setup" in readme
     assert "Copy `.env.example` to `.env`" in readme
     assert "docker compose up --build" in readme
     assert "scripts/setup_qdrant_collections.py" in readme
     assert "scripts/seed_knowledge_base.py" in readme
-    assert "scripts/seed_demo_case.py" in readme
-    assert "scripts/run_minimal_eval_suite.py --case-id case_demo_happy_path" in readme
+    assert "scripts/seed_operational_verification_case.py" in readme
+    assert (
+        "scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready"
+        in readme
+    )
     assert "uv sync" in readme
     assert "uv run uvicorn app.main:app --reload" in readme
     assert "uv run medical-ai-api" in readme
@@ -32,12 +35,12 @@ def test_readme_lists_env_vars_demo_timing_and_safety_warning() -> None:
     assert "QDRANT_URL" in readme
     assert "QDRANT_COLLECTION_NAME" in readme
     assert "DOCTOR_TELEGRAM_ID_ALLOWLIST" in readme
-    assert "Expected demo processing time" in readme
+    assert "Expected operational verification processing time" in readme
     assert "synthetic or anonymized knowledge-base fixtures" in readme
     assert "Real patient data requires separate legal, security, and compliance review" in readme
-    assert "case_demo_happy_path" in readme
-    assert "data/artifacts/<case_id>/demo/reviewer-export.json" in readme
-    assert "data/artifacts/<case_id>/demo/minimal-eval-suite.json" in readme
+    assert "case_operational_verification_ready" in readme
+    assert "data/artifacts/<case_id>/verification/operational-verification-export.json" in readme
+    assert "data/artifacts/<case_id>/verification/minimal-eval-suite.json" in readme
 
 
 def test_env_example_documents_local_demo_contract() -> None:
@@ -57,7 +60,7 @@ def test_env_example_documents_local_demo_contract() -> None:
 def test_readme_documents_portfolio_architecture_and_limits() -> None:
     readme = README_PATH.read_text(encoding="utf-8")
 
-    assert "## Portfolio Overview" in readme
+    assert "## Operational Overview" in readme
     assert "LangGraph orchestrates" in readme
     assert "PostgreSQL stores case state" in readme
     assert "Qdrant stores retrieval data" in readme

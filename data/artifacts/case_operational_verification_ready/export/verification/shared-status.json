@@ -1,5 +1,5 @@
 {
-  "case_id": "case_demo_happy_path",
+  "case_id": "case_operational_verification_ready",
   "doctor_review_reason": "Processing is partial and the case needs more work before review.",
   "doctor_review_status": "partial",
   "doctor_status": "processing_pending",
@@ -18,7 +18,7 @@
         "detail": "Case status 'processing_documents' is not eligible for handoff."
       }
     ],
-    "case_id": "case_demo_happy_path",
+    "case_id": "case_operational_verification_ready",
     "doctor_status": "partial",
     "doctor_status_reason": "Processing is partial and the case needs more work before review.",
     "is_ready_for_doctor": false,

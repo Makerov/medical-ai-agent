@@ -8,15 +8,15 @@ from app.core.settings import Settings
 from app.evals.minimal_suite import MinimalEvalSuite
 
 
-def _write_demo_artifacts(root: Path, case_id: str) -> None:
-    demo_dir = root / case_id / "export" / "demo"
-    (root / case_id / "safety" / "demo").mkdir(parents=True, exist_ok=True)
-    demo_dir.mkdir(parents=True, exist_ok=True)
-    (demo_dir / "structured-extraction-examples.json").write_text(
+def _write_verification_artifacts(root: Path, case_id: str) -> None:
+    verification_dir = root / case_id / "export" / "verification"
+    (root / case_id / "safety" / "verification").mkdir(parents=True, exist_ok=True)
+    verification_dir.mkdir(parents=True, exist_ok=True)
+    (verification_dir / "structured-extraction-examples.json").write_text(
         json.dumps(
             {
                 "case_id": case_id,
-                "data_classification": "synthetic_anonymized_demo",
+                "data_classification": "synthetic_anonymized_verification",
                 "indicators": [
                     {
                         "name": "Hemoglobin",
@@ -30,11 +30,11 @@ def _write_demo_artifacts(root: Path, case_id: str) -> None:
         ),
         encoding="utf-8",
     )
-    (demo_dir / "rag-provenance-examples.json").write_text(
+    (verification_dir / "rag-provenance-examples.json").write_text(
         json.dumps(
             {
                 "case_id": case_id,
-                "data_classification": "synthetic_anonymized_demo",
+                "data_classification": "synthetic_anonymized_verification",
                 "examples": [
                     {
                         "example_id": "grounded_hemoglobin_provenance",
@@ -50,11 +50,11 @@ def _write_demo_artifacts(root: Path, case_id: str) -> None:
         ),
         encoding="utf-8",
     )
-    (root / case_id / "safety" / "demo" / "safety-check-examples.json").write_text(
+    (root / case_id / "safety" / "verification" / "safety-check-examples.json").write_text(
         json.dumps(
             {
                 "case_id": case_id,
-                "data_classification": "synthetic_anonymized_demo",
+                "data_classification": "synthetic_anonymized_verification",
                 "examples": [
                     {"decision": "pass", "issues": []},
                     {"decision": "blocked", "issues": [{"category": "diagnosis_language"}]},
@@ -67,16 +67,16 @@ def _write_demo_artifacts(root: Path, case_id: str) -> None:
 
 
 def test_minimal_eval_suite_writes_case_linked_synthetic_results(tmp_path: Path) -> None:
-    case_id = "case_demo_happy_path"
-    _write_demo_artifacts(tmp_path, case_id)
+    case_id = "case_operational_verification_ready"
+    _write_verification_artifacts(tmp_path, case_id)
     settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
 
     result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
 
     assert result.summary.case_id == case_id
-    assert result.summary.data_classification == "synthetic_anonymized_demo"
+    assert result.summary.data_classification == "synthetic_anonymized_verification"
     assert result.summary.synthetic_by_default is True
-    assert result.artifact_path == tmp_path / case_id / "demo" / "minimal-eval-suite.json"
+    assert result.artifact_path == tmp_path / case_id / "verification" / "minimal-eval-suite.json"
     assert result.artifact_path.exists()
 
     payload = json.loads(result.artifact_path.read_text(encoding="utf-8"))
@@ -92,8 +92,8 @@ def test_minimal_eval_suite_writes_case_linked_synthetic_results(tmp_path: Path)
 
 
 def test_minimal_eval_suite_reruns_with_stable_artifact_shape(tmp_path: Path, monkeypatch) -> None:
-    case_id = "case_demo_happy_path"
-    _write_demo_artifacts(tmp_path, case_id)
+    case_id = "case_operational_verification_ready"
+    _write_verification_artifacts(tmp_path, case_id)
     settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
 
     class FrozenDateTime:

@@ -7,7 +7,9 @@ from app.evals import MinimalEvalSuite
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run the minimal demo eval suite")
+    parser = argparse.ArgumentParser(
+        description="Run the minimal operational verification eval suite"
+    )
     parser.add_argument("--case-id", required=True)
     args = parser.parse_args()
     result = MinimalEvalSuite().run(case_id=args.case_id)

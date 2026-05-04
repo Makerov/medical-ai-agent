@@ -185,14 +185,14 @@ def test_build_case_artifact_path_returns_stable_case_scoped_path() -> None:
     artifact_path = audit_service.build_case_artifact_path(
         case_id=patient_case.case_id,
         artifact_kind=ArtifactKind.EXPORT,
-        relative_path="demo/export.json",
+        relative_path="verification/export.json",
     )
 
     assert artifact_path.case_id == patient_case.case_id
     assert artifact_path.artifact_kind == ArtifactKind.EXPORT
-    assert artifact_path.relative_path == "case_audit_path/export/demo/export.json"
+    assert artifact_path.relative_path == "case_audit_path/export/verification/export.json"
     assert artifact_path.absolute_path == Path(
-        "data/artifacts/case_audit_path/export/demo/export.json"
+        "data/artifacts/case_audit_path/export/verification/export.json"
     ).resolve(strict=False)
 
 

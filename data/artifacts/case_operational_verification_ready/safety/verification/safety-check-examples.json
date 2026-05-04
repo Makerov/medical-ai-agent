@@ -1,17 +1,17 @@
 {
-  "case_id": "case_demo_happy_path",
-  "data_classification": "synthetic_anonymized_demo",
-  "example_note": "Synthetic demo safety examples derived from the stable seed case and canonical safety gate.",
+  "case_id": "case_operational_verification_ready",
+  "data_classification": "synthetic_anonymized_verification",
+  "example_note": "Synthetic operational verification safety examples derived from the prepared anonymized case and canonical safety gate.",
   "examples": [
     {
-      "case_id": "case_demo_happy_path",
+      "case_id": "case_operational_verification_ready",
       "correction_path": null,
       "decision": "pass",
       "decision_rationale": "Summary draft contains no blocked safety language.",
       "issues": []
     },
     {
-      "case_id": "case_demo_happy_path",
+      "case_id": "case_operational_verification_ready",
       "correction_path": "recoverable_correction",
       "decision": "corrected",
       "decision_rationale": "Borderline phrasing should be corrected before handoff.",
@@ -25,7 +25,7 @@
       ]
     },
     {
-      "case_id": "case_demo_happy_path",
+      "case_id": "case_operational_verification_ready",
       "correction_path": "manual_review_required",
       "decision": "blocked",
       "decision_rationale": "Unsafe clinical language requires blocking before handoff.",

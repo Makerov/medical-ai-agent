@@ -73,7 +73,7 @@ PATIENT_POST_CONSENT_WAITING_MESSAGE = (
 )
 
 PATIENT_DELETION_CONFIRMATION_MESSAGE = (
-    "Запросить удаление demo case?\n\n"
+    "Запросить удаление verification case?\n\n"
     "Материалы станут недоступны в patient flow. Действие необратимо."
 )
 
@@ -165,7 +165,9 @@ PATIENT_STATUS_READY_FOR_DOCTOR_MESSAGE = (
 
 PATIENT_STATUS_CLOSED_MESSAGE = "Заявка закрыта.\nЕсли хотите начать заново, нажмите /start."
 
-PATIENT_STATUS_DELETED_MESSAGE = "Заявка удалена.\nЭта demo case больше недоступна в patient flow."
+PATIENT_STATUS_DELETED_MESSAGE = (
+    "Заявка удалена.\nЭтот verification case больше недоступен в patient flow."
+)
 
 PATIENT_INTAKE_DELETED_MESSAGE = "Эта заявка уже удалена.\nЧтобы начать заново, нажмите /start."
 

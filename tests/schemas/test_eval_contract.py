@@ -21,7 +21,7 @@ def test_eval_suite_summary_links_all_results_to_same_case() -> None:
     summary = EvalSuiteSummary(
         case_id="case-1",
         generated_at=datetime(2026, 5, 1, 6, 0, tzinfo=UTC),
-        data_classification="synthetic_anonymized_demo",
+        data_classification="synthetic_anonymized_verification",
         results=(
             EvalCheckResult(
                 category="safety",
@@ -32,7 +32,7 @@ def test_eval_suite_summary_links_all_results_to_same_case() -> None:
                 threshold_signal="ok",
             ),
         ),
-        artifact_path="case-1/demo/minimal-eval-suite.json",
+        artifact_path="case-1/verification/minimal-eval-suite.json",
     )
 
     assert summary.synthetic_by_default is True

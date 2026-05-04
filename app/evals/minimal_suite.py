@@ -21,8 +21,8 @@ class MinimalEvalSuite:
 
     def run(self, *, case_id: str) -> MinimalEvalSuiteResult:
         artifact_root = Path(self._settings.artifact_root_dir)
-        demo_dir = artifact_root / case_id / "demo"
-        artifact_path = demo_dir / "minimal-eval-suite.json"
+        verification_dir = artifact_root / case_id / "verification"
+        artifact_path = verification_dir / "minimal-eval-suite.json"
         results = (
             self._build_extraction_check(case_id=case_id),
             self._build_groundedness_check(case_id=case_id),
@@ -31,7 +31,7 @@ class MinimalEvalSuite:
         summary = EvalSuiteSummary(
             case_id=case_id,
             generated_at=datetime.now(UTC),
-            data_classification="synthetic_anonymized_demo",
+            data_classification="synthetic_anonymized_verification",
             results=results,
             artifact_path=str(artifact_path.relative_to(artifact_root)),
         )
@@ -39,7 +39,7 @@ class MinimalEvalSuite:
         return MinimalEvalSuiteResult(summary=summary, artifact_path=artifact_path)
 
     def _build_extraction_check(self, *, case_id: str) -> EvalCheckResult:
-        path = f"{case_id}/export/demo/structured-extraction-examples.json"
+        path = f"{case_id}/export/verification/structured-extraction-examples.json"
         payload = self._read_artifact(path)
         indicators = self._extract_indicators(payload)
         if not indicators:
@@ -103,7 +103,7 @@ class MinimalEvalSuite:
         return []
 
     def _build_groundedness_check(self, *, case_id: str) -> EvalCheckResult:
-        path = f"{case_id}/export/demo/rag-provenance-examples.json"
+        path = f"{case_id}/export/verification/rag-provenance-examples.json"
         payload = self._read_artifact(path)
         examples = payload["examples"]
         grounded = next(example for example in examples if example["grounded"] is True)
@@ -130,7 +130,7 @@ class MinimalEvalSuite:
         )
 
     def _build_safety_check(self, *, case_id: str) -> EvalCheckResult:
-        path = f"{case_id}/safety/demo/safety-check-examples.json"
+        path = f"{case_id}/safety/verification/safety-check-examples.json"
         payload = self._read_artifact(path)
         blocked = next(
             example for example in payload["examples"] if example["decision"] == "blocked"
