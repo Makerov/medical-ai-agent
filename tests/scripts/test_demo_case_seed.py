@@ -33,9 +33,7 @@ def test_seed_demo_case_creates_stable_case_and_case_scoped_artifacts(tmp_path: 
         "intake_snapshot": Path("case_demo_happy_path/export/demo/intake-snapshot.json"),
         "extracted_facts": Path("case_demo_happy_path/export/demo/extracted-facts.json"),
         "safety_check_result": Path("case_demo_happy_path/safety/demo/safety-check-result.json"),
-        "safety_check_examples": Path(
-            "case_demo_happy_path/safety/demo/safety-check-examples.json"
-        ),
+        "safety_check_examples": Path("case_demo_happy_path/safety/demo/safety-check-examples.json"),
         "handoff_payload": Path("case_demo_happy_path/export/demo/doctor-handoff.json"),
         "source_references": Path("case_demo_happy_path/export/demo/source-references.json"),
         "shared_status": Path("case_demo_happy_path/export/demo/shared-status.json"),

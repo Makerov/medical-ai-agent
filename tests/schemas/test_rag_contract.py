@@ -204,9 +204,9 @@ def test_rag_provenance_example_set_preserves_grounded_and_not_grounded_examples
     )
     example_set = RAGProvenanceExampleSet(
         case_id="case_001",
-        data_classification="synthetic_anonymized_demo",
+        data_classification="synthetic_anonymized_verification",
         examples=(grounded_example, not_grounded_example),
-        example_note="Synthetic demo RAG provenance examples.",
+        example_note="Synthetic operational verification RAG provenance examples.",
     )
 
     dumped = example_set.model_dump(mode="json")

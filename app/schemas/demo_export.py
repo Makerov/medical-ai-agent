@@ -4,6 +4,10 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+# Deprecated compatibility module name.
+# The canonical runtime path now uses operational verification wording, but these
+# typed contracts remain in place to avoid a broader schema rename in the same pass.
+
 
 def _normalize_text(value: str) -> str:
     normalized = value.strip()

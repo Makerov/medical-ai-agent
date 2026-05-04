@@ -8,9 +8,68 @@ from app.core.settings import Settings
 from app.evals.minimal_suite import MinimalEvalSuite
 
 
-def _write_demo_artifacts(root: Path, case_id: str) -> None:
+def _write_verification_artifacts(root: Path, case_id: str) -> None:
+    verification_dir = root / case_id / "export" / "verification"
+    (root / case_id / "safety" / "verification").mkdir(parents=True, exist_ok=True)
+    verification_dir.mkdir(parents=True, exist_ok=True)
+    (verification_dir / "structured-extraction-examples.json").write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "data_classification": "synthetic_anonymized_verification",
+                "indicators": [
+                    {
+                        "name": "Hemoglobin",
+                        "value": 13.2,
+                        "unit": "g/dL",
+                        "confidence": 0.98,
+                        "source_document_reference": {"record_id": "doc-1"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (verification_dir / "rag-provenance-examples.json").write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "data_classification": "synthetic_anonymized_verification",
+                "examples": [
+                    {
+                        "example_id": "grounded_hemoglobin_provenance",
+                        "grounded": True,
+                        "summary_reference": {"case_id": case_id, "record_id": "summary-1"},
+                    },
+                    {
+                        "example_id": "not_grounded_creatinine_provenance",
+                        "grounded": False,
+                    },
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / case_id / "safety" / "verification" / "safety-check-examples.json").write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "data_classification": "synthetic_anonymized_verification",
+                "examples": [
+                    {"decision": "pass", "issues": []},
+                    {"decision": "blocked", "issues": [{"category": "diagnosis_language"}]},
+                    {"decision": "corrected", "issues": []},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_legacy_demo_artifacts(root: Path, case_id: str) -> None:
     demo_dir = root / case_id / "export" / "demo"
     (root / case_id / "safety" / "demo").mkdir(parents=True, exist_ok=True)
+    (root / case_id / "demo").mkdir(parents=True, exist_ok=True)
     demo_dir.mkdir(parents=True, exist_ok=True)
     (demo_dir / "structured-extraction-examples.json").write_text(
         json.dumps(
@@ -40,11 +99,7 @@ def _write_demo_artifacts(root: Path, case_id: str) -> None:
                         "example_id": "grounded_hemoglobin_provenance",
                         "grounded": True,
                         "summary_reference": {"case_id": case_id, "record_id": "summary-1"},
-                    },
-                    {
-                        "example_id": "not_grounded_creatinine_provenance",
-                        "grounded": False,
-                    },
+                    }
                 ],
             }
         ),
@@ -58,7 +113,6 @@ def _write_demo_artifacts(root: Path, case_id: str) -> None:
                 "examples": [
                     {"decision": "pass", "issues": []},
                     {"decision": "blocked", "issues": [{"category": "diagnosis_language"}]},
-                    {"decision": "corrected", "issues": []},
                 ],
             }
         ),
@@ -67,16 +121,16 @@ def _write_demo_artifacts(root: Path, case_id: str) -> None:
 
 
 def test_minimal_eval_suite_writes_case_linked_synthetic_results(tmp_path: Path) -> None:
-    case_id = "case_demo_happy_path"
-    _write_demo_artifacts(tmp_path, case_id)
+    case_id = "case_operational_verification_ready"
+    _write_verification_artifacts(tmp_path, case_id)
     settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
 
     result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
 
     assert result.summary.case_id == case_id
-    assert result.summary.data_classification == "synthetic_anonymized_demo"
+    assert result.summary.data_classification == "synthetic_anonymized_verification"
     assert result.summary.synthetic_by_default is True
-    assert result.artifact_path == tmp_path / case_id / "demo" / "minimal-eval-suite.json"
+    assert result.artifact_path == tmp_path / case_id / "verification" / "minimal-eval-suite.json"
     assert result.artifact_path.exists()
 
     payload = json.loads(result.artifact_path.read_text(encoding="utf-8"))
@@ -92,8 +146,8 @@ def test_minimal_eval_suite_writes_case_linked_synthetic_results(tmp_path: Path)
 
 
 def test_minimal_eval_suite_reruns_with_stable_artifact_shape(tmp_path: Path, monkeypatch) -> None:
-    case_id = "case_demo_happy_path"
-    _write_demo_artifacts(tmp_path, case_id)
+    case_id = "case_operational_verification_ready"
+    _write_verification_artifacts(tmp_path, case_id)
     settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
 
     class FrozenDateTime:
@@ -116,3 +170,45 @@ def test_minimal_eval_suite_reruns_with_stable_artifact_shape(tmp_path: Path, mo
     assert [result.category for result in first.summary.results] == [
         result.category for result in second.summary.results
     ]
+
+
+def test_minimal_eval_suite_supports_legacy_demo_artifact_layout(tmp_path: Path) -> None:
+    case_id = "case_demo_happy_path"
+    _write_legacy_demo_artifacts(tmp_path, case_id)
+    settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
+
+    result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
+
+    assert result.summary.case_id == case_id
+    assert result.artifact_path == tmp_path / case_id / "demo" / "minimal-eval-suite.json"
+    assert [item.outcome for item in result.summary.results] == ["pass", "pass", "pass"]
+
+
+def test_minimal_eval_suite_returns_failures_for_partial_verification_artifacts(
+    tmp_path: Path,
+) -> None:
+    case_id = "case_operational_verification_ready"
+    verification_dir = tmp_path / case_id / "export" / "verification"
+    safety_dir = tmp_path / case_id / "safety" / "verification"
+    verification_dir.mkdir(parents=True, exist_ok=True)
+    safety_dir.mkdir(parents=True, exist_ok=True)
+    (verification_dir / "structured-extraction-examples.json").write_text(
+        json.dumps({"case_id": case_id, "indicators": []}),
+        encoding="utf-8",
+    )
+    (verification_dir / "rag-provenance-examples.json").write_text(
+        json.dumps({"case_id": case_id, "examples": []}),
+        encoding="utf-8",
+    )
+    (safety_dir / "safety-check-examples.json").write_text(
+        json.dumps({"case_id": case_id, "examples": [{"decision": "pass", "issues": []}]}),
+        encoding="utf-8",
+    )
+    settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
+
+    result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
+
+    assert [item.outcome for item in result.summary.results] == ["fail", "fail", "fail"]
+    assert result.summary.results[0].failure_reason is not None
+    assert result.summary.results[1].threshold_signal == "missing_grounded_example"
+    assert result.summary.results[2].threshold_signal == "missing_safety_block"

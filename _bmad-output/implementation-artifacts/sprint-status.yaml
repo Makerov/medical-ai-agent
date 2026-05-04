@@ -1,5 +1,5 @@
 # generated: 2026-05-02T18:37:20+0600
-# last_updated: 2026-05-02T18:37:20+0600
+# last_updated: 2026-05-04T13:50:00+0600
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-02T18:37:20+0600
-last_updated: 2026-05-02T18:37:20+0600
+last_updated: 2026-05-04T14:30:00+0600
 project: medical-ai-agent
 project_key: NOKEY
 tracking_system: file-system
@@ -83,5 +83,5 @@ development_status:
   6-5-prepared-anonymized-operational-verification-case: backlog
   6-6-minimal-eval-suite-and-reviewable-quality-results: backlog
   6-7-runtime-api-reference-artifacts-and-operational-examples: backlog
-  6-8-demo-path-cleanup-and-operational-verification-refactor: ready-for-dev
+  6-8-demo-path-cleanup-and-operational-verification-refactor: done
   epic-6-retrospective: optional

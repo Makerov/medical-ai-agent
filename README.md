@@ -1,8 +1,8 @@
 # medical-ai-agent
 
-Backend-first medical consultation workflow for portfolio review. The system uses FastAPI, Telegram adapters, LangGraph orchestration, typed schemas, RAG grounding, safety validation, audit trail storage, and case-scoped demo artifacts to prepare information for a doctor.
+Backend-first medical consultation workflow for operational verification. The system uses FastAPI, Telegram adapters, LangGraph orchestration, typed schemas, RAG grounding, safety validation, audit trail storage, and case-scoped verification artifacts to prepare information for a doctor.
 
-## Local demo setup
+## Local operational verification setup
 
 This repository is intended to be runnable from a fresh checkout without manual developer state.
 
@@ -14,13 +14,13 @@ This repository is intended to be runnable from a fresh checkout without manual 
 
 ### Fresh-checkout bootstrap
 
-The canonical reviewer path is:
+The canonical operational verification path is:
 
 1. Copy `.env.example` to `.env`.
 2. Keep the synthetic/anonymized defaults unless you are intentionally exercising optional adapters.
 3. Start the local stack with Docker Compose.
 4. Run the documented bootstrap scripts in order.
-5. Optionally run the minimal eval suite on the stable demo case.
+5. Optionally run the minimal eval suite on the prepared anonymized verification case.
 
 ### Required environment variables
 
@@ -45,11 +45,11 @@ Copy `.env.example` to `.env` and fill the values that apply to your local run:
 - `DOCTOR_TELEGRAM_ID`
 - `HF_TOKEN`
 
-For the default local demo, the bot token, allowlist, and HF values can stay empty unless you are exercising the Telegram adapters or model-backed flows. The containerized stack uses the API, PostgreSQL, and Qdrant services defined in `docker-compose.yml`, while host-run scripts use the `.env` file directly.
+For the default local operational verification run, the bot token, allowlist, and HF values can stay empty unless you are exercising the Telegram adapters or model-backed flows. The containerized stack uses the API, PostgreSQL, and Qdrant services defined in `docker-compose.yml`, while host-run scripts use the `.env` file directly.
 
 ### Documented startup paths
 
-Preferred containerized demo:
+Preferred containerized operational verification path:
 
 ```bash
 cp .env.example .env
@@ -62,16 +62,16 @@ After the stack is up, run the deterministic bootstrap scripts in this order:
 ```bash
 uv run python scripts/setup_qdrant_collections.py
 uv run python scripts/seed_knowledge_base.py
-uv run python scripts/seed_demo_case.py
+uv run python scripts/seed_operational_verification_case.py
 ```
 
-Optional verification for the prepared demo case:
+Optional verification for the prepared anonymized verification case:
 
 ```bash
-uv run python scripts/run_minimal_eval_suite.py --case-id case_demo_happy_path
+uv run python scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready
 ```
 
-Expected demo processing time:
+Expected operational verification processing time:
 
 - API startup is usually a few seconds on a warm machine.
 - First-run dependency install and image build can take longer, especially on a clean checkout or slower network.
@@ -98,19 +98,19 @@ uv sync
 uv run medical-ai-api
 ```
 
-### Demo data
+### Verification data
 
-The default demo path uses synthetic or anonymized knowledge-base fixtures from `data/knowledge_base/`.
+The default operational verification path uses synthetic or anonymized knowledge-base fixtures from `data/knowledge_base/`.
 
 - `data/knowledge_base/blood-glucose-test.json`
 - `data/knowledge_base/creatinine-test.json`
 - `data/knowledge_base/hemoglobin-test.json`
 
-These fixtures keep the local demo on non-production sample content by default. Real patient data requires separate legal, security, and compliance review before use.
+These fixtures keep the local verification path on non-production sample content by default. Real patient data requires separate legal, security, and compliance review before use.
 
-## Portfolio Overview
+## Operational Overview
 
-This repository is organized around a backend workflow rather than a dashboard. The user-facing adapters are thin, while the core logic stays in services, schemas, and a LangGraph workflow that can be exercised from Telegram, the API, or local demo scripts.
+This repository is organized around a backend workflow rather than a dashboard. The user-facing adapters are thin, while the core logic stays in services, schemas, and a LangGraph workflow that can be exercised from Telegram, the API, or local operational verification scripts.
 
 Major runtime boundaries:
 
@@ -121,22 +121,22 @@ Major runtime boundaries:
 - Qdrant stores retrieval data for grounded knowledge lookup.
 - Pydantic schemas validate structured contracts before downstream use.
 - The safety gate blocks or corrects unsupported doctor-facing output before it is shown.
-- Demo artifacts remain case-scoped so reviewers can trace every output through the same `case_id`.
+- Verification artifacts remain case-scoped so maintainers can trace every output through the same `case_id`.
 
-The architecture diagram is stored at [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md) and is linked as a standalone portfolio artifact.
+The architecture diagram is stored at [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md) and is linked as a standalone operational artifact.
 
-## Demo Traceability
+## Verification Traceability
 
-The stable demo case is `case_demo_happy_path`. That `case_id` threads through seeded inputs, exports, safety examples, reviewer bundles, and eval output so the demo can be traced end-to-end without searching the repository.
+The prepared anonymized verification case is `case_operational_verification_ready`. That `case_id` threads through seeded inputs, exports, safety examples, verification bundles, and eval output so the operational flow can be traced end-to-end without searching the repository.
 
-Stable demo artifact locations:
+Stable verification artifact locations:
 
 - Seed data and generated outputs: `data/artifacts/<case_id>/`
-- Reviewer export bundle: `data/artifacts/<case_id>/demo/reviewer-export.json`
-- Synthetic extraction, grounding, and safety examples: `data/artifacts/<case_id>/export/demo/`
-- Minimal eval suite output: `data/artifacts/<case_id>/demo/minimal-eval-suite.json`
+- Operational verification export bundle: `data/artifacts/<case_id>/verification/operational-verification-export.json`
+- Synthetic extraction, grounding, and safety examples: `data/artifacts/<case_id>/export/verification/`
+- Minimal eval suite output: `data/artifacts/<case_id>/verification/minimal-eval-suite.json`
 
-The repo uses synthetic or anonymized defaults for the portfolio path. The documented paths are intended to make seed data, export outputs, and eval results easy to find from the README alone.
+The repo uses synthetic or anonymized defaults for the operational verification path. The documented paths are intended to make seed data, export outputs, and eval results easy to find from the README alone.
 
 ## Backend scaffold
 
@@ -155,7 +155,7 @@ Create a local `.env` file from `.env.example` and fill runtime secrets:
 - `DOCTOR_TELEGRAM_ID` - Telegram ID allowed to use doctor-facing bot flows.
 - `HF_TOKEN` - Hugging Face token for model access.
 
-The same `.env` file also carries the local demo infrastructure contract:
+The same `.env` file also carries the local operational verification infrastructure contract:
 
 - `QDRANT_URL`
 - `QDRANT_API_KEY`
@@ -181,35 +181,35 @@ Useful local URLs:
 - Health: http://localhost:8000/api/v1/health
 - OpenAPI docs: http://localhost:8000/docs
 
-This MVP is a portfolio/demo system. It is not production medical software and is not compliance-ready for clinical use.
+This MVP is an operational verification system. It is not production medical software and is not compliance-ready for clinical use.
 
 Safety boundary: the AI prepares information for a doctor, but does not diagnose or prescribe treatment. A human doctor must review the materials before any medical decision.
-Demo exports also include synthetic safety check examples showing pass, blocked, and corrected outcomes under the same stable `case_id`.
-The demo artifact set also includes synthetic RAG/source provenance examples under `data/artifacts/<case_id>/export/demo/`, showing both grounded and not-grounded retrieval paths with explicit source metadata and summary linkage.
-For reviewer walkthroughs, the seed command also writes a case-scoped bundle to `data/artifacts/<case_id>/demo/reviewer-export.json` that links the extracted facts, provenance, safety result, minimal eval summary, and reviewer-readable case overview without requiring live model calls.
+Verification exports also include synthetic safety check examples showing pass, blocked, and corrected outcomes under the same stable `case_id`.
+The verification artifact set also includes synthetic RAG/source provenance examples under `data/artifacts/<case_id>/export/verification/`, showing both grounded and not-grounded retrieval paths with explicit source metadata and summary linkage.
+For maintainer walkthroughs, the seed command also writes a case-scoped bundle to `data/artifacts/<case_id>/verification/operational-verification-export.json` that links the extracted facts, provenance, safety result, minimal eval summary, and maintainer-readable case overview without requiring live model calls.
 
 ## Limitations
 
-This is an MVP portfolio demo, not a production clinical platform.
+This is an MVP operational verification environment, not a production clinical platform.
 
 - No diagnosis or treatment recommendations are provided.
 - No production compliance claim is made.
 - No EHR, LIS, or MIS integrations are included in the MVP.
-- No web dashboard is part of the current demo surface.
-- The system assumes low-concurrency portfolio usage rather than production-scale throughput.
+- No web dashboard is part of the current verification surface.
+- The system assumes low-concurrency operational usage rather than production-scale throughput.
 - Real patient data, clinical deployment, and regulated use require separate legal, security, and compliance review.
 - Future growth features should be treated as planned work, not current capability.
 
-The low-concurrency assumption means the demo is designed for sequential walkthroughs, deterministic artifact review, and local validation rather than high-volume concurrent traffic or hospital-grade operational guarantees.
+The low-concurrency assumption means the verification path is designed for sequential walkthroughs, deterministic artifact review, and local validation rather than high-volume concurrent traffic or hospital-grade operational guarantees.
 
 ### Minimal eval suite
 
-The portfolio demo also ships a minimal eval suite for the stable seed case.
+The operational verification path also ships a minimal eval suite for the prepared verification case.
 
-Run it after generating the demo artifacts:
+Run it after generating the verification artifacts:
 
 ```bash
-uv run python scripts/run_minimal_eval_suite.py --case-id case_demo_happy_path
+uv run python scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready
 ```
 
 The suite checks three typed categories:
@@ -218,8 +218,8 @@ The suite checks three typed categories:
 - groundedness: retrieval evidence stays linked to extracted facts or curated sources;
 - safety: unsupported diagnosis, treatment, and overconfident clinical language remain blocked or corrected.
 
-The default outputs are synthetic or anonymized, case-linked, and deterministic in artifact shape. The suite does not use real patient documents or live model calls for the default fixture set.
+The default outputs are synthetic or anonymized, case-linked, and deterministic in artifact shape. The suite does not use real patient documents or live model calls for the default verification fixture set.
 
 ## Architecture Diagram
 
-The standalone portfolio diagram is here: [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md)
+The standalone operational diagram is here: [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md)

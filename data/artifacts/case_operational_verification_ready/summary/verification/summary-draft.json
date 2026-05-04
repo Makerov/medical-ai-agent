@@ -2,7 +2,7 @@
   "grounded_summary": {
     "citations": [
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
         "indicator": null,
         "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
         "provenance": null,
@@ -10,7 +10,7 @@
         "source_metadata": null
       },
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Glucose",
         "indicator": null,
         "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
         "provenance": null,
@@ -18,7 +18,7 @@
         "source_metadata": null
       },
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
         "indicator": null,
         "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
         "provenance": null,
@@ -26,7 +26,7 @@
         "source_metadata": null
       },
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
         "indicator": null,
         "label": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
         "provenance": null,
@@ -40,7 +40,7 @@
         "rejection_reason": null,
         "status": "supported",
         "supported_citation_keys": [
-          "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
+          "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
         ],
         "text": "Hemoglobin: 13.5 g/dL"
       },
@@ -49,7 +49,7 @@
         "rejection_reason": null,
         "status": "supported",
         "supported_citation_keys": [
-          "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose"
+          "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Glucose"
         ],
         "text": "Glucose: 5.6 mmol/L"
       },
@@ -58,7 +58,7 @@
         "rejection_reason": null,
         "status": "supported",
         "supported_citation_keys": [
-          "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+          "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
         ],
         "text": "Creatinine: 88 umol/L"
       },
@@ -67,14 +67,14 @@
         "rejection_reason": null,
         "status": "supported",
         "supported_citation_keys": [
-          "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
+          "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
         ],
         "text": "Ferritin: 42"
       }
     ],
     "grounded_facts": [
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
         "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
         "human_readable_summary": "Hemoglobin: 13.5 g/dL",
         "indicator": null,
@@ -83,7 +83,7 @@
         "source_kind": "indicator"
       },
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Glucose",
         "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Glucose",
         "human_readable_summary": "Glucose: 5.6 mmol/L",
         "indicator": null,
@@ -92,7 +92,7 @@
         "source_kind": "indicator"
       },
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
         "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Creatinine",
         "human_readable_summary": "Creatinine: 88 umol/L",
         "indicator": null,
@@ -101,7 +101,7 @@
         "source_kind": "indicator"
       },
       {
-        "citation_key": "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
+        "citation_key": "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
         "fact_id": "indicator:telegram_document:demo_lab_panel_pdf_v1:Ferritin",
         "human_readable_summary": "Ferritin: 42",
         "indicator": null,
@@ -110,7 +110,7 @@
         "source_kind": "indicator"
       }
     ],
-    "narrative": "Synthetic demo case summary with case-linked extracted facts and provenance.",
+    "narrative": "Synthetic operational verification summary with case-linked extracted facts and provenance.",
     "validation": {
       "grounded_fact_count": 4,
       "status": "valid",
@@ -120,7 +120,7 @@
           "rejection_reason": null,
           "status": "supported",
           "supported_citation_keys": [
-            "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
+            "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin"
           ],
           "text": "Hemoglobin: 13.5 g/dL"
         },
@@ -129,7 +129,7 @@
           "rejection_reason": null,
           "status": "supported",
           "supported_citation_keys": [
-            "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose"
+            "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Glucose"
           ],
           "text": "Glucose: 5.6 mmol/L"
         },
@@ -138,7 +138,7 @@
           "rejection_reason": null,
           "status": "supported",
           "supported_citation_keys": [
-            "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+            "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
           ],
           "text": "Creatinine: 88 umol/L"
         },
@@ -147,7 +147,7 @@
           "rejection_reason": null,
           "status": "supported",
           "supported_citation_keys": [
-            "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
+            "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Ferritin"
           ],
           "text": "Ferritin: 42"
         }
@@ -161,9 +161,9 @@
   "questions_for_doctor": [
     {
       "citation_keys": [
-        "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
-        "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Glucose",
-        "case_demo_happy_path:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
+        "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Hemoglobin",
+        "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Glucose",
+        "case_operational_verification_ready:telegram_document:demo_lab_panel_pdf_v1:Creatinine"
       ],
       "focus": "missing_context",
       "question_id": "question:fact_context",

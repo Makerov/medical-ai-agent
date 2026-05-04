@@ -35,7 +35,7 @@ def test_safety_check_example_set_preserves_case_linked_typed_results() -> None:
     )
     result = SafetyCheckExampleSet(
         case_id="case_123",
-        data_classification="synthetic_anonymized_demo",
+        data_classification="synthetic_anonymized_verification",
         examples=(
             pass_result,
             SafetyCheckResult(
@@ -55,13 +55,16 @@ def test_safety_check_example_set_preserves_case_linked_typed_results() -> None:
                 correction_path="manual_review_required",
             ),
         ),
-        example_note="Synthetic demo safety examples derived from the stable seed case.",
+        example_note=(
+            "Synthetic operational verification safety examples derived from the prepared "
+            "anonymized case."
+        ),
     )
 
     dumped = result.model_dump(mode="json")
 
     assert dumped["case_id"] == "case_123"
-    assert dumped["data_classification"] == "synthetic_anonymized_demo"
+    assert dumped["data_classification"] == "synthetic_anonymized_verification"
     assert dumped["examples"][0]["decision"] == "pass"
     assert dumped["examples"][1]["decision"] == "blocked"
     assert dumped["examples"][1]["issues"][0]["category"] == "diagnosis_language"

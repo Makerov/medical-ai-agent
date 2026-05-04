@@ -6,7 +6,7 @@
 
 ## 1. Описание проблемы
 
-Текущий план проекта описывает backend-first Telegram систему в режиме `portfolio/demo`: synthetic/demo data, seed demo case, local demo bootstrap, reviewer-oriented artifacts и README как основной способ показать ценность. Это больше не соответствует целевому курсу.
+Текущий план проекта описывает backend-first Telegram систему в устаревшем режиме `portfolio/demo`: synthetic/demo data, seed demo case, local demo bootstrap, reviewer-oriented artifacts и README как основной способ показать ценность. Это больше не соответствует целевому курсу и не должно рассматриваться как активный source of truth.
 
 Новый запрос меняет продуктовый режим на **operational pet project**:
 

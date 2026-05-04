@@ -139,9 +139,9 @@ The rebuilt `epics.md` is directionally aligned with the updated PRD and archite
 
 ### UX Alignment Issues
 
-- The UX document still defines `portfolio reviewer` as a target user and treats reviewer/demo value as a first-class success lens.
-- It still describes `demo/reviewer flows`, `demo artifact naming/display conventions`, and reviewer-facing portfolio components as part of MVP semantics.
-- This conflicts with the sprint change proposal, which explicitly says UX language must be reoriented away from demo/reviewer flow and toward operational bot usage.
+- The previous UX draft had defined `portfolio reviewer` as a target user and treated reviewer/demo value as a first-class success lens.
+- That older draft had described `demo/reviewer flows`, `demo artifact naming/display conventions`, and reviewer-facing portfolio components as part of MVP semantics.
+- The active UX baseline now needs to stay oriented away from demo/reviewer flow and toward operational bot usage.
 
 ### Readiness Impact
 

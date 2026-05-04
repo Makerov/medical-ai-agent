@@ -699,7 +699,7 @@ def test_handle_case_deletion_request_replies_with_confirmation_keyboard() -> No
     message.answer.assert_awaited_once()
     reply = message.answer.await_args.args[0]
     reply_markup = message.answer.await_args.kwargs["reply_markup"]
-    assert "Запросить удаление demo case?" in reply
+    assert "Запросить удаление verification case?" in reply
     assert patient_case.case_id in reply
     assert reply_markup.inline_keyboard[0][0].callback_data == build_case_deletion_callback_data(
         action="confirm",
