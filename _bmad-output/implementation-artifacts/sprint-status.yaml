@@ -1,5 +1,5 @@
 # generated: 2026-05-02T18:37:20+0600
-# last_updated: 2026-05-04T13:50:00+0600
+# last_updated: 2026-05-04T16:00:00+0600
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,15 +35,15 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-02T18:37:20+0600
-last_updated: 2026-05-04T14:30:00+0600
+last_updated: 2026-05-04T16:00:00+0600
 project: medical-ai-agent
 project_key: NOKEY
 tracking_system: file-system
 story_location: /Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts
 
 development_status:
-  epic-1: backlog
-  1-1-runtime-scaffold-and-process-topology: backlog
+  epic-1: in-progress
+  1-1-runtime-scaffold-and-process-topology: review
   1-2-case-lifecycle-and-stable-identity-model: backlog
   1-3-environment-secret-and-runtime-profile-handling: backlog
   1-4-internal-api-and-role-separated-runtime-boundaries: backlog
@@ -75,7 +75,7 @@ development_status:
   5-3-doctor-review-surface-for-facts-questions-and-provenance: backlog
   5-4-case-scoped-audit-review-by-case-id: backlog
   epic-5-retrospective: optional
-  epic-6: in-progress
+  epic-6: backlog
   6-1-runtime-health-and-readiness-checks: backlog
   6-2-startup-verification-for-migrations-and-knowledge-base: backlog
   6-3-restart-and-recovery-behavior: backlog
