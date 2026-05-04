@@ -123,7 +123,7 @@ Major runtime boundaries:
 - The safety gate blocks or corrects unsupported doctor-facing output before it is shown.
 - Verification artifacts remain case-scoped so maintainers can trace every output through the same `case_id`.
 
-The architecture diagram is stored at [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md) and is linked as a standalone portfolio artifact.
+The architecture diagram is stored at [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md) and is linked as a standalone operational artifact.
 
 ## Verification Traceability
 

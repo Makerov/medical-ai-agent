@@ -1,6 +1,6 @@
 # Story 6.8: Demo-Path Cleanup and Operational Verification Refactor
 
-Status: review
+Status: done
 
 ## Story
 
@@ -54,6 +54,14 @@ Status: review
 - [x] Зафиксировать compatibility strategy и non-goals. (AC: 4)
   - [x] Если legacy filenames или paths остаются на переходный период, явно пометить их как deprecated compatibility path.
   - [x] Не возвращать reviewer-first bundles как canonical success path.
+
+### Review Findings
+
+- [x] [Review][Patch] Legacy compatibility wrapper no longer preserves the legacy demo contract [scripts/seed_demo_case.py:15]
+- [x] [Review][Patch] Minimal eval still hard-fails on legacy or partially migrated artifact layouts [app/evals/minimal_suite.py:42]
+- [x] [Review][Patch] Verification seeder crashes on empty extraction output instead of degrading recoverably [scripts/seed_operational_verification_case.py:490]
+- [x] [Review][Patch] README still exposes stale portfolio wording in the canonical operational path [README.md:126]
+- [x] [Review][Patch] Active planning artifacts still mix operational and demo-first source-of-truth surfaces [_bmad-output/planning-artifacts/sprint-change-proposal-2026-05-02.md:9]
 
 ## Dev Notes
 

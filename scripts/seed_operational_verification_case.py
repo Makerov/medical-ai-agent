@@ -495,6 +495,17 @@ def _build_rag_provenance_examples(
     grounded_summary: GroundedSummaryContract,
     clock: Callable[[], datetime],
 ) -> dict[str, Any]:
+    if not extracted_facts:
+        example_set = RAGProvenanceExampleSet(
+            case_id=case_id,
+            data_classification=data_classification,
+            examples=(),
+            example_note=(
+                "Synthetic operational verification RAG provenance examples are unavailable "
+                "because the fixture did not yield extracted facts."
+            ),
+        )
+        return example_set.model_dump(mode="json")
     indicator_fact = extracted_facts[0]
     indicator = RetrievalIndicatorContext(
         name="Hemoglobin",
