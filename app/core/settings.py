@@ -11,7 +11,9 @@ TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES = 20_000_000
 class Settings(BaseSettings):
     app_name: str = "medical-ai-agent"
     environment: str = "local"
+    runtime_profile: str = "local"
     api_v1_prefix: str = "/api/v1"
+    database_url: str | None = None
     artifact_root_dir: Path = Path("data/artifacts")
     knowledge_base_seed_dir: Path = Path("data/knowledge_base")
     debug: bool = False
@@ -34,9 +36,20 @@ class Settings(BaseSettings):
     )
     document_upload_max_file_size_bytes: int = TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES
     patient_bot_token: str | None = None
+    doctor_bot_token: str | None = None
     debug_admin_static_token: str | None = None
+    hf_token: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("runtime_profile")
+    @classmethod
+    def validate_runtime_profile(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if not normalized:
+            msg = "RUNTIME_PROFILE must not be empty"
+            raise ValueError(msg)
+        return normalized
 
     @field_validator("doctor_telegram_id_allowlist", mode="before")
     @classmethod
@@ -113,6 +126,28 @@ class Settings(BaseSettings):
         msg = "PATIENT_BOT_TOKEN must be a string"
         raise ValueError(msg)
 
+    @field_validator("doctor_bot_token", mode="before")
+    @classmethod
+    def normalize_doctor_bot_token(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        msg = "DOCTOR_BOT_TOKEN must be a string"
+        raise ValueError(msg)
+
+    @field_validator("hf_token", mode="before")
+    @classmethod
+    def normalize_hf_token(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        msg = "HF_TOKEN must be a string"
+        raise ValueError(msg)
+
     @field_validator("api_v1_prefix")
     @classmethod
     def validate_api_v1_prefix(cls, value: str) -> str:
@@ -174,7 +209,29 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return normalized
 
+    def validate_runtime_profile_readiness(self) -> None:
+        if self.runtime_profile != "operational":
+            return
+
+        missing: list[str] = []
+        if not self.database_url:
+            missing.append("DATABASE_URL")
+        if not self.hf_token:
+            missing.append("HF_TOKEN")
+        if not self.doctor_bot_token:
+            missing.append("DOCTOR_BOT_TOKEN")
+        if not self.patient_bot_token:
+            missing.append("PATIENT_BOT_TOKEN")
+        if not self.qdrant_url:
+            missing.append("QDRANT_URL")
+        if missing:
+            joined = ", ".join(missing)
+            msg = f"Operational profile requires configured runtime settings: {joined}"
+            raise ValueError(msg)
+
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    settings.validate_runtime_profile_readiness()
+    return settings
