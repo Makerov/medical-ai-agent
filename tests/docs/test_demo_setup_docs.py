@@ -46,6 +46,8 @@ def test_readme_lists_env_vars_demo_timing_and_safety_warning() -> None:
 def test_env_example_documents_local_demo_contract() -> None:
     env_example = ENV_EXAMPLE_PATH.read_text(encoding="utf-8")
 
+    assert "RUNTIME_PROFILE=local" in env_example
+    assert "DATABASE_URL=postgresql://localhost:5432/medical_ai_agent" in env_example
     assert "ARTIFACT_ROOT_DIR=data/artifacts" in env_example
     assert "KNOWLEDGE_BASE_SEED_DIR=data/knowledge_base" in env_example
     assert "QDRANT_URL=http://localhost:6333" in env_example
@@ -96,6 +98,7 @@ def test_compose_documents_fresh_checkout_api_entrypoint() -> None:
     assert 'postgres:' in compose
     assert 'qdrant:' in compose
     assert 'image: qdrant/qdrant:v1.17.1' in compose
+    assert 'DATABASE_URL: postgresql://medical_ai_agent:medical_ai_agent@postgres:5432/medical_ai_agent' in compose
     assert '"127.0.0.1:8000:8000"' in compose
     assert '"127.0.0.1:5432:5432"' in compose
     assert '"127.0.0.1:6333:6333"' in compose

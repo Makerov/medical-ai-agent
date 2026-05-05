@@ -99,6 +99,34 @@ def test_settings_parse_patient_bot_token(monkeypatch) -> None:
     assert settings.patient_bot_token == "demo-patient-token"
 
 
+def test_settings_parse_runtime_profile_and_database_url(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("RUNTIME_PROFILE", " OPERATIONAL ")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://localhost:5432/medical")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.runtime_profile == "operational"
+    assert settings.database_url == "postgresql://localhost:5432/medical"
+
+
+def test_settings_parse_doctor_bot_and_hf_tokens(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("DOCTOR_BOT_TOKEN", " demo-doctor-token ")
+    monkeypatch.setenv("HF_TOKEN", " demo-hf-token ")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.doctor_bot_token == "demo-doctor-token"
+    assert settings.hf_token == "demo-hf-token"
+
+
 def test_settings_parse_document_upload_supported_mime_types(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv(
@@ -135,6 +163,17 @@ def test_settings_reject_empty_artifact_root_dir(monkeypatch) -> None:
 
     try:
         with pytest.raises(ValidationError, match="ARTIFACT_ROOT_DIR must not be empty"):
+            get_settings()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_settings_reject_missing_operational_runtime_configuration(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("RUNTIME_PROFILE", "operational")
+
+    try:
+        with pytest.raises(ValueError, match="Operational profile requires configured runtime settings"):
             get_settings()
     finally:
         get_settings.cache_clear()

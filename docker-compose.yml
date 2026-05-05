@@ -4,6 +4,7 @@ services:
     env_file:
       - .env
     environment:
+      DATABASE_URL: postgresql://medical_ai_agent:medical_ai_agent@postgres:5432/medical_ai_agent
       QDRANT_URL: http://qdrant:6333
     ports:
       - "127.0.0.1:8000:8000"

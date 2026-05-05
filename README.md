@@ -80,6 +80,7 @@ Expected operational verification processing time:
 Containerized services and defaults:
 
 - `docker compose` starts the API, PostgreSQL, and Qdrant services together.
+- The API container receives `DATABASE_URL=postgresql://medical_ai_agent:medical_ai_agent@postgres:5432/medical_ai_agent` on the compose network.
 - The API container uses `QDRANT_URL=http://qdrant:6333` on the compose network.
 - PostgreSQL uses the compose-local defaults defined in `docker-compose.yml`; no extra hidden setup is required.
 - Host-run scripts use the `.env` file, so `QDRANT_URL=http://localhost:6333` remains the local default for direct script execution.
