@@ -1,6 +1,6 @@
 # Story 3.5: Recoverable OCR and Extraction Failure Handling
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -10,48 +10,48 @@ so that document processing never looks successful when the document was not pro
 
 ## Acceptance Criteria
 
-1. **Given** OCR processing cannot complete because the provider is unavailable, times out, or raises a typed OCR failure  
-   **When** the document-processing workflow evaluates the case  
-   **Then** the case moves into an explicit recoverable failure state such as `ocr_failed` or `manual_review_required`  
+1. **Given** OCR processing cannot complete because the provider is unavailable, times out, or raises a typed OCR failure
+   **When** the document-processing workflow evaluates the case
+   **Then** the case moves into an explicit recoverable failure state such as `ocr_failed` or `manual_review_required`
    **And** the backend records a machine-readable failure reason instead of returning a false success.
 
-2. **Given** OCR returns text but the confidence or text quality is too low for safe extraction  
-   **When** the parse/extraction workflow evaluates the result  
-   **Then** the case moves into `partial_extraction` or `manual_review_required` as appropriate  
+2. **Given** OCR returns text but the confidence or text quality is too low for safe extraction
+   **When** the parse/extraction workflow evaluates the result
+   **Then** the case moves into `partial_extraction` or `manual_review_required` as appropriate
    **And** the system preserves the low-quality extraction as recoverable context rather than pretending the document was fully understood.
 
-3. **Given** structured extraction cannot produce usable indicators from the OCR output  
-   **When** the extraction stage completes without reliable grounded facts  
-   **Then** the workflow returns a typed recoverable outcome with a stable failure code  
+3. **Given** structured extraction cannot produce usable indicators from the OCR output
+   **When** the extraction stage completes without reliable grounded facts
+   **Then** the workflow returns a typed recoverable outcome with a stable failure code
    **And** the case does not advance to a summary-ready or doctor-ready state.
 
-4. **Given** a recoverable OCR or extraction failure has already been recorded for the case and document  
-   **When** the workflow is invoked again for the same source document  
-   **Then** the result remains idempotent and does not create duplicate failure artifacts or duplicate state transitions  
+4. **Given** a recoverable OCR or extraction failure has already been recorded for the case and document
+   **When** the workflow is invoked again for the same source document
+   **Then** the result remains idempotent and does not create duplicate failure artifacts or duplicate state transitions
    **And** the previously recorded recoverable state remains the source of truth.
 
-5. **Given** the runtime is in `operational profile`  
-   **When** OCR or extraction fails  
-   **Then** the runtime does not silently fall back to a mock/stub implementation  
+5. **Given** the runtime is in `operational profile`
+   **When** OCR or extraction fails
+   **Then** the runtime does not silently fall back to a mock/stub implementation
    **And** the patient-facing surface shows a calm recoverable message without leaking provider internals, parser internals, or stack traces.
 
 ## Tasks / Subtasks
 
-- [ ] Tighten the document-processing failure contract so OCR and extraction failures map to explicit recoverable case states. (AC: 1, 2, 3, 5)
-  - [ ] Review `app/workflow/nodes/parse_document.py` for the current OCR failure, partial extraction, and case-transition branches.
-  - [ ] Confirm the workflow emits stable failure codes for OCR provider failure, low-quality extraction, and no-usable-indicators outcomes.
-  - [ ] Ensure the failure path preserves case-linked auditability and does not advance the lifecycle to a success state.
-- [ ] Preserve idempotent retry behavior for the same document and case. (AC: 4)
-  - [ ] Keep duplicate invocations for the same source document from creating duplicate failure records or duplicate transitions.
-  - [ ] Preserve the existing safe re-entry behavior when the node is called after a partial or failed processing attempt.
-- [ ] Keep patient-facing messaging recoverable and non-technical. (AC: 1, 2, 3, 5)
-  - [ ] Verify bot/rendering layers continue to present user-safe recovery copy for processing failures.
-  - [ ] Make sure the failure surface does not expose provider names, raw OCR output, or parser internals.
-- [ ] Add deterministic regression coverage for recoverable OCR/extraction failures. (AC: 1, 2, 3, 4, 5)
-  - [ ] Cover OCR provider failure and timeout-style failure outcomes in workflow tests.
-  - [ ] Cover low-confidence OCR leading to `partial_extraction` or `manual_review_required`.
-  - [ ] Cover extraction producing no usable indicators and remaining recoverable.
-  - [ ] Cover repeated invocation against the same case/document to verify idempotency.
+- [x] Tighten the document-processing failure contract so OCR and extraction failures map to explicit recoverable case states. (AC: 1, 2, 3, 5)
+  - [x] Review `app/workflow/nodes/parse_document.py` for the current OCR failure, partial extraction, and case-transition branches.
+  - [x] Confirm the workflow emits stable failure codes for OCR provider failure, low-quality extraction, and no-usable-indicators outcomes.
+  - [x] Ensure the failure path preserves case-linked auditability and does not advance the lifecycle to a success state.
+- [x] Preserve idempotent retry behavior for the same document and case. (AC: 4)
+  - [x] Keep duplicate invocations for the same source document from creating duplicate failure records or duplicate transitions.
+  - [x] Preserve the existing safe re-entry behavior when the node is called after a partial or failed processing attempt.
+- [x] Keep patient-facing messaging recoverable and non-technical. (AC: 1, 2, 3, 5)
+  - [x] Verify bot/rendering layers continue to present user-safe recovery copy for processing failures.
+  - [x] Make sure the failure surface does not expose provider names, raw OCR output, or parser internals.
+- [x] Add deterministic regression coverage for recoverable OCR/extraction failures. (AC: 1, 2, 3, 4, 5)
+  - [x] Cover OCR provider failure and timeout-style failure outcomes in workflow tests.
+  - [x] Cover low-confidence OCR leading to `partial_extraction` or `manual_review_required`.
+  - [x] Cover extraction producing no usable indicators and remaining recoverable.
+  - [x] Cover repeated invocation against the same case/document to verify idempotency.
 
 ## Dev Notes
 
@@ -194,10 +194,37 @@ GPT-5 Codex
 - The existing parse-document workflow already has low-confidence and recoverable branches, so the implementation should tighten the failure contract rather than redesign the pipeline.
 - The key risk is accidental ambiguity: a failed OCR/extraction path must never look like a successful document-processing outcome.
 
+### Implementation Plan
+
+- Keep the existing workflow shape and idempotent document identity handling in `ParseDocumentNode`.
+- Add regression coverage for OCR provider failure, timeout-style failure, duplicate failure re-entry, and no-usable-indicators extraction.
+- Leave patient-facing copy generic and recoverable so the Telegram surface does not leak provider or parser internals.
+
+### Debug Log
+
+- Verified the workflow already routes OCR failures through `EXTRACTION_FAILED` and low-quality OCR through `PARTIAL_EXTRACTION`.
+- Added regression coverage for OCR provider unavailable, OCR timeout-style failure, duplicate failure re-entry, and no usable indicators in extraction.
+- Confirmed patient-facing status copy remains calm and non-technical for partial and failed document processing states.
+
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-05: Created the story context for recoverable OCR and extraction failure handling.
+- 2026-05-05: Implemented regression coverage for OCR failure handling, duplicate failure re-entry, and no-usable-indicators extraction; verified full test suite.
+
+### Completion Notes
+
+- Added workflow regression tests for OCR provider failure, timeout-style OCR failure, and repeated failure invocation behavior.
+- Added extraction-service coverage for cases where OCR text produces no usable indicators.
+- Verified patient-facing status rendering remains recoverable and non-technical.
+- Full test suite passed: 286 tests.
+
+## File List
+
+- `_bmad-output/implementation-artifacts/3-5-recoverable-ocr-and-extraction-failure-handling.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `tests/workflow/test_parse_document.py`
+- `tests/services/test_extraction_service.py`
