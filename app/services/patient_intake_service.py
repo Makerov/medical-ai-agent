@@ -330,7 +330,13 @@ class PatientIntakeService:
                 case_status=patient_case.status,
             )
 
-        validation_result = self._document_service.validate_document_upload(document)
+        existing_document_count = len(
+            self._case_service.get_case_core_records(patient_case.case_id).documents
+        )
+        validation_result = self._document_service.validate_document_upload(
+            document,
+            existing_document_count=existing_document_count,
+        )
         if not validation_result.is_accepted:
             return self._reject_document_upload(
                 document=document,
