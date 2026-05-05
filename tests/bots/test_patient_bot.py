@@ -227,7 +227,7 @@ def test_handle_patient_start_replies_with_success_message() -> None:
     message.answer.assert_awaited_once()
     reply = message.answer.await_args.args[0]
     reply_markup = message.answer.await_args.kwargs["reply_markup"]
-    assert "Заявка на приём начата." in reply
+    assert "Заявка начата." in reply
     assert "case_patient_001" in reply
     assert SAFETY_BOUNDARY_STATEMENT in reply
     assert HUMAN_REVIEW_STATEMENT in reply
@@ -247,6 +247,14 @@ def test_render_ai_boundary_message_keeps_safety_wording() -> None:
     assert SAFETY_BOUNDARY_STATEMENT in message
     assert HUMAN_REVIEW_STATEMENT in message
     assert "финальное медицинское решение" not in message.lower()
+    assert "диагноз" in message.lower()
+    assert "лечение" in message.lower()
+
+
+def test_patient_intake_copy_stays_short_and_explicit() -> None:
+    assert PATIENT_CONSENT_PROMPT_MESSAGE.startswith("Перед отправкой данных нужно ваше согласие.")
+    assert "ИИ подготавливает информацию для врача" in PATIENT_CONSENT_PROMPT_MESSAGE
+    assert "не ставит диагноз и не назначает лечение" in PATIENT_CONSENT_PROMPT_MESSAGE
 
 
 def test_handle_patient_start_replies_with_safe_failure_message() -> None:

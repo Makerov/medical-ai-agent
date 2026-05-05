@@ -14,6 +14,7 @@ from app.schemas.document import (
 from app.schemas.patient import PatientIntakeField, PatientIntakeMessageKind
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import (
+    ConsentGateStatus,
     PatientIntakeService,
     PatientIntakeStep,
     PreConsentReminderKind,
@@ -90,6 +91,62 @@ def test_pre_consent_input_returns_recoverable_consent_reminder() -> None:
     assert result.reminder_kind == PreConsentReminderKind.CONSENT_REQUIRED
     stored_case = case_service.get_shared_status_view(result.case_id)
     assert stored_case.lifecycle_status == CaseStatus.AWAITING_CONSENT
+
+
+def test_evaluate_consent_gate_routes_missing_consent_back_to_consent() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_gate_001")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+
+    result = intake_service.evaluate_consent_gate(telegram_user_id=123456)
+
+    assert result.case_id == "case_patient_gate_001"
+    assert result.case_status == CaseStatus.AWAITING_CONSENT
+    assert result.gate_status == ConsentGateStatus.MISSING
+    assert result.next_step == PatientIntakeStep.AWAITING_CONSENT
+    assert result.is_allowed is False
+
+
+def test_evaluate_consent_gate_routes_declined_consent_back_to_consent() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_gate_002")
+    intake_service = PatientIntakeService(case_service=case_service)
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.decline_consent(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    result = intake_service.evaluate_consent_gate(telegram_user_id=123456)
+
+    assert result.case_id == start_result.case_id
+    assert result.case_status == CaseStatus.AWAITING_CONSENT
+    assert result.gate_status == ConsentGateStatus.DECLINED
+    assert result.next_step == PatientIntakeStep.AWAITING_CONSENT
+    assert result.is_allowed is False
+
+
+def test_evaluate_consent_gate_allows_progress_after_consent() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_gate_003")
+    intake_service = PatientIntakeService(case_service=case_service)
+    start_result = intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(
+        telegram_user_id=123456,
+        case_id=start_result.case_id,
+    )
+
+    result = intake_service.evaluate_consent_gate(telegram_user_id=123456)
+
+    assert result.case_id == start_result.case_id
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.gate_status == ConsentGateStatus.ALLOWED
+    assert result.next_step == PatientIntakeStep.AWAITING_PROFILE
+    assert result.is_allowed is True
 
 
 def test_accept_consent_transitions_case_and_attaches_linked_consent_record() -> None:
