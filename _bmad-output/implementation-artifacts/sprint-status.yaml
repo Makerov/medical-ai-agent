@@ -61,7 +61,7 @@ development_status:
   3-2-supported-file-validation-and-recoverable-rejection: done
   3-3-operational-ocr-provider-boundary: done
   3-4-structured-medical-extraction-with-provenance-and-confidence: done
-  3-5-recoverable-ocr-and-extraction-failure-handling: ready-for-dev
+  3-5-recoverable-ocr-and-extraction-failure-handling: done
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-operational-retrieval-through-qdrant: backlog
