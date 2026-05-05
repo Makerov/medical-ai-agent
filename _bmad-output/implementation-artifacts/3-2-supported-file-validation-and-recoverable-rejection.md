@@ -1,6 +1,6 @@
 # Story 3.2: Supported File Validation and Recoverable Rejection
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -18,17 +18,17 @@ so that I can correct the upload without corrupting my case.
 
 ## Tasks / Subtasks
 
-- [ ] Tighten backend document-validation rules and rejection reasons. (AC: 1, 3, 4, 5)
-  - [ ] Extend `DocumentService.validate_document_upload` to cover explicit unsupported-file, oversized-file, and invalid-document checks as stable contract cases.
-  - [ ] Add per-case document-count enforcement in backend-owned intake flow, not in the bot handler.
-  - [ ] Keep duplicate/repeated uploads recoverable with a typed result instead of raising or mutating state unpredictably.
-- [ ] Preserve patient-safe rejection rendering in the bot layer. (AC: 2, 5)
-  - [ ] Keep `patient_bot` as a thin adapter that renders typed rejection results only.
-  - [ ] Ensure rejection copy names the supported next action and avoids raw parser, stack-trace, or transport internals.
-- [ ] Add deterministic tests for validation and rejection behavior. (AC: 1, 2, 3, 4, 5)
-  - [ ] Cover supported file types, max-size rejection, invalid-document rejection, and per-case document-count behavior in service tests.
-  - [ ] Cover bot rendering for each rejection reason and duplicate/recoverable handling.
-  - [ ] Verify `operational profile` behavior does not introduce silent fallback semantics.
+- [x] Tighten backend document-validation rules and rejection reasons. (AC: 1, 3, 4, 5)
+  - [x] Extend `DocumentService.validate_document_upload` to cover explicit unsupported-file, oversized-file, and invalid-document checks as stable contract cases.
+  - [x] Add per-case document-count enforcement in backend-owned intake flow, not in the bot handler.
+  - [x] Keep duplicate/repeated uploads recoverable with a typed result instead of raising or mutating state unpredictably.
+- [x] Preserve patient-safe rejection rendering in the bot layer. (AC: 2, 5)
+  - [x] Keep `patient_bot` as a thin adapter that renders typed rejection results only.
+  - [x] Ensure rejection copy names the supported next action and avoids raw parser, stack-trace, or transport internals.
+- [x] Add deterministic tests for validation and rejection behavior. (AC: 1, 2, 3, 4, 5)
+  - [x] Cover supported file types, max-size rejection, invalid-document rejection, and per-case document-count behavior in service tests.
+  - [x] Cover bot rendering for each rejection reason and duplicate/recoverable handling.
+  - [x] Verify `operational profile` behavior does not introduce silent fallback semantics.
 
 ## Dev Notes
 
@@ -166,19 +166,30 @@ GPT-5 Codex
 
 ### Completion Notes
 
-- Created the story context package for supported-file validation and recoverable rejection.
-- Captured the backend validation boundary, patient-safe rejection rendering, and duplicate/recoverable handling expectations.
-- Added implementation guardrails to keep validation backend-owned and prevent scope creep into OCR/extraction work.
+- Implemented backend-owned document validation with explicit unsupported-file, oversized-file, invalid-document, and document-count-limit rejection reasons.
+- Kept duplicate and repeated uploads recoverable, with safe `IN_PROGRESS` handling after an accepted upload and typed rejection outcomes for blocked uploads.
+- Preserved patient-safe bot rendering for every rejection reason and kept the bot layer as a thin adapter over typed service results.
+- Added deterministic service and bot tests covering validation, rejection rendering, duplicate handling, and backend-owned enforcement.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-2-supported-file-validation-and-recoverable-rejection.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `app/bots/messages.py`
+- `app/bots/patient_bot.py`
+- `app/core/settings.py`
+- `app/schemas/document.py`
+- `app/services/document_service.py`
+- `app/services/patient_intake_service.py`
+- `tests/bots/test_patient_bot.py`
+- `tests/services/test_document_service.py`
+- `tests/services/test_patient_intake_service.py`
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-05: Created the story context for supported file validation and recoverable rejection.
+- 2026-05-05: Implemented backend document validation limits, patient-safe rejection rendering, and deterministic tests.
