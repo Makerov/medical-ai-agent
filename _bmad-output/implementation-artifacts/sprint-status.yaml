@@ -49,12 +49,12 @@ development_status:
   1-4-internal-api-and-role-separated-runtime-boundaries: done
   1-5-core-error-contract-for-recoverable-failures: done
   epic-1-retrospective: optional
-  epic-2: in-progress
+  epic-2: done
   2-1-start-intake-through-patient-bot: done
   2-2-ai-boundary-explanation-and-explicit-consent: done
-  2-3-consent-record-for-operational-intake: review
-  2-4-profile-and-consultation-goal-capture-with-anonymized-default: backlog
-  2-5-patient-status-and-deletion-control: backlog
+  2-3-consent-record-for-operational-intake: done
+  2-4-profile-and-consultation-goal-capture-with-anonymized-default: done
+  2-5-patient-status-and-deletion-control: done
   epic-2-retrospective: optional
   epic-3: backlog
   3-1-document-upload-and-processing-dispatch: backlog
