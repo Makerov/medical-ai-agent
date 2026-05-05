@@ -1,6 +1,6 @@
 # Story 3.1: Document Upload and Processing Dispatch
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -16,6 +16,19 @@ so that the backend can start document processing without putting workflow logic
 4. Given the upload dispatch path runs in `operational profile`, when backend processing needs OCR, then it uses the configured real `OCR` provider boundary or the explicit worker boundary, not a silent mock/stub substitution.
 5. Given the upload or dispatch request cannot continue, when the backend returns a failure, then the bot shows a recoverable patient-facing message and does not leak raw stack traces, provider internals, or transport details.
 6. Given the patient bot handles document upload, then it remains a thin adapter and does not own persistence, dispatch, OCR invocation, or lifecycle state transitions directly.
+
+## Tasks / Subtasks
+
+- [x] Keep document upload handling backend-owned and case-linked. (AC: 1, 2, 3, 6)
+  - [x] Forward uploaded document metadata from `patient_bot` into `PatientIntakeService` rather than handling persistence in the bot layer.
+  - [x] Attach accepted uploads to the active `case_id` through backend service logic and transition the case into the document-processing path.
+  - [x] Keep Telegram handlers thin and limited to transport/rendering concerns.
+- [x] Preserve safe, recoverable failure behavior for document upload. (AC: 4, 5)
+  - [x] Keep upload failure handling typed and patient-safe so stack traces and transport details are not exposed.
+  - [x] Keep document-processing orchestration backend-owned so OCR/provider boundaries remain outside the Telegram adapter.
+- [x] Verify the upload path with deterministic tests. (AC: 1, 2, 3, 4, 5, 6)
+  - [x] Run the targeted bot, service, and intake tests covering upload forwarding, document metadata linkage, and recoverable responses.
+  - [x] Run the full test suite after implementation to confirm no regressions.
 
 ## Scope Notes
 
@@ -198,12 +211,20 @@ GPT-5 Codex
 - Captured the backend boundary, case linkage, and thin-adapter requirements for the upload path.
 - Added implementation guardrails for real-provider operational mode and recoverable failure handling.
 - Included latest official framework notes for FastAPI upload handling, aiogram document metadata, Pydantic serialization, and LangGraph compilation behavior.
+- Fixed a pre-existing intake regression so repeat pre-consent prompts now retain the consent token after consent capture.
+- Verified the upload-related tests and the full repository test suite passed after the fix.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-1-document-upload-and-processing-dispatch.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `app/services/patient_intake_service.py`
 
 ## Status
 
-ready-for-dev
+review
+
+## Change Log
+
+- 2026-05-05: Added execution tasks and completion notes for document upload and processing dispatch.
+- 2026-05-05: Fixed consent-token retention in repeat pre-consent handling and verified the full test suite.
