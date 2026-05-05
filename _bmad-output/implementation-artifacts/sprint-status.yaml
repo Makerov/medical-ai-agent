@@ -1,5 +1,5 @@
 # generated: 2026-05-02T18:37:20+0600
-# last_updated: 2026-05-04T16:00:00+0600
+# last_updated: 2026-05-05T00:00:00+0600
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -42,12 +42,12 @@ tracking_system: file-system
 story_location: /Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts
 
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-runtime-scaffold-and-process-topology: done
   1-2-case-lifecycle-and-stable-identity-model: done
   1-3-environment-secret-and-runtime-profile-handling: done
-  1-4-internal-api-and-role-separated-runtime-boundaries: backlog
-  1-5-core-error-contract-for-recoverable-failures: backlog
+  1-4-internal-api-and-role-separated-runtime-boundaries: done
+  1-5-core-error-contract-for-recoverable-failures: done
   epic-1-retrospective: optional
   epic-2: backlog
   2-1-start-intake-through-patient-bot: backlog
