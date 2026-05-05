@@ -437,6 +437,123 @@ def test_parse_document_marks_failure_without_exposing_raw_error_details() -> No
     )
 
 
+def test_parse_document_maps_ocr_provider_unavailable_to_recoverable_failure() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_003_unavailable")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_003_unavailable",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_003_unavailable",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    def unavailable_parser(document_bytes: bytes, payload: DocumentUploadMetadata) -> tuple[str, float]:
+        raise RuntimeError("provider unavailable: maintenance window")
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=unavailable_parser,
+        clock=lambda: now,
+    )
+    node = ParseDocumentNode(case_service=case_service, ocr_client=client)
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.case_status == CaseStatus.EXTRACTION_FAILED
+    assert result.is_recoverable_failure is True
+    assert result.failure_code == "ocr_processing_failed"
+    assert result.failure_message == "Не удалось обработать документ."
+    assert "maintenance" not in result.failure_message.lower()
+    assert case_service.get_case_core_records(patient_case.case_id).extractions == ()
+    assert case_service.get_case_core_records(patient_case.case_id).patient_case.status == (
+        CaseStatus.EXTRACTION_FAILED
+    )
+
+
+def test_parse_document_maps_timeout_style_ocr_failure_to_recoverable_failure() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_003_timeout")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_003_timeout",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_003_timeout",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    def timeout_parser(document_bytes: bytes, payload: DocumentUploadMetadata) -> tuple[str, float]:
+        raise RuntimeError("request timed out after 30 seconds")
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=timeout_parser,
+        clock=lambda: now,
+    )
+    node = ParseDocumentNode(case_service=case_service, ocr_client=client)
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.case_status == CaseStatus.EXTRACTION_FAILED
+    assert result.is_recoverable_failure is True
+    assert result.failure_code == "ocr_processing_failed"
+    assert "timed out" not in result.failure_message.lower()
+    assert case_service.get_case_core_records(patient_case.case_id).patient_case.status == (
+        CaseStatus.EXTRACTION_FAILED
+    )
+
+
+def test_parse_document_is_idempotent_for_repeated_failure_execution() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_003_repeat")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_003_repeat",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_003_repeat",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+
+    client = OCRClient(
+        document_bytes_fetcher=lambda _: b"raw document bytes",
+        document_parser=lambda _bytes, _document: ("", 0.9),
+        clock=lambda: now,
+    )
+    node = ParseDocumentNode(case_service=case_service, ocr_client=client)
+
+    first_result = node.parse_document(case_id=patient_case.case_id, document=document)
+    second_result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert first_result.failure_code == "ocr_processing_failed"
+    assert second_result.failure_code == "processing_state_unavailable"
+    assert second_result.was_duplicate is False
+    assert len(case_service.get_case_extraction_records(patient_case.case_id)) == 0
+    assert case_service.get_case_core_records(patient_case.case_id).patient_case.status == (
+        CaseStatus.EXTRACTION_FAILED
+    )
+
+
 def test_parse_document_returns_recoverable_failure_when_document_reference_is_missing() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
     case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_missing_ref")
