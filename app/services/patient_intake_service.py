@@ -173,6 +173,7 @@ class PatientIntakeService:
         if session.active_step == PatientIntakeStep.CONSENT_CAPTURED:
             return PreConsentGateResult(
                 case_id=patient_case.case_id,
+                consent_token=self._ensure_consent_token(patient_case.case_id),
                 case_status=patient_case.status,
                 active_step=PatientIntakeStep.CONSENT_CAPTURED,
                 reminder_kind=PreConsentReminderKind.CONSENT_ALREADY_CAPTURED,
