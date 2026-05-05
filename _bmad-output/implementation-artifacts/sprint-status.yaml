@@ -57,7 +57,7 @@ development_status:
   2-5-patient-status-and-deletion-control: done
   epic-2-retrospective: optional
   epic-3: in-progress
-  3-1-document-upload-and-processing-dispatch: ready-for-dev
+  3-1-document-upload-and-processing-dispatch: done
   3-2-supported-file-validation-and-recoverable-rejection: backlog
   3-3-operational-ocr-provider-boundary: backlog
   3-4-structured-medical-extraction-with-provenance-and-confidence: backlog
