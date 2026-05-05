@@ -10,11 +10,14 @@ from app.bots.keyboards import (
     CASE_DELETE_CONFIRM_CALLBACK_PREFIX,
     CONSENT_ACCEPT_CALLBACK_PREFIX,
     CONSENT_DECLINE_CALLBACK_PREFIX,
+    DOCUMENTS_DONE_CALLBACK,
+    DOCUMENTS_MORE_CALLBACK,
     build_ai_boundary_keyboard,
     build_case_deletion_keyboard,
+    build_documents_decision_keyboard,
     build_consent_keyboard,
     extract_case_id_from_case_deletion_callback,
-    extract_case_id_from_consent_callback,
+    extract_consent_token_from_consent_callback,
 )
 from app.bots.messages import (
     PATIENT_INTAKE_FAILED_MESSAGE,
@@ -26,13 +29,14 @@ from app.bots.messages import (
     render_case_deletion_result_message,
     render_consent_result_message,
     render_consent_step_message,
+    PATIENT_DOCUMENTS_DECISION_MESSAGE,
     render_document_upload_message,
     render_patient_intake_message,
     render_patient_status_message,
 )
 from app.core.settings import Settings, get_settings
 from app.schemas.case import CaseStatus
-from app.schemas.document import DocumentUploadMetadata
+from app.schemas.document import DocumentUploadMetadata, DocumentUploadMessageKind
 from app.schemas.patient import PatientIntakeMessageKind
 from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
@@ -85,6 +89,20 @@ def _build_document_metadata(message: Message) -> DocumentUploadMetadata:
     )
 
 
+def _build_photo_metadata(message: Message) -> DocumentUploadMetadata:
+    photo = getattr(message, "photo", None)
+    if not photo:
+        raise ValueError("Photo payload is missing")
+    largest_photo = photo[-1]
+    return DocumentService.normalize_document_metadata(
+        file_id=largest_photo.file_id,
+        file_name=None,
+        mime_type="image/jpeg",
+        file_size=largest_photo.file_size,
+        file_unique_id=largest_photo.file_unique_id,
+    )
+
+
 def _is_deleted_case_status(case_status: CaseStatus) -> bool:
     return case_status in {CaseStatus.DELETION_REQUESTED, CaseStatus.DELETED}
 
@@ -125,7 +143,7 @@ async def handle_ai_boundary_continue(
     if callback.message is not None:
         await callback.message.answer(
             render_consent_step_message(gate_result),
-            reply_markup=build_consent_keyboard(case_id=gate_result.case_id),
+            reply_markup=build_consent_keyboard(consent_token=gate_result.consent_token),
         )
 
 
@@ -135,8 +153,11 @@ async def handle_consent_accept(
 ) -> None:
     try:
         telegram_user_id = callback.from_user.id if getattr(callback, "from_user", None) else None
-        case_id = extract_case_id_from_consent_callback(getattr(callback, "data", None))
-        if telegram_user_id is None or case_id is None:
+        consent_token = extract_consent_token_from_consent_callback(getattr(callback, "data", None))
+        if telegram_user_id is None or consent_token is None:
+            raise ValueError
+        case_id = intake_service.resolve_consent_token(consent_token)
+        if case_id is None:
             raise ValueError
         case_service = getattr(intake_service, "case_service", None)
         if case_service is not None:
@@ -172,8 +193,11 @@ async def handle_consent_decline(
 ) -> None:
     try:
         telegram_user_id = callback.from_user.id if getattr(callback, "from_user", None) else None
-        case_id = extract_case_id_from_consent_callback(getattr(callback, "data", None))
-        if telegram_user_id is None or case_id is None:
+        consent_token = extract_consent_token_from_consent_callback(getattr(callback, "data", None))
+        if telegram_user_id is None or consent_token is None:
+            raise ValueError
+        case_id = intake_service.resolve_consent_token(consent_token)
+        if case_id is None:
             raise ValueError
         case_service = getattr(intake_service, "case_service", None)
         if case_service is not None:
@@ -195,9 +219,12 @@ async def handle_consent_decline(
 
     await callback.answer()
     if callback.message is not None:
+        consent_token = intake_service.resolve_consent_token_by_case_id(capture_result.case_id)
+        if consent_token is None:
+            raise ValueError("Missing consent token for case")
         await callback.message.answer(
             render_consent_result_message(capture_result),
-            reply_markup=build_consent_keyboard(case_id=capture_result.case_id),
+            reply_markup=build_consent_keyboard(consent_token=consent_token),
         )
 
 
@@ -290,10 +317,17 @@ async def handle_patient_message(
         return
 
     reply_markup = (
-        build_consent_keyboard(case_id=update_result.case_id)
+        build_consent_keyboard(
+            consent_token=(
+                intake_service.resolve_consent_token_by_case_id(update_result.case_id)
+                or ""
+            ),
+        )
         if update_result.message_kind == PatientIntakeMessageKind.CONSENT_REQUIRED
         else None
     )
+    if update_result.message_kind == PatientIntakeMessageKind.GOAL_SAVED:
+        reply_markup = build_documents_decision_keyboard()
     await message.answer(
         render_patient_intake_message(update_result),
         reply_markup=reply_markup,
@@ -318,6 +352,36 @@ async def handle_document_upload(
         return
 
     await message.answer(render_document_upload_message(upload_result))
+    if upload_result.message_kind == DocumentUploadMessageKind.ACCEPTED:
+        await message.answer(
+            PATIENT_DOCUMENTS_DECISION_MESSAGE,
+            reply_markup=build_documents_decision_keyboard(),
+        )
+
+
+async def handle_photo_upload(
+    message: MessageResponder,
+    intake_service: PatientIntakeService,
+) -> None:
+    try:
+        telegram_user_id = message.from_user.id if getattr(message, "from_user", None) else None
+        if telegram_user_id is None:
+            raise ValueError
+        photo_metadata = _build_photo_metadata(message)  # type: ignore[arg-type]
+        upload_result = intake_service.handle_document_upload(
+            telegram_user_id=telegram_user_id,
+            document=photo_metadata,
+        )
+    except Exception:  # noqa: BLE001 - recoverable adapter boundary
+        await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
+        return
+
+    await message.answer(render_document_upload_message(upload_result))
+    if upload_result.message_kind == DocumentUploadMessageKind.ACCEPTED:
+        await message.answer(
+            PATIENT_DOCUMENTS_DECISION_MESSAGE,
+            reply_markup=build_documents_decision_keyboard(),
+        )
 
 
 async def handle_patient_status(
@@ -367,6 +431,10 @@ def build_patient_router(
     async def document_handler(message: Message) -> None:
         await handle_document_upload(message, intake_service)
 
+    @router.message(lambda message: bool(getattr(message, "photo", None)))
+    async def photo_handler(message: Message) -> None:
+        await handle_photo_upload(message, intake_service)
+
     @router.callback_query(lambda callback: callback.data == AI_BOUNDARY_CONTINUE_CALLBACK)
     async def continue_to_consent_handler(callback: CallbackQuery) -> None:
         await handle_ai_boundary_continue(callback, intake_service)
@@ -384,6 +452,22 @@ def build_patient_router(
     )
     async def consent_decline_handler(callback: CallbackQuery) -> None:
         await handle_consent_decline(callback, intake_service)
+
+    @router.callback_query(lambda callback: callback.data == DOCUMENTS_MORE_CALLBACK)
+    async def documents_more_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.answer(
+                "Хорошо. Отправьте следующий медицинский документ файлом в этот чат."
+            )
+
+    @router.callback_query(lambda callback: callback.data == DOCUMENTS_DONE_CALLBACK)
+    async def documents_done_handler(callback: CallbackQuery) -> None:
+        await callback.answer()
+        if callback.message is not None:
+            await callback.message.answer(
+                "Понял. Я передам обращение врачу после обработки уже загруженных материалов."
+            )
 
     @router.callback_query(
         lambda callback: bool(callback.data)
