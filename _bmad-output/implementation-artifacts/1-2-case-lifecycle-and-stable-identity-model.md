@@ -1,6 +1,6 @@
 # Story 1.2: Case Lifecycle and Stable Identity Model
 
-Status: review
+Status: done
 
 ## Story
 
