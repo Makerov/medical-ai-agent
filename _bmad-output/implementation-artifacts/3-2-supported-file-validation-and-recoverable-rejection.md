@@ -1,6 +1,6 @@
 # Story 3.2: Supported File Validation and Recoverable Rejection
 
-Status: review
+Status: done
 
 ## Story
 
