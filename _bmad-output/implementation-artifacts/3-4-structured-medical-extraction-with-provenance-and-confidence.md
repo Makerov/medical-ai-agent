@@ -1,6 +1,6 @@
 # Story 3.4: Structured Medical Extraction with Provenance and Confidence
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -37,18 +37,18 @@ So that I can understand what was found and how reliable it is before reading th
 
 ## Tasks / Subtasks
 
-- [ ] Tighten the structured extraction contract so provenance and confidence are always explicit. (AC: 1, 2, 3, 4, 5)
-  - [ ] Review `OCRTextExtractionResult`, `CaseExtractionRecord`, `StructuredMedicalIndicator`, and `CaseIndicatorExtractionRecord` for any missing provenance or confidence fields.
-  - [ ] Keep provider name, source document reference, extraction reference, extracted timestamp, and confidence available in the typed model path.
-  - [ ] Ensure invalid or incomplete structured output fails validation rather than being persisted as a success.
-- [ ] Preserve uncertainty semantics in indicator building. (AC: 2, 5)
-  - [ ] Keep reliable indicators strict about value, unit, and source linkage.
-  - [ ] Keep uncertain indicators explicit with `is_uncertain`, `uncertainty_reason`, and `missing_fields`.
-  - [ ] Make sure partially inferred facts are not promoted into grounded downstream data.
-- [ ] Add deterministic regression tests for provenance, confidence, and uncertainty handling. (AC: 1, 2, 3, 4, 5)
-  - [ ] Cover typed validation of structured extraction payloads.
-  - [ ] Cover reliable versus uncertain indicator creation from the same extraction text.
-  - [ ] Cover provider-name retention and case-linkage validation.
+- [x] Tighten the structured extraction contract so provenance and confidence are always explicit. (AC: 1, 2, 3, 4, 5)
+  - [x] Review `OCRTextExtractionResult`, `CaseExtractionRecord`, `StructuredMedicalIndicator`, and `CaseIndicatorExtractionRecord` for any missing provenance or confidence fields.
+  - [x] Keep provider name, source document reference, extraction reference, extracted timestamp, and confidence available in the typed model path.
+  - [x] Ensure invalid or incomplete structured output fails validation rather than being persisted as a success.
+- [x] Preserve uncertainty semantics in indicator building. (AC: 2, 5)
+  - [x] Keep reliable indicators strict about value, unit, and source linkage.
+  - [x] Keep uncertain indicators explicit with `is_uncertain`, `uncertainty_reason`, and `missing_fields`.
+  - [x] Make sure partially inferred facts are not promoted into grounded downstream data.
+- [x] Add deterministic regression tests for provenance, confidence, and uncertainty handling. (AC: 1, 2, 3, 4, 5)
+  - [x] Cover typed validation of structured extraction payloads.
+  - [x] Cover reliable versus uncertain indicator creation from the same extraction text.
+  - [x] Cover provider-name retention and case-linkage validation.
 
 ## Dev Notes
 
@@ -188,12 +188,15 @@ GPT-5 Codex
 
 ### Completion Notes
 
-- Story context created for structured medical extraction with provenance and confidence.
-- Implementation has not started yet.
+- Tightened the structured extraction contract with regression coverage for provider retention, case linkage, and timezone-aware validation.
+- Preserved explicit uncertainty semantics for reliable versus uncertain indicator records.
+- Verified the full test suite with `uv run pytest` and confirmed all 282 tests pass.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/3-4-structured-medical-extraction-with-provenance-and-confidence.md`
+- `tests/schemas/test_extraction.py`
+- `tests/schemas/test_indicator.py`
 
 ## Status
 
@@ -202,3 +205,4 @@ ready-for-dev
 ## Change Log
 
 - 2026-05-05: Created the story context for structured medical extraction with provenance and confidence.
+- 2026-05-05: Added regression coverage for structured extraction provenance, confidence, and uncertainty handling; marked story ready for review.
