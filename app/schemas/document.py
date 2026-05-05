@@ -15,6 +15,7 @@ class DocumentUploadRejectionReasonCode(StrEnum):
     UNSUPPORTED_FILE_TYPE = "unsupported_file_type"
     FILE_TOO_LARGE = "file_too_large"
     INVALID_DOCUMENT = "invalid_document"
+    DOCUMENT_COUNT_LIMIT_EXCEEDED = "document_count_limit_exceeded"
 
 
 class DocumentUploadMetadata(BaseModel):
@@ -38,6 +39,7 @@ class DocumentUploadMetadata(BaseModel):
 class DocumentUploadValidationContext(BaseModel):
     supported_mime_types: tuple[str, ...] = ()
     configured_max_file_size_bytes: int | None = None
+    configured_max_documents_per_case: int | None = None
     file_name: str | None = None
     mime_type: str | None = None
     file_size: int | None = None

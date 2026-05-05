@@ -17,6 +17,7 @@ class DocumentService:
             mime_type.lower() for mime_type in self._settings.document_upload_supported_mime_types
         )
         self._max_file_size_bytes = self._settings.document_upload_max_file_size_bytes
+        self._max_documents_per_case = self._settings.document_upload_max_documents_per_case
 
     @staticmethod
     def normalize_document_metadata(
@@ -57,10 +58,13 @@ class DocumentService:
     def validate_document_upload(
         self,
         document: DocumentUploadMetadata,
+        *,
+        existing_document_count: int = 0,
     ) -> DocumentUploadValidationResult:
         validation_context = DocumentUploadValidationContext(
             supported_mime_types=self._supported_mime_types,
             configured_max_file_size_bytes=self._max_file_size_bytes,
+            configured_max_documents_per_case=self._max_documents_per_case,
             file_name=document.file_name,
             mime_type=document.mime_type,
             file_size=document.file_size,
@@ -84,6 +88,13 @@ class DocumentService:
             return DocumentUploadValidationResult(
                 is_accepted=False,
                 rejection_reason_code=DocumentUploadRejectionReasonCode.FILE_TOO_LARGE,
+                validation_context=validation_context,
+            )
+
+        if existing_document_count >= self._max_documents_per_case:
+            return DocumentUploadValidationResult(
+                is_accepted=False,
+                rejection_reason_code=DocumentUploadRejectionReasonCode.DOCUMENT_COUNT_LIMIT_EXCEEDED,
                 validation_context=validation_context,
             )
 

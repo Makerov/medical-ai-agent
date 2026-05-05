@@ -103,6 +103,7 @@ def test_settings_parse_runtime_profile_and_database_url(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("RUNTIME_PROFILE", " OPERATIONAL ")
     monkeypatch.setenv("DATABASE_URL", "postgresql://localhost:5432/medical")
+    monkeypatch.setenv("OCR_PROVIDER_NAME", "real-provider")
 
     try:
         settings = get_settings()
@@ -125,6 +126,18 @@ def test_settings_parse_doctor_bot_and_hf_tokens(monkeypatch) -> None:
 
     assert settings.doctor_bot_token == "demo-doctor-token"
     assert settings.hf_token == "demo-hf-token"
+
+
+def test_settings_parse_ocr_provider_name(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("OCR_PROVIDER_NAME", " real-provider ")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.ocr_provider_name == "real-provider"
 
 
 def test_settings_parse_document_upload_supported_mime_types(monkeypatch) -> None:
@@ -171,9 +184,30 @@ def test_settings_reject_empty_artifact_root_dir(monkeypatch) -> None:
 def test_settings_reject_missing_operational_runtime_configuration(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("RUNTIME_PROFILE", "operational")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://localhost:5432/medical")
+    monkeypatch.setenv("HF_TOKEN", "demo-hf-token")
+    monkeypatch.setenv("DOCTOR_BOT_TOKEN", "demo-doctor-token")
+    monkeypatch.setenv("PATIENT_BOT_TOKEN", "demo-patient-token")
+    monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
 
     try:
         with pytest.raises(ValueError, match="Operational profile requires configured runtime settings"):
+            get_settings()
+    finally:
+        get_settings.cache_clear()
+
+
+def test_settings_reject_missing_operational_ocr_provider_configuration(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("RUNTIME_PROFILE", "operational")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://localhost:5432/medical")
+    monkeypatch.setenv("HF_TOKEN", "demo-hf-token")
+    monkeypatch.setenv("DOCTOR_BOT_TOKEN", "demo-doctor-token")
+    monkeypatch.setenv("PATIENT_BOT_TOKEN", "demo-patient-token")
+    monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
+
+    try:
+        with pytest.raises(ValueError, match="OCR_PROVIDER_NAME"):
             get_settings()
     finally:
         get_settings.cache_clear()

@@ -9,8 +9,6 @@ from app.bots.keyboards import (
     AI_BOUNDARY_CONTINUE_CALLBACK,
     CONSENT_ACCEPT_CALLBACK_PREFIX,
     CONSENT_DECLINE_CALLBACK_PREFIX,
-    DOCUMENTS_DONE_CALLBACK,
-    DOCUMENTS_MORE_CALLBACK,
     build_case_deletion_callback_data,
     build_consent_callback_data,
     build_documents_decision_keyboard,
@@ -20,9 +18,9 @@ from app.bots.messages import (
     PATIENT_CONSENT_DECLINED_MESSAGE,
     PATIENT_CONSENT_PROMPT_MESSAGE,
     PATIENT_DELETION_CANCELLED_MESSAGE,
-    PATIENT_DOCUMENTS_DECISION_MESSAGE,
     PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE,
     PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE,
+    PATIENT_DOCUMENTS_DECISION_MESSAGE,
     PATIENT_GOAL_INVALID_MESSAGE,
     PATIENT_GOAL_SAVED_MESSAGE,
     PATIENT_INTAKE_FAILED_MESSAGE,
@@ -46,10 +44,10 @@ from app.bots.patient_bot import (
     handle_consent_accept,
     handle_consent_decline,
     handle_document_upload,
-    handle_photo_upload,
     handle_patient_message,
     handle_patient_start,
     handle_patient_status,
+    handle_photo_upload,
 )
 from app.schemas.case import (
     CaseRecordKind,
@@ -372,7 +370,9 @@ def test_handle_document_upload_replies_with_accepted_message_and_forwards_metad
     assert message.answer.await_count == 2
     assert message.answer.await_args_list[0].args[0] == PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
     assert message.answer.await_args_list[1].args[0] == PATIENT_DOCUMENTS_DECISION_MESSAGE
-    assert message.answer.await_args_list[1].kwargs["reply_markup"] == build_documents_decision_keyboard()
+    assert message.answer.await_args_list[1].kwargs["reply_markup"] == (
+        build_documents_decision_keyboard()
+    )
 
 
 def test_handle_photo_upload_replies_with_accepted_message_and_forwards_metadata() -> None:
@@ -515,6 +515,19 @@ def test_render_document_upload_message_uses_recoverable_copy() -> None:
             ),
         }
     )
+    count_limited = accepted.model_copy(
+        update={
+            "message_kind": DocumentUploadMessageKind.REJECTED,
+            "rejection_reason_code": (
+                DocumentUploadRejectionReasonCode.DOCUMENT_COUNT_LIMIT_EXCEEDED
+            ),
+            "validation_context": DocumentUploadValidationContext(
+                supported_mime_types=("application/pdf", "image/jpeg", "image/png"),
+                configured_max_file_size_bytes=20_000_000,
+                configured_max_documents_per_case=1,
+            ),
+        }
+    )
 
     assert render_document_upload_message(accepted) == PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
     assert (
@@ -529,6 +542,9 @@ def test_render_document_upload_message_uses_recoverable_copy() -> None:
     assert "Файл слишком большой" in oversized_message
     assert "20 МБ" in oversized_message
     assert "не смог проверить файл".lower() in invalid_message.lower()
+    count_limited_message = render_document_upload_message(count_limited)
+    assert "достаточно документов" in count_limited_message
+    assert "1 документ" in count_limited_message
 
 
 def test_handle_ai_boundary_continue_answers_callback_and_shows_consent_step() -> None:

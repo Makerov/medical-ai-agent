@@ -43,8 +43,10 @@ class ParseDocumentNode:
         settings: Settings | None = None,
     ) -> None:
         self._case_service = case_service
-        self._ocr_client = ocr_client or OCRClient()
         self._settings = settings or get_settings()
+        self._ocr_client = ocr_client or OCRClient(
+            provider_name=self._settings.ocr_provider_name or "provider_agnostic",
+        )
 
     def parse_document(
         self,

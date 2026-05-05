@@ -14,12 +14,13 @@ from app.bots.keyboards import (
     DOCUMENTS_MORE_CALLBACK,
     build_ai_boundary_keyboard,
     build_case_deletion_keyboard,
-    build_documents_decision_keyboard,
     build_consent_keyboard,
+    build_documents_decision_keyboard,
     extract_case_id_from_case_deletion_callback,
     extract_consent_token_from_consent_callback,
 )
 from app.bots.messages import (
+    PATIENT_DOCUMENTS_DECISION_MESSAGE,
     PATIENT_INTAKE_FAILED_MESSAGE,
     PATIENT_STATUS_DELETED_MESSAGE,
     PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE,
@@ -29,14 +30,13 @@ from app.bots.messages import (
     render_case_deletion_result_message,
     render_consent_result_message,
     render_consent_step_message,
-    PATIENT_DOCUMENTS_DECISION_MESSAGE,
     render_document_upload_message,
     render_patient_intake_message,
     render_patient_status_message,
 )
 from app.core.settings import Settings, get_settings
 from app.schemas.case import CaseStatus
-from app.schemas.document import DocumentUploadMetadata, DocumentUploadMessageKind
+from app.schemas.document import DocumentUploadMessageKind, DocumentUploadMetadata
 from app.schemas.patient import PatientIntakeMessageKind
 from app.services.audit_service import AuditService
 from app.services.case_service import CaseService

@@ -35,6 +35,8 @@ class Settings(BaseSettings):
         "image/png",
     )
     document_upload_max_file_size_bytes: int = TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES
+    document_upload_max_documents_per_case: int = 1
+    ocr_provider_name: str | None = None
     patient_bot_token: str | None = None
     doctor_bot_token: str | None = None
     debug_admin_static_token: str | None = None
@@ -103,6 +105,25 @@ class Settings(BaseSettings):
             )
             raise ValueError(msg)
         return value
+
+    @field_validator("document_upload_max_documents_per_case")
+    @classmethod
+    def validate_document_upload_max_documents_per_case(cls, value: int) -> int:
+        if value <= 0:
+            msg = "DOCUMENT_UPLOAD_MAX_DOCUMENTS_PER_CASE must be greater than zero"
+            raise ValueError(msg)
+        return value
+
+    @field_validator("ocr_provider_name", mode="before")
+    @classmethod
+    def normalize_ocr_provider_name(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        msg = "OCR_PROVIDER_NAME must be a string"
+        raise ValueError(msg)
 
     @field_validator("debug_admin_static_token", mode="before")
     @classmethod
@@ -222,6 +243,8 @@ class Settings(BaseSettings):
             missing.append("DOCTOR_BOT_TOKEN")
         if not self.patient_bot_token:
             missing.append("PATIENT_BOT_TOKEN")
+        if not self.ocr_provider_name:
+            missing.append("OCR_PROVIDER_NAME")
         if not self.qdrant_url:
             missing.append("QDRANT_URL")
         if missing:

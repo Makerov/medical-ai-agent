@@ -117,6 +117,35 @@ def test_validate_document_upload_rejects_invalid_metadata() -> None:
     assert result.validation_context.mime_type is None
 
 
+def test_validate_document_upload_rejects_when_case_document_limit_is_exceeded() -> None:
+    service = DocumentService(
+        settings=Settings(
+            document_upload_supported_mime_types=(
+                "application/pdf",
+                "image/jpeg",
+                "image/png",
+            ),
+            document_upload_max_file_size_bytes=20_000_000,
+            document_upload_max_documents_per_case=1,
+        )
+    )
+    document = DocumentUploadMetadata(
+        file_id="file_005",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+    )
+
+    result = service.validate_document_upload(document, existing_document_count=1)
+
+    assert result.is_accepted is False
+    assert result.rejection_reason_code == (
+        DocumentUploadRejectionReasonCode.DOCUMENT_COUNT_LIMIT_EXCEEDED
+    )
+    assert result.validation_context is not None
+    assert result.validation_context.configured_max_documents_per_case == 1
+
+
 def test_build_document_reference_falls_back_to_file_id_when_unique_id_is_missing() -> None:
     service = DocumentService(
         settings=Settings(

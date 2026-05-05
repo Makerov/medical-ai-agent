@@ -1025,3 +1025,57 @@ def test_handle_document_upload_is_idempotent_for_repeated_unsupported_file() ->
     assert second_result.case_status == CaseStatus.COLLECTING_INTAKE
     assert second_result.validation_context == first_result.validation_context
     assert case_service.get_case_core_records("case_patient_upload_006").documents == ()
+
+
+def test_handle_document_upload_rejects_when_case_document_limit_is_already_reached() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_007")
+    intake_service = PatientIntakeService(case_service=case_service)
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(telegram_user_id=123456, case_id="case_patient_upload_007")
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+
+    first_document = DocumentUploadMetadata(
+        file_id="file_007a",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+        file_unique_id="unique_007a",
+    )
+    case_service.attach_case_record_reference(
+        intake_service._document_service.build_document_reference(
+            case_id="case_patient_upload_007",
+            document_metadata=first_document,
+            created_at=now,
+        )
+    )
+
+    result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=DocumentUploadMetadata(
+            file_id="file_007b",
+            file_name="scan-2.pdf",
+            mime_type="application/pdf",
+            file_size=1024,
+            file_unique_id="unique_007b",
+        ),
+    )
+
+    assert result.case_id == "case_patient_upload_007"
+    assert result.case_status == CaseStatus.COLLECTING_INTAKE
+    assert result.message_kind == DocumentUploadMessageKind.REJECTED
+    assert result.rejection_reason_code == (
+        DocumentUploadRejectionReasonCode.DOCUMENT_COUNT_LIMIT_EXCEEDED
+    )
+    assert result.validation_context is not None
+    assert result.validation_context.configured_max_documents_per_case == 1
+    assert result.document_record is None
+    assert len(case_service.get_case_core_records("case_patient_upload_007").documents) == 1
