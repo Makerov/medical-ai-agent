@@ -29,8 +29,8 @@ from app.services.patient_intake_service import (
 )
 
 PATIENT_INTAKE_STARTED_MESSAGE = (
-    "Заявка на приём начата.\n\n"
-    "Ваша заявка создана. Сначала коротко объясню роль ИИ перед согласием."
+    "Заявка начата.\n\n"
+    "Сначала коротко объясню роль ИИ."
 )
 
 PATIENT_INTAKE_FAILED_MESSAGE = (
@@ -44,13 +44,11 @@ PATIENT_STATUS_NO_ACTIVE_CASE_MESSAGE = (
 PATIENT_AI_BOUNDARY_MESSAGE = (
     f"{SAFETY_BOUNDARY_SENTENCES[0]}\n"
     f"{SAFETY_BOUNDARY_SENTENCES[1]}\n\n"
-    "Перед отправкой личных данных и документов сначала подтвердите согласие."
+    "Если согласны, продолжим к согласию."
 )
 
 PATIENT_CONSENT_PROMPT_MESSAGE = (
     "Перед отправкой данных нужно ваше согласие.\n\n"
-    "Мы соберем только demo-данные для intake: профиль и жалобы, "
-    "чтобы подготовить материалы для врача.\n"
     f"{SAFETY_BOUNDARY_SENTENCES[0]}\n"
     f"{SAFETY_BOUNDARY_SENTENCES[1]}\n\n"
     "Выберите один вариант ниже."
