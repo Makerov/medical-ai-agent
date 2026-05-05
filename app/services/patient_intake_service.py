@@ -41,6 +41,12 @@ class PreConsentReminderKind(StrEnum):
     CONSENT_ALREADY_CAPTURED = "consent_already_captured"
 
 
+class ConsentGateStatus(StrEnum):
+    ALLOWED = "allowed"
+    MISSING = "missing"
+    DECLINED = "declined"
+
+
 class PatientIntakeStartResult(BaseModel):
     case_id: str = Field(min_length=1)
     case_status: CaseStatus
@@ -55,6 +61,16 @@ class PreConsentGateResult(BaseModel):
     case_status: CaseStatus
     active_step: PatientIntakeStep
     reminder_kind: PreConsentReminderKind
+
+    model_config = ConfigDict(frozen=True)
+
+
+class ConsentGateResult(BaseModel):
+    case_id: str = Field(min_length=1)
+    case_status: CaseStatus
+    gate_status: ConsentGateStatus
+    next_step: PatientIntakeStep
+    is_allowed: bool
 
     model_config = ConfigDict(frozen=True)
 
@@ -499,6 +515,33 @@ class PatientIntakeService:
             case_status=patient_case.status,
             active_step=active_step,
             reminder_kind=PreConsentReminderKind.CONSENT_REQUIRED,
+        )
+
+    def evaluate_consent_gate(self, *, telegram_user_id: int) -> ConsentGateResult:
+        session = self._require_pre_consent_session(telegram_user_id)
+        patient_case = self._case_service.get_case_core_records(session.case_id).patient_case
+        if session.last_consent_outcome == ConsentOutcome.ACCEPTED:
+            return ConsentGateResult(
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                gate_status=ConsentGateStatus.ALLOWED,
+                next_step=PatientIntakeStep.AWAITING_PROFILE,
+                is_allowed=True,
+            )
+        if session.last_consent_outcome == ConsentOutcome.DECLINED:
+            return ConsentGateResult(
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                gate_status=ConsentGateStatus.DECLINED,
+                next_step=PatientIntakeStep.AWAITING_CONSENT,
+                is_allowed=False,
+            )
+        return ConsentGateResult(
+            case_id=patient_case.case_id,
+            case_status=patient_case.status,
+            gate_status=ConsentGateStatus.MISSING,
+            next_step=PatientIntakeStep.AWAITING_CONSENT,
+            is_allowed=False,
         )
 
     @staticmethod
