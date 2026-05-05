@@ -60,7 +60,7 @@ development_status:
   3-1-document-upload-and-processing-dispatch: done
   3-2-supported-file-validation-and-recoverable-rejection: done
   3-3-operational-ocr-provider-boundary: done
-  3-4-structured-medical-extraction-with-provenance-and-confidence: ready-for-dev
+  3-4-structured-medical-extraction-with-provenance-and-confidence: review
   3-5-recoverable-ocr-and-extraction-failure-handling: backlog
   epic-3-retrospective: optional
   epic-4: backlog
