@@ -35,6 +35,7 @@ class Settings(BaseSettings):
         "image/png",
     )
     document_upload_max_file_size_bytes: int = TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES
+    document_upload_max_documents_per_case: int = 1
     patient_bot_token: str | None = None
     doctor_bot_token: str | None = None
     debug_admin_static_token: str | None = None
@@ -101,6 +102,14 @@ class Settings(BaseSettings):
                 "DOCUMENT_UPLOAD_MAX_FILE_SIZE_BYTES must not exceed the Telegram file download "
                 f"limit of {TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES} bytes"
             )
+            raise ValueError(msg)
+        return value
+
+    @field_validator("document_upload_max_documents_per_case")
+    @classmethod
+    def validate_document_upload_max_documents_per_case(cls, value: int) -> int:
+        if value <= 0:
+            msg = "DOCUMENT_UPLOAD_MAX_DOCUMENTS_PER_CASE must be greater than zero"
             raise ValueError(msg)
         return value
 
