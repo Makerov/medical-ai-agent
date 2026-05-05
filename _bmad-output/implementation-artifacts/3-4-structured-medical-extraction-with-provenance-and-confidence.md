@@ -1,6 +1,6 @@
 # Story 3.4: Structured Medical Extraction with Provenance and Confidence
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,29 +10,29 @@ So that I can understand what was found and how reliable it is before reading th
 
 ## Acceptance Criteria
 
-1. **Given** OCR or parsed text is available for a supported document  
-   **When** structured extraction runs  
-   **Then** extracted indicators include value, unit, relevant reference context, provenance to the source document, and confidence markers  
+1. **Given** OCR or parsed text is available for a supported document
+   **When** structured extraction runs
+   **Then** extracted indicators include value, unit, relevant reference context, provenance to the source document, and confidence markers
    **And** invalid structured output is rejected rather than stored as success.
 
-2. **Given** extraction returns incomplete or uncertain fields  
-   **When** the result is persisted  
-   **Then** those fields are explicitly marked uncertain or omitted from grounded downstream use  
+2. **Given** extraction returns incomplete or uncertain fields
+   **When** the result is persisted
+   **Then** those fields are explicitly marked uncertain or omitted from grounded downstream use
    **And** the system does not pretend the document was fully understood.
 
-3. **Given** the runtime is in `operational profile`  
-   **When** extraction is performed  
-   **Then** the backend preserves the configured provider name and case-linked provenance on the extraction record and on derived indicator records  
+3. **Given** the runtime is in `operational profile`
+   **When** extraction is performed
+   **Then** the backend preserves the configured provider name and case-linked provenance on the extraction record and on derived indicator records
    **And** no bot layer invents extraction details outside backend-owned services.
 
-4. **Given** structured extraction produces data that is missing required shape, timezone, or case linkage  
-   **When** the backend validates the result  
-   **Then** the invalid payload is rejected as a typed failure  
+4. **Given** structured extraction produces data that is missing required shape, timezone, or case linkage
+   **When** the backend validates the result
+   **Then** the invalid payload is rejected as a typed failure
    **And** the case keeps its previous safe state instead of storing a false success.
 
-5. **Given** extraction confidence is below the configured threshold or a field is partially inferred  
-   **When** indicators are built  
-   **Then** the record marks the indicator uncertain with a stable reason and missing-field metadata  
+5. **Given** extraction confidence is below the configured threshold or a field is partially inferred
+   **When** indicators are built
+   **Then** the record marks the indicator uncertain with a stable reason and missing-field metadata
    **And** only confidently grounded indicators are promoted to reliable downstream use.
 
 ## Tasks / Subtasks
