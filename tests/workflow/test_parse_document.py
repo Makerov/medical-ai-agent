@@ -73,6 +73,9 @@ def test_parse_document_transitions_case_and_attaches_extraction_reference() -> 
     assert case_service.get_case_core_records(patient_case.case_id).extractions == (
         result.extraction_reference,
     )
+    assert case_service.get_case_extraction_records(patient_case.case_id)[0].provider_name == (
+        "stub"
+    )
     assert (
         case_service.get_case_core_records(patient_case.case_id).patient_case.status
         == CaseStatus.PROCESSING_DOCUMENTS
