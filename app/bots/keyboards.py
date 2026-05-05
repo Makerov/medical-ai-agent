@@ -5,6 +5,8 @@ CONSENT_ACCEPT_CALLBACK_PREFIX = "patient_intake:accept_consent"
 CONSENT_DECLINE_CALLBACK_PREFIX = "patient_intake:decline_consent"
 CASE_DELETE_CONFIRM_CALLBACK_PREFIX = "patient_intake:confirm_delete"
 CASE_DELETE_CANCEL_CALLBACK_PREFIX = "patient_intake:cancel_delete"
+DOCUMENTS_MORE_CALLBACK = "patient_intake:more_documents"
+DOCUMENTS_DONE_CALLBACK = "patient_intake:transfer_to_doctor"
 
 
 def build_ai_boundary_keyboard() -> InlineKeyboardMarkup:
@@ -20,23 +22,23 @@ def build_ai_boundary_keyboard() -> InlineKeyboardMarkup:
     )
 
 
-def build_consent_callback_data(*, action: str, case_id: str) -> str:
+def build_consent_callback_data(*, action: str, consent_token: str) -> str:
     if action == "accept":
-        return f"{CONSENT_ACCEPT_CALLBACK_PREFIX}:{case_id}"
+        return f"{CONSENT_ACCEPT_CALLBACK_PREFIX}:{consent_token}"
     if action == "decline":
-        return f"{CONSENT_DECLINE_CALLBACK_PREFIX}:{case_id}"
+        return f"{CONSENT_DECLINE_CALLBACK_PREFIX}:{consent_token}"
     msg = "Unsupported consent callback action"
     raise ValueError(msg)
 
 
-def extract_case_id_from_consent_callback(data: str | None) -> str | None:
+def extract_consent_token_from_consent_callback(data: str | None) -> str | None:
     if data is None:
         return None
     for prefix in (CONSENT_ACCEPT_CALLBACK_PREFIX, CONSENT_DECLINE_CALLBACK_PREFIX):
         if not data.startswith(f"{prefix}:"):
             continue
-        case_id = data.removeprefix(f"{prefix}:")
-        return case_id or None
+        consent_token = data.removeprefix(f"{prefix}:")
+        return consent_token or None
     return None
 
 
@@ -60,7 +62,7 @@ def extract_case_id_from_case_deletion_callback(data: str | None) -> str | None:
     return None
 
 
-def build_consent_keyboard(*, case_id: str) -> InlineKeyboardMarkup:
+def build_consent_keyboard(*, consent_token: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -68,14 +70,14 @@ def build_consent_keyboard(*, case_id: str) -> InlineKeyboardMarkup:
                     text="Подтвердить согласие",
                     callback_data=build_consent_callback_data(
                         action="accept",
-                        case_id=case_id,
+                        consent_token=consent_token,
                     ),
                 ),
                 InlineKeyboardButton(
                     text="Отказаться",
                     callback_data=build_consent_callback_data(
                         action="decline",
-                        case_id=case_id,
+                        consent_token=consent_token,
                     ),
                 ),
             ]
@@ -100,6 +102,23 @@ def build_case_deletion_keyboard(*, case_id: str) -> InlineKeyboardMarkup:
                         action="cancel",
                         case_id=case_id,
                     ),
+                ),
+            ]
+        ]
+    )
+
+
+def build_documents_decision_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="Еще есть документы",
+                    callback_data=DOCUMENTS_MORE_CALLBACK,
+                ),
+                InlineKeyboardButton(
+                    text="Передать врачу",
+                    callback_data=DOCUMENTS_DONE_CALLBACK,
                 ),
             ]
         ]
