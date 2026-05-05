@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import StrEnum
+from secrets import token_urlsafe
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -49,6 +50,7 @@ class ConsentGateStatus(StrEnum):
 
 class PatientIntakeStartResult(BaseModel):
     case_id: str = Field(min_length=1)
+    consent_token: str = Field(min_length=1)
     case_status: CaseStatus
     next_step: str = Field(min_length=1)
     active_step: PatientIntakeStep
@@ -58,6 +60,7 @@ class PatientIntakeStartResult(BaseModel):
 
 class PreConsentGateResult(BaseModel):
     case_id: str = Field(min_length=1)
+    consent_token: str = Field(min_length=1)
     case_status: CaseStatus
     active_step: PatientIntakeStep
     reminder_kind: PreConsentReminderKind
@@ -107,6 +110,7 @@ class PatientIntakeService:
         self._audit_service = audit_service
         self._pre_consent_steps: dict[int, IntakeSessionState] = {}
         self._intake_payloads: dict[str, PatientIntakePayload] = {}
+        self._consent_tokens: dict[str, str] = {}
 
     @property
     def case_service(self) -> CaseService:
@@ -135,18 +139,22 @@ class PatientIntakeService:
                     CaseStatus.AWAITING_CONSENT,
                     CaseStatus.COLLECTING_INTAKE,
                 }:
-                    return self._to_start_result(active_case)
+                    return self._to_start_result(
+                        active_case,
+                        consent_token=self._ensure_consent_token(active_case.case_id),
+                    )
         patient_case = self._case_service.create_case()
         transitioned_case = self._case_service.transition_case(
             patient_case.case_id,
             CaseStatus.AWAITING_CONSENT,
         )
+        consent_token = self._ensure_consent_token(transitioned_case.case_id)
         if telegram_user_id is not None:
             self._pre_consent_steps[telegram_user_id] = IntakeSessionState(
                 case_id=transitioned_case.case_id,
                 active_step=PatientIntakeStep.SHOW_AI_BOUNDARY,
             )
-        return self._to_start_result(transitioned_case)
+        return self._to_start_result(transitioned_case, consent_token=consent_token)
 
     def mark_ai_boundary_shown(self, *, telegram_user_id: int) -> PreConsentGateResult:
         session = self._require_pre_consent_session(telegram_user_id)
@@ -213,6 +221,15 @@ class PatientIntakeService:
             last_consent_outcome=ConsentOutcome.DECLINED,
         )
         return result
+
+    def resolve_consent_token(self, consent_token: str) -> str | None:
+        return self._consent_tokens.get(consent_token)
+
+    def resolve_consent_token_by_case_id(self, case_id: str) -> str | None:
+        for consent_token, mapped_case_id in self._consent_tokens.items():
+            if mapped_case_id == case_id:
+                return consent_token
+        return None
 
     def handle_patient_message(
         self,
@@ -455,9 +472,14 @@ class PatientIntakeService:
         )
 
     @staticmethod
-    def _to_start_result(patient_case: PatientCase) -> PatientIntakeStartResult:
+    def _to_start_result(
+        patient_case: PatientCase,
+        *,
+        consent_token: str,
+    ) -> PatientIntakeStartResult:
         return PatientIntakeStartResult(
             case_id=patient_case.case_id,
+            consent_token=consent_token,
             case_status=patient_case.status,
             next_step=PatientIntakeStep.SHOW_AI_BOUNDARY,
             active_step=PatientIntakeStep.SHOW_AI_BOUNDARY,
@@ -512,10 +534,19 @@ class PatientIntakeService:
         )
         return PreConsentGateResult(
             case_id=patient_case.case_id,
+            consent_token=self._ensure_consent_token(patient_case.case_id),
             case_status=patient_case.status,
             active_step=active_step,
             reminder_kind=PreConsentReminderKind.CONSENT_REQUIRED,
         )
+
+    def _ensure_consent_token(self, case_id: str) -> str:
+        for existing_token, existing_case_id in self._consent_tokens.items():
+            if existing_case_id == case_id:
+                return existing_token
+        consent_token = token_urlsafe(8)
+        self._consent_tokens[consent_token] = case_id
+        return consent_token
 
     def evaluate_consent_gate(self, *, telegram_user_id: int) -> ConsentGateResult:
         session = self._require_pre_consent_session(telegram_user_id)
