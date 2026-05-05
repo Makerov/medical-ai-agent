@@ -9,14 +9,18 @@ from app.bots.keyboards import (
     AI_BOUNDARY_CONTINUE_CALLBACK,
     CONSENT_ACCEPT_CALLBACK_PREFIX,
     CONSENT_DECLINE_CALLBACK_PREFIX,
+    DOCUMENTS_DONE_CALLBACK,
+    DOCUMENTS_MORE_CALLBACK,
     build_case_deletion_callback_data,
     build_consent_callback_data,
+    build_documents_decision_keyboard,
 )
 from app.bots.messages import (
     PATIENT_CONSENT_ACCEPTED_MESSAGE,
     PATIENT_CONSENT_DECLINED_MESSAGE,
     PATIENT_CONSENT_PROMPT_MESSAGE,
     PATIENT_DELETION_CANCELLED_MESSAGE,
+    PATIENT_DOCUMENTS_DECISION_MESSAGE,
     PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE,
     PATIENT_DOCUMENT_UPLOAD_IN_PROGRESS_MESSAGE,
     PATIENT_GOAL_INVALID_MESSAGE,
@@ -42,6 +46,7 @@ from app.bots.patient_bot import (
     handle_consent_accept,
     handle_consent_decline,
     handle_document_upload,
+    handle_photo_upload,
     handle_patient_message,
     handle_patient_start,
     handle_patient_status,
@@ -86,10 +91,12 @@ class FakeMessage:
         user_id: int | None = 123,
         text: str | None = None,
         document: object | None = None,
+        photo: object | None = None,
     ) -> None:
         self.from_user = SimpleNamespace(id=user_id) if user_id is not None else None
         self.text = text
         self.document = document
+        self.photo = photo
         self.answer = AsyncMock()
 
 
@@ -134,6 +141,7 @@ class FakeIntakeService:
         self.document_calls: list[tuple[int, DocumentUploadMetadata]] = []
         self.prompt_calls: list[tuple[int, str | None]] = []
         self.deletion_calls: list[tuple[int, str]] = []
+        self._consent_token_by_case_id = {"case_patient_001": "token_001"}
 
     def start_intake(self, *, telegram_user_id: int | None = None) -> PatientIntakeStartResult:
         self.calls.append(telegram_user_id)
@@ -195,6 +203,14 @@ class FakeIntakeService:
     def get_active_case_id(self, telegram_user_id: int) -> str | None:
         return self.active_case_id
 
+    def resolve_consent_token(self, consent_token: str) -> str | None:
+        if consent_token == "token_001":
+            return "case_patient_001"
+        return None
+
+    def resolve_consent_token_by_case_id(self, case_id: str) -> str | None:
+        return self._consent_token_by_case_id.get(case_id)
+
     def decline_consent(self, *, telegram_user_id: int, case_id: str) -> ConsentCaptureResult:
         self.decline_calls.append((telegram_user_id, case_id))
         if self.error is not None:
@@ -215,6 +231,7 @@ def test_handle_patient_start_replies_with_success_message() -> None:
     service = FakeIntakeService(
         result=PatientIntakeStartResult(
             case_id="case_patient_001",
+            consent_token="token_001",
             case_status=CaseStatus.AWAITING_CONSENT,
             next_step="show_ai_boundary",
             active_step=PatientIntakeStep.SHOW_AI_BOUNDARY,
@@ -237,6 +254,7 @@ def test_handle_patient_start_replies_with_success_message() -> None:
 def test_render_ai_boundary_message_keeps_safety_wording() -> None:
     result = PatientIntakeStartResult(
         case_id="case_patient_001",
+        consent_token="token_001",
         case_status=CaseStatus.AWAITING_CONSENT,
         next_step="show_ai_boundary",
         active_step=PatientIntakeStep.SHOW_AI_BOUNDARY,
@@ -274,25 +292,29 @@ def test_handle_patient_start_replies_with_safe_failure_message() -> None:
 def test_build_patient_router_registers_command_start_handler() -> None:
     router = build_patient_router(FakeIntakeService())
 
-    assert len(router.message.handlers) == 6
+    assert len(router.message.handlers) == 7
     start_handler = router.message.handlers[0]
     status_handler = router.message.handlers[1]
     delete_handler = router.message.handlers[2]
     delete_case_handler = router.message.handlers[3]
     document_handler = router.message.handlers[4]
-    message_handler = router.message.handlers[5]
-    assert len(router.callback_query.handlers) == 5
+    photo_handler = router.message.handlers[5]
+    message_handler = router.message.handlers[6]
+    assert len(router.callback_query.handlers) == 7
     assert start_handler.callback.__name__ == "start_handler"
     assert status_handler.callback.__name__ == "status_handler"
     assert delete_handler.callback.__name__ == "delete_handler"
     assert delete_case_handler.callback.__name__ == "delete_case_handler"
     assert document_handler.callback.__name__ == "document_handler"
+    assert photo_handler.callback.__name__ == "photo_handler"
     assert message_handler.callback.__name__ == "patient_message_handler"
     assert router.callback_query.handlers[0].callback.__name__ == "continue_to_consent_handler"
     assert router.callback_query.handlers[1].callback.__name__ == "consent_accept_handler"
     assert router.callback_query.handlers[2].callback.__name__ == "consent_decline_handler"
-    assert router.callback_query.handlers[3].callback.__name__ == "case_delete_confirm_handler"
-    assert router.callback_query.handlers[4].callback.__name__ == "case_delete_cancel_handler"
+    assert router.callback_query.handlers[3].callback.__name__ == "documents_more_handler"
+    assert router.callback_query.handlers[4].callback.__name__ == "documents_done_handler"
+    assert router.callback_query.handlers[5].callback.__name__ == "case_delete_confirm_handler"
+    assert router.callback_query.handlers[6].callback.__name__ == "case_delete_cancel_handler"
     assert any(
         isinstance(filter_.callback, CommandStart)
         for filter_ in start_handler.filters
@@ -347,7 +369,56 @@ def test_handle_document_upload_replies_with_accepted_message_and_forwards_metad
             ),
         )
     ]
-    message.answer.assert_awaited_once_with(PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE)
+    assert message.answer.await_count == 2
+    assert message.answer.await_args_list[0].args[0] == PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
+    assert message.answer.await_args_list[1].args[0] == PATIENT_DOCUMENTS_DECISION_MESSAGE
+    assert message.answer.await_args_list[1].kwargs["reply_markup"] == build_documents_decision_keyboard()
+
+
+def test_handle_photo_upload_replies_with_accepted_message_and_forwards_metadata() -> None:
+    photo_sizes = [
+        SimpleNamespace(file_id="photo_small", file_size=1024, file_unique_id="uniq_small"),
+        SimpleNamespace(file_id="photo_large", file_size=2048, file_unique_id="uniq_large"),
+    ]
+    message = FakeMessage(photo=photo_sizes)
+    service = FakeIntakeService(
+        document_result=DocumentUploadResult(
+            case_id="case_patient_021b",
+            case_status=CaseStatus.DOCUMENTS_UPLOADED,
+            message_kind=DocumentUploadMessageKind.ACCEPTED,
+            document_metadata=DocumentUploadMetadata(
+                file_id="photo_large",
+                file_name=None,
+                mime_type="image/jpeg",
+                file_size=2048,
+                file_unique_id="uniq_large",
+            ),
+            document_record=CaseRecordReference(
+                case_id="case_patient_021b",
+                record_kind=CaseRecordKind.DOCUMENT,
+                record_id="telegram_document:uniq_large",
+                created_at=datetime(2026, 4, 28, 6, 0, tzinfo=UTC),
+            ),
+        )
+    )
+
+    asyncio.run(handle_photo_upload(message, service))
+
+    assert service.document_calls == [
+        (
+            123,
+            DocumentUploadMetadata(
+                file_id="photo_large",
+                file_name=None,
+                mime_type="image/jpeg",
+                file_size=2048,
+                file_unique_id="uniq_large",
+            ),
+        )
+    ]
+    assert message.answer.await_count == 2
+    assert message.answer.await_args_list[0].args[0] == PATIENT_DOCUMENT_UPLOAD_ACCEPTED_MESSAGE
+    assert message.answer.await_args_list[1].args[0] == PATIENT_DOCUMENTS_DECISION_MESSAGE
 
 
 def test_handle_document_upload_replies_with_reason_specific_rejection_message() -> None:
@@ -465,6 +536,7 @@ def test_handle_ai_boundary_continue_answers_callback_and_shows_consent_step() -
     service = FakeIntakeService(
         gate_result=PreConsentGateResult(
             case_id="case_patient_001",
+            consent_token="token_001",
             case_status=CaseStatus.AWAITING_CONSENT,
             active_step=PatientIntakeStep.AWAITING_CONSENT,
             reminder_kind=PreConsentReminderKind.CONSENT_REQUIRED,
@@ -480,17 +552,17 @@ def test_handle_ai_boundary_continue_answers_callback_and_shows_consent_step() -
     reply_markup = callback.message.answer.await_args.kwargs["reply_markup"]
     assert reply_markup.inline_keyboard[0][0].callback_data == build_consent_callback_data(
         action="accept",
-        case_id="case_patient_001",
+        consent_token="token_001",
     )
     assert reply_markup.inline_keyboard[0][1].callback_data == build_consent_callback_data(
         action="decline",
-        case_id="case_patient_001",
+        consent_token="token_001",
     )
 
 
 def test_handle_consent_accept_answers_callback_and_shows_acceptance_message() -> None:
     callback = FakeCallbackQuery()
-    callback.data = build_consent_callback_data(action="accept", case_id="case_patient_001")
+    callback.data = build_consent_callback_data(action="accept", consent_token="token_001")
     service = FakeIntakeService(
         accept_result=ConsentCaptureResult(
             case_id="case_patient_001",
@@ -520,7 +592,7 @@ def test_handle_consent_accept_answers_callback_and_shows_acceptance_message() -
 
 def test_handle_consent_decline_answers_callback_and_shows_refusal_message() -> None:
     callback = FakeCallbackQuery()
-    callback.data = build_consent_callback_data(action="decline", case_id="case_patient_001")
+    callback.data = build_consent_callback_data(action="decline", consent_token="token_001")
     service = FakeIntakeService(
         decline_result=ConsentCaptureResult(
             case_id="case_patient_001",
@@ -540,11 +612,11 @@ def test_handle_consent_decline_answers_callback_and_shows_refusal_message() -> 
     reply_markup = callback.message.answer.await_args.kwargs["reply_markup"]
     assert reply_markup.inline_keyboard[0][0].callback_data == build_consent_callback_data(
         action="accept",
-        case_id="case_patient_001",
+        consent_token="token_001",
     )
     assert reply_markup.inline_keyboard[0][1].callback_data == build_consent_callback_data(
         action="decline",
-        case_id="case_patient_001",
+        consent_token="token_001",
     )
 
 
@@ -568,11 +640,11 @@ def test_handle_patient_message_before_consent_returns_consent_reminder_with_key
     reply_markup = message.answer.await_args.kwargs["reply_markup"]
     assert reply_markup.inline_keyboard[0][0].callback_data == build_consent_callback_data(
         action="accept",
-        case_id="case_patient_001",
+        consent_token="token_001",
     )
     assert reply_markup.inline_keyboard[0][1].callback_data == build_consent_callback_data(
         action="decline",
-        case_id="case_patient_001",
+        consent_token="token_001",
     )
 
 
@@ -605,7 +677,9 @@ def test_handle_patient_message_can_render_goal_success_confirmation() -> None:
 
     asyncio.run(handle_patient_message(message, service))
 
-    message.answer.assert_awaited_once_with(PATIENT_GOAL_SAVED_MESSAGE, reply_markup=None)
+    message.answer.assert_awaited_once()
+    assert message.answer.await_args.args[0] == PATIENT_GOAL_SAVED_MESSAGE
+    assert message.answer.await_args.kwargs["reply_markup"] == build_documents_decision_keyboard()
 
 
 def test_handle_patient_message_after_completion_returns_next_step_pending_message() -> None:
