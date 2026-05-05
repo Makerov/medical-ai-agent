@@ -151,3 +151,24 @@ def test_extract_indicators_is_idempotent_for_repeated_execution() -> None:
     assert len(case_service.get_case_core_records(patient_case.case_id).indicators) == 1
     assert first_result is not None
     assert len(first_result.uncertain_indicators) == 1
+
+
+def test_extract_indicators_returns_none_when_text_has_no_usable_indicators() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_indicator_005")
+    patient_case = case_service.create_case()
+    extraction_record = _build_extraction_record(
+        case_id=patient_case.case_id,
+        now=now,
+        extracted_text="free text without structured facts",
+    )
+    service = ExtractionService(case_service=case_service)
+
+    indicator_record = service.extract_indicators(
+        case_id=patient_case.case_id,
+        extraction_record=extraction_record,
+    )
+
+    assert indicator_record is None
+    assert case_service.get_case_indicator_records(patient_case.case_id) == ()
+    assert case_service.get_case_core_records(patient_case.case_id).indicators == ()
