@@ -351,3 +351,60 @@ def test_case_indicator_extraction_record_rejects_wrong_reference_kind() -> None
             indicators=(),
             extracted_at=now,
         )
+
+
+def test_case_indicator_extraction_record_retains_provider_and_uncertainty_metadata() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    source_reference = CaseRecordReference(
+        case_id="case_001",
+        record_kind=CaseRecordKind.DOCUMENT,
+        record_id="document_001",
+        created_at=now,
+    )
+    raw_extraction_reference = CaseRecordReference(
+        case_id="case_001",
+        record_kind=CaseRecordKind.EXTRACTION,
+        record_id="extraction_001",
+        created_at=now,
+    )
+    indicator_reference = CaseRecordReference(
+        case_id="case_001",
+        record_kind=CaseRecordKind.INDICATOR,
+        record_id="structured_indicator:document_001",
+        created_at=now,
+    )
+    document = DocumentUploadMetadata(
+        file_id="file_001",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_001",
+    )
+    uncertain_indicator = StructuredMedicalIndicator(
+        case_id="case_001",
+        name="Glucose",
+        value=5.6,
+        unit=None,
+        confidence=0.74,
+        source_document_reference=source_reference,
+        extracted_at=now,
+        provider_name="stub",
+        is_uncertain=True,
+        uncertainty_reason="missing_unit",
+        missing_fields=("unit",),
+    )
+
+    record = CaseIndicatorExtractionRecord(
+        case_id="case_001",
+        source_document=document,
+        source_document_reference=source_reference,
+        raw_extraction_reference=raw_extraction_reference,
+        indicator_reference=indicator_reference,
+        uncertain_indicators=(uncertain_indicator,),
+        extracted_at=now,
+        provider_name="stub",
+    )
+
+    assert record.provider_name == "stub"
+    assert record.uncertain_indicators[0].uncertainty_reason == "missing_unit"
+    assert record.uncertain_indicators[0].missing_fields == ("unit",)

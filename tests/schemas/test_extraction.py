@@ -5,7 +5,11 @@ from pydantic import ValidationError
 
 from app.schemas.case import CaseRecordKind, CaseRecordReference
 from app.schemas.document import DocumentUploadMetadata
-from app.schemas.extraction import StructuredExtractionExampleSet
+from app.schemas.extraction import (
+    CaseExtractionRecord,
+    OCRTextExtractionResult,
+    StructuredExtractionExampleSet,
+)
 from app.schemas.indicator import StructuredMedicalIndicator
 
 
@@ -128,5 +132,48 @@ def test_structured_extraction_example_set_rejects_invalid_reliable_subset() -> 
             ),
             uncertain_indicators=(),
             extracted_at=datetime(2026, 5, 1, 6, 1, tzinfo=UTC),
+            provider_name="synthetic_operational_verification_fixture",
+        )
+
+
+def test_case_extraction_record_retains_provider_name_and_case_linkage() -> None:
+    now = datetime(2026, 5, 1, 6, 0, tzinfo=UTC)
+    source_document = DocumentUploadMetadata(
+        file_id="demo_lab_panel_pdf",
+        file_name="synthetic-lab-panel.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="demo_lab_panel_pdf_v1",
+    )
+    extraction_record = CaseExtractionRecord(
+        case_id="case_operational_verification_ready",
+        source_document=source_document,
+        source_document_reference=_build_document_reference(),
+        extraction_reference=_build_extraction_reference(),
+        extracted_text="Hemoglobin: 13.5 g/dL",
+        confidence=0.91,
+        extracted_at=now,
+        provider_name="synthetic_operational_verification_fixture",
+    )
+
+    assert extraction_record.provider_name == "synthetic_operational_verification_fixture"
+    assert extraction_record.source_document_reference.case_id == extraction_record.case_id
+
+
+def test_ocr_text_extraction_result_rejects_naive_timestamp() -> None:
+    source_document = DocumentUploadMetadata(
+        file_id="demo_lab_panel_pdf",
+        file_name="synthetic-lab-panel.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="demo_lab_panel_pdf_v1",
+    )
+
+    with pytest.raises(ValidationError, match="timezone-aware"):
+        OCRTextExtractionResult(
+            source_document=source_document,
+            extracted_text="Hemoglobin: 13.5 g/dL",
+            confidence=0.91,
+            extracted_at=datetime(2026, 5, 1, 6, 0),
             provider_name="synthetic_operational_verification_fixture",
         )
