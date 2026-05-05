@@ -283,6 +283,13 @@ def _render_document_upload_rejection_message(result: DocumentUploadResult) -> s
                 f"Пришлите {_render_document_supported_formats(result.validation_context)} "
                 "меньшего размера."
             )
+        case DocumentUploadRejectionReasonCode.DOCUMENT_COUNT_LIMIT_EXCEEDED:
+            limit = _render_document_count_limit(result.validation_context)
+            return (
+                "Для этой заявки уже загружено достаточно документов.\n"
+                f"Лимит сейчас {limit}.\n"
+                "Если это повторная отправка, подождите обработки текущего файла."
+            )
     msg = f"Unsupported document rejection reason code: {result.rejection_reason_code}"
     raise ValueError(msg)
 
@@ -299,6 +306,19 @@ def _render_document_size_limit(
     if limit_in_mb.is_integer():
         return f"{int(limit_in_mb)} МБ"
     return f"{limit_in_mb:.1f}".rstrip("0").rstrip(".") + " МБ"
+
+
+def _render_document_count_limit(
+    validation_context: DocumentUploadValidationContext | None,
+) -> str:
+    max_documents = (
+        validation_context.configured_max_documents_per_case if validation_context else None
+    )
+    if not isinstance(max_documents, int) or max_documents <= 0:
+        return "установленный лимит"
+    if max_documents == 1:
+        return "1 документ"
+    return f"{max_documents} документов"
 
 
 def _render_document_supported_formats(
