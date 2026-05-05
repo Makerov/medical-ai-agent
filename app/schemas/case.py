@@ -176,8 +176,21 @@ class CaseTransitionError(Exception):
         self.case_id = case_id
         self.from_status = from_status
         self.to_status = to_status
-        self.details = details
+        self.details = details or {}
         super().__init__(code)
+
+    def to_public_error(self) -> dict[str, object]:
+        error: dict[str, object] = {
+            "code": self.code,
+            "case_id": self.case_id,
+            "from_status": self.from_status.value if isinstance(self.from_status, CaseStatus) else None,
+            "to_status": self.to_status.value if isinstance(self.to_status, CaseStatus) else self.to_status,
+            "details": self.details,
+        }
+        return error
+
+    def __str__(self) -> str:
+        return self.code
 
 
 class HandoffBlockingReason(BaseModel):

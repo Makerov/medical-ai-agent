@@ -88,6 +88,15 @@ def test_transition_case_rejects_invalid_transition_with_domain_error() -> None:
     assert error.case_id == patient_case.case_id
     assert error.from_status == CaseStatus.DRAFT
     assert error.to_status == CaseStatus.READY_FOR_DOCTOR
+    assert error.details == {}
+    assert error.to_public_error() == {
+        "code": "invalid_case_transition",
+        "case_id": patient_case.case_id,
+        "from_status": "draft",
+        "to_status": "ready_for_doctor",
+        "details": {},
+    }
+    assert str(error) == "invalid_case_transition"
 
 
 def test_transition_case_rejects_unknown_status_with_domain_error() -> None:
@@ -104,6 +113,14 @@ def test_transition_case_rejects_unknown_status_with_domain_error() -> None:
     assert error.code == "invalid_case_status"
     assert error.case_id == patient_case.case_id
     assert error.to_status == "not_a_status"
+    assert error.details == {}
+    assert error.to_public_error() == {
+        "code": "invalid_case_status",
+        "case_id": patient_case.case_id,
+        "from_status": None,
+        "to_status": "not_a_status",
+        "details": {},
+    }
 
 
 def test_create_case_rejects_naive_clock_timestamp() -> None:
@@ -153,6 +170,7 @@ def test_create_case_rejects_duplicate_case_id() -> None:
     assert error.code == "duplicate_case_id"
     assert error.case_id == "case_duplicate"
     assert error.to_status == CaseStatus.DRAFT
+    assert error.details == {}
 
 
 def test_transition_case_rejects_unknown_case_with_domain_error() -> None:
@@ -161,8 +179,16 @@ def test_transition_case_rejects_unknown_case_with_domain_error() -> None:
     with pytest.raises(CaseTransitionError) as exc_info:
         service.transition_case("case_missing", CaseStatus.AWAITING_CONSENT)
 
-    assert exc_info.value.code == "case_not_found"
-    assert exc_info.value.case_id == "case_missing"
+    error = exc_info.value
+    assert error.code == "case_not_found"
+    assert error.case_id == "case_missing"
+    assert error.to_public_error() == {
+        "code": "case_not_found",
+        "case_id": "case_missing",
+        "from_status": None,
+        "to_status": "awaiting_consent",
+        "details": {},
+    }
 
 
 def test_transition_case_uses_monotonic_clock_values_without_mutating_original() -> None:
@@ -238,6 +264,7 @@ def test_attach_case_record_reference_rejects_mismatched_case_id() -> None:
     assert error.code == "case_record_case_id_mismatch"
     assert error.case_id == patient_case.case_id
     assert error.to_status == "case_other"
+    assert error.details == {}
 
 
 def test_attach_case_record_reference_rejects_empty_explicit_case_id() -> None:
