@@ -56,7 +56,7 @@ development_status:
   2-4-profile-and-consultation-goal-capture-with-anonymized-default: done
   2-5-patient-status-and-deletion-control: done
   epic-2-retrospective: optional
-  epic-3: in-progress
+  epic-3: done
   3-1-document-upload-and-processing-dispatch: done
   3-2-supported-file-validation-and-recoverable-rejection: done
   3-3-operational-ocr-provider-boundary: done
