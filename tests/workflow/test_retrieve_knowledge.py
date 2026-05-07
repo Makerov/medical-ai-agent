@@ -84,6 +84,7 @@ class FakeRAGService:
             indicator=RetrievalIndicatorContext.from_indicator(_build_indicator()),
             matches=(_build_entry(),),
             grounded=True,
+            status="grounded",
             reason=None,
             retrieved_at=datetime(2026, 5, 1, 9, 0, tzinfo=UTC),
         )
