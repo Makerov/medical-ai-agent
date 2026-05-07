@@ -1,7 +1,17 @@
 import asyncio
 from unittest.mock import AsyncMock
 
-from app.bots.doctor_bot import send_doctor_ready_case_delivery
+import pytest
+
+from app.bots.doctor_bot import (
+    build_doctor_bot,
+    build_doctor_dispatcher,
+    get_doctor_bot_runtime_status,
+    run_doctor_bot,
+    send_doctor_case_card_delivery,
+    send_doctor_ready_case_delivery,
+)
+from app.core.settings import Settings
 from app.bots.messages import (
     DOCTOR_CASE_CARD_ACCESS_DENIED_MESSAGE,
     DOCTOR_CASE_CARD_HEADER,
@@ -32,6 +42,55 @@ from app.schemas.rag import DoctorFacingQuestion
 class FakeBot:
     def __init__(self) -> None:
         self.send_message = AsyncMock()
+
+
+def test_doctor_runtime_reports_not_ready_when_token_allowlist_or_backend_missing() -> None:
+    settings = Settings(
+        doctor_bot_token=None,
+        doctor_telegram_id_allowlist=(),
+        database_url=None,
+    )
+
+    runtime_status = get_doctor_bot_runtime_status(settings)
+
+    assert runtime_status.status == "not-ready"
+    assert runtime_status.missing_dependencies == (
+        "DOCTOR_BOT_TOKEN",
+        "DOCTOR_TELEGRAM_ID_ALLOWLIST",
+        "DATABASE_URL",
+    )
+    assert runtime_status.reason == "Doctor bot runtime is missing required configuration."
+
+
+def test_doctor_runtime_reports_ready_when_required_configuration_exists() -> None:
+    settings = Settings(
+        doctor_bot_token="demo-doctor-token",
+        doctor_telegram_id_allowlist=(123456,),
+        database_url="postgresql://localhost:5432/medical",
+    )
+
+    runtime_status = get_doctor_bot_runtime_status(settings)
+
+    assert runtime_status.status == "ready"
+    assert runtime_status.missing_dependencies == ()
+    assert runtime_status.reason is None
+
+
+def test_build_doctor_bot_requires_token() -> None:
+    settings = Settings(
+        doctor_bot_token=None,
+        doctor_telegram_id_allowlist=(123456,),
+        database_url="postgresql://localhost:5432/medical",
+    )
+
+    with pytest.raises(RuntimeError, match="DOCTOR_BOT_TOKEN is required"):
+        build_doctor_bot(settings)
+
+
+def test_build_doctor_dispatcher_is_separate_from_patient_runtime() -> None:
+    dispatcher = build_doctor_dispatcher()
+
+    assert dispatcher is not None
 
 
 def test_render_doctor_ready_case_notification_message_is_minimal() -> None:

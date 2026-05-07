@@ -10,10 +10,14 @@ COMPOSE_PATH = PROJECT_ROOT / "docker-compose.yml"
 
 def test_runtime_scaffold_exposes_required_backend_boundaries() -> None:
     assert callable(app_main.run)
+    assert callable(doctor_bot.build_doctor_bot)
+    assert callable(doctor_bot.build_doctor_dispatcher)
     assert callable(patient_bot.build_patient_router)
     assert callable(patient_bot.run)
     assert callable(doctor_bot.send_doctor_ready_case_delivery)
     assert callable(doctor_bot.send_doctor_case_card_delivery)
+    assert callable(doctor_bot.get_doctor_bot_runtime_status)
+    assert callable(doctor_bot.run_doctor_bot)
     assert hasattr(process_case_worker, "ProcessCaseWorker")
 
 
