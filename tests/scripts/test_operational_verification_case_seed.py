@@ -69,6 +69,9 @@ def test_seed_operational_verification_case_writes_case_linked_artifacts(
         "structured_extraction_examples",
         "summary_draft",
         "rag_provenance_examples",
+        "openapi_snapshot",
+        "example_payloads",
+        "api_runtime_reference",
         "verification_export_contract",
     }
     assert set(result.artifacts) == expected_keys
@@ -86,10 +89,17 @@ def test_seed_operational_verification_case_writes_case_linked_artifacts(
         "non_goals"
     ]
     assert [item["label"] for item in export_contract["required_artifacts"]] == [
+        "api_runtime_reference",
+        "openapi_snapshot",
+        "example_payloads",
         "structured_extraction_examples",
         "rag_provenance_examples",
         "safety_check_result",
         "minimal_eval_suite",
+    ]
+    assert [item["label"] for item in export_contract["optional_artifacts"]] == [
+        "shared_status",
+        "summary_draft",
     ]
 
     verification_files = sorted(
@@ -142,3 +152,70 @@ def test_seed_operational_verification_case_is_deterministic_across_reruns(
     assert export_contract["overview"]["reviewer_notes"].startswith(
         "Synthetic, case-scoped operational verification bundle"
     )
+
+    runtime_reference = json.loads(
+        second.artifacts["api_runtime_reference"].read_text(encoding="utf-8")
+    )
+    example_payloads = json.loads(
+        second.artifacts["example_payloads"].read_text(encoding="utf-8")
+    )
+    openapi_snapshot = json.loads(second.artifacts["openapi_snapshot"].read_text(encoding="utf-8"))
+
+    assert runtime_reference["case_id"] == OPERATIONAL_VERIFICATION_CASE_ID
+    assert runtime_reference["canonical_path"]["canonical_path"] == "verification/"
+    assert runtime_reference["canonical_path"]["non_canonical_legacy_path"] == "demo/"
+    assert runtime_reference["source_of_truth"]["openapi_snapshot"] == (
+        "case_operational_verification_ready/verification/openapi.json"
+    )
+    assert runtime_reference["source_of_truth"]["example_payloads"] == (
+        "case_operational_verification_ready/verification/example-payloads.json"
+    )
+    assert "verification/" in runtime_reference["canonical_operational_guidance"][2]
+    assert {item["name"] for item in runtime_reference["environment_inputs"]} >= {
+        "ARTIFACT_ROOT_DIR",
+        "API_V1_PREFIX",
+        "DATABASE_URL",
+        "QDRANT_URL",
+        "QDRANT_COLLECTION_NAME",
+        "DOCTOR_TELEGRAM_ID_ALLOWLIST",
+        "PATIENT_BOT_TOKEN",
+        "DOCTOR_BOT_TOKEN",
+        "HF_TOKEN",
+        "OCR_PROVIDER_NAME",
+    }
+    assert {item["code"] for item in runtime_reference["recoverable_error_shapes"]} >= {
+        "ocr_failed",
+        "unsupported_file_type",
+        "doctor_not_allowlisted",
+        "case_transition_failed",
+    }
+
+    assert example_payloads["case_id"] == OPERATIONAL_VERIFICATION_CASE_ID
+    assert example_payloads["canonical_path"]["canonical_export_bundle"] == (
+        "case_operational_verification_ready/verification/operational-verification-export.json"
+    )
+    assert example_payloads["typed_examples"]["shared_status"]["case_id"] == (
+        OPERATIONAL_VERIFICATION_CASE_ID
+    )
+    assert example_payloads["typed_examples"]["document_processing_result"]["case_id"] == (
+        OPERATIONAL_VERIFICATION_CASE_ID
+    )
+    assert example_payloads["typed_examples"]["document_processing_recoverable_failure"][
+        "failure_code"
+    ] == "ocr_failed"
+    assert example_payloads["typed_examples"]["doctor_ready_case_notification"][
+        "case_id"
+    ] == OPERATIONAL_VERIFICATION_CASE_ID
+    assert example_payloads["typed_examples"]["doctor_case_card_delivery"]["case_id"] == (
+        OPERATIONAL_VERIFICATION_CASE_ID
+    )
+    assert example_payloads["typed_examples"]["safety_check_examples"]["examples"][0][
+        "decision"
+    ] == "pass"
+    assert example_payloads["recoverable_error_shapes"][0]["payload"]["failure_code"] == (
+        "ocr_failed"
+    )
+    assert "traceback" not in json.dumps(example_payloads).lower()
+    assert "secret" not in json.dumps(example_payloads).lower()
+    assert "/api/v1/health" in openapi_snapshot["paths"]
+    assert "/api/v1/doctor/protected-smoke" in openapi_snapshot["paths"]
