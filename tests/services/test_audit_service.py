@@ -378,6 +378,9 @@ def test_record_summary_trace_persists_passed_summary_provenance_chain() -> None
         grounded_summary=grounded_summary,
         safety_check_result=safety_result,
         retrievals=(retrieval,),
+        runtime_profile="fallback_stub",
+        presentation_state="unverified",
+        presentation_markers=("runtime_profile:fallback_stub", "uncertainty_visible"),
         trace_id="audit_trace_pass_001",
     )
 
@@ -392,6 +395,12 @@ def test_record_summary_trace_persists_passed_summary_provenance_chain() -> None
     assert trace.retrieved_sources[0].source_identifier == "medlineplus_hemoglobin_test"
     assert trace.metadata.grounded_fact_count == 2
     assert trace.metadata.retrieved_source_count == 1
+    assert trace.metadata.runtime_profile == "fallback_stub"
+    assert trace.metadata.presentation_state == "unverified"
+    assert trace.metadata.presentation_markers == (
+        "runtime_profile:fallback_stub",
+        "uncertainty_visible",
+    )
     assert audit_service.get_summary_trace(trace.trace_id) == trace
     assert aggregate.audit_events[-1].record_kind == CaseRecordKind.AUDIT
     assert aggregate.audit_events[-1].record_id == trace.trace_id

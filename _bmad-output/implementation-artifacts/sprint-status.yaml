@@ -1,5 +1,5 @@
 # generated: 2026-05-02T18:37:20+0600
-# last_updated: 2026-05-05T00:00:00+0600
+# last_updated: 2026-05-07T00:00:00+0600
 # project: medical-ai-agent
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-05-02T18:37:20+0600
-last_updated: 2026-05-05T00:00:00+0600
+last_updated: 2026-05-07T00:00:00+0600
 project: medical-ai-agent
 project_key: NOKEY
 tracking_system: file-system
@@ -63,11 +63,11 @@ development_status:
   3-4-structured-medical-extraction-with-provenance-and-confidence: done
   3-5-recoverable-ocr-and-extraction-failure-handling: done
   epic-3-retrospective: optional
-  epic-4: backlog
-  4-1-operational-retrieval-through-qdrant: backlog
-  4-2-real-llm-summary-generation-with-grounding-inputs: backlog
-  4-3-safety-validation-before-doctor-facing-output: backlog
-  4-4-degraded-and-fallback-profile-presentation-rules: backlog
+  epic-4: done
+  4-1-operational-retrieval-through-qdrant: done
+  4-2-real-llm-summary-generation-with-grounding-inputs: done
+  4-3-safety-validation-before-doctor-facing-output: done
+  4-4-degraded-and-fallback-profile-presentation-rules: done
   epic-4-retrospective: optional
   epic-5: backlog
   5-1-doctor-runtime-and-access-allowlist: backlog

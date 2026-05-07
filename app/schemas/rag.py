@@ -90,11 +90,14 @@ class KnowledgeRetrievalResult(BaseModel):
     matches: tuple[KnowledgeRetrievalMatch, ...] = ()
     grounded: bool = False
     reason: str | None = None
+    status: Literal["grounded", "limited", "retrieval_failed"] = "grounded"
+    failure_code: str | None = None
+    failure_detail: str | None = None
     retrieved_at: datetime
 
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("reason")
+    @field_validator("reason", "failure_code", "failure_detail")
     @classmethod
     def normalize_reason(cls, value: str | None) -> str | None:
         if value is None:
@@ -104,6 +107,10 @@ class KnowledgeRetrievalResult(BaseModel):
     @property
     def is_not_grounded(self) -> bool:
         return not self.grounded
+
+    @property
+    def is_recoverable_failure(self) -> bool:
+        return self.status == "retrieval_failed"
 
 
 ApplicabilityDecisionStatus = Literal["applicable", "not_applicable", "insufficient_context"]
@@ -432,3 +439,67 @@ class DoctorFacingSummaryDraft(BaseModel):
         if value is None:
             return None
         return _normalize_text(value)
+
+
+SummaryGenerationStatus = Literal["generated", "generated_with_incomplete_grounding", "summary_failed"]
+
+
+class SummaryGenerationFailure(BaseModel):
+    code: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+    detail: str = Field(min_length=1)
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("code", "reason", "detail")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        return _normalize_text(value)
+
+
+class SummaryGenerationInput(BaseModel):
+    case_id: str = Field(min_length=1)
+    patient_goal_context: str | None = None
+    grounded_summary: GroundedSummaryContract
+    retrievals: tuple[KnowledgeRetrievalResult, ...] = ()
+    applicability_decisions: tuple[KnowledgeApplicabilityDecision, ...] = ()
+    extracted_facts: tuple[GroundedFact, ...] = ()
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("case_id", "patient_goal_context")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalize_text(value)
+
+
+class SummaryGenerationResult(BaseModel):
+    status: SummaryGenerationStatus
+    grounded_summary: GroundedSummaryContract | None = None
+    failure: SummaryGenerationFailure | None = None
+    grounding_is_complete: bool
+    grounding_notes: tuple[str, ...] = ()
+    llm_provider_name: str | None = None
+    structured_inputs: SummaryGenerationInput
+
+    model_config = ConfigDict(frozen=True)
+
+    @model_validator(mode="after")
+    def validate_state(self) -> "SummaryGenerationResult":
+        if self.status == "summary_failed":
+            if self.failure is None:
+                msg = "Failed summary results must include failure details"
+                raise ValueError(msg)
+            if self.grounded_summary is not None:
+                msg = "Failed summary results must not include a grounded summary"
+                raise ValueError(msg)
+        else:
+            if self.grounded_summary is None:
+                msg = "Successful summary results must include a grounded summary"
+                raise ValueError(msg)
+            if self.failure is not None:
+                msg = "Successful summary results must not include failure details"
+                raise ValueError(msg)
+        return self

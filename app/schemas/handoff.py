@@ -14,6 +14,7 @@ from app.schemas.rag import (
     DoctorFacingQuestion,
     DoctorFacingUncertaintyMarker,
 )
+from app.schemas.safety import SafetyCheckResult
 
 
 class DoctorCaseIndicatorFact(BaseModel):
@@ -240,6 +241,9 @@ class DoctorCaseCardRejection(BaseModel):
     rejection_message: str = Field(min_length=1)
     shared_status: SharedCaseStatusCode | None = None
     required_capability: Capability | None = None
+    safety_check_result: SafetyCheckResult | None = None
+    safety_failure_reason_code: str | None = None
+    safety_failure_detail: str | None = None
 
     model_config = ConfigDict(frozen=True)
 
@@ -261,11 +265,25 @@ class DoctorCaseCardRejection(BaseModel):
             raise ValueError(msg)
         return normalized
 
+    @field_validator("safety_failure_reason_code", "safety_failure_detail")
+    @classmethod
+    def normalize_optional_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Doctor case card safety failure fields must not be empty"
+            raise ValueError(msg)
+        return normalized
+
 
 class DoctorCaseCard(BaseModel):
     case_id: str = Field(min_length=1)
     current_case_status: str = Field(min_length=1)
     shared_status: SharedCaseStatusCode
+    runtime_profile: str = Field(min_length=1)
+    presentation_state: str = Field(min_length=1)
+    presentation_markers: tuple[str, ...] = ()
     doctor_review_status: DoctorFacingStatusCode = DoctorFacingStatusCode.READY
     doctor_review_reason: str = Field(min_length=1)
     ai_boundary_label: str = Field(min_length=1)
@@ -281,7 +299,7 @@ class DoctorCaseCard(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("case_id", "current_case_status", "doctor_review_reason")
+    @field_validator("case_id", "current_case_status", "doctor_review_reason", "runtime_profile", "presentation_state")
     @classmethod
     def normalize_required_text_fields(cls, value: str) -> str:
         normalized = value.strip()
@@ -298,6 +316,22 @@ class DoctorCaseCard(BaseModel):
             msg = "Doctor case boundary label must not be empty"
             raise ValueError(msg)
         return normalized
+
+    @field_validator("presentation_markers")
+    @classmethod
+    def normalize_presentation_markers(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for marker in value:
+            stripped = marker.strip()
+            if not stripped:
+                msg = "Doctor case presentation markers must not be empty"
+                raise ValueError(msg)
+            if stripped in seen:
+                continue
+            normalized.append(stripped)
+            seen.add(stripped)
+        return tuple(normalized)
 
 
 class DoctorCaseCardDelivery(BaseModel):

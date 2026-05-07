@@ -57,6 +57,8 @@ def test_doctor_case_card_contract_is_typed_and_minimal() -> None:
         case_id="case_ready_003",
         current_case_status="ready_for_doctor",
         shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+        runtime_profile="operational",
+        presentation_state="operational",
         doctor_review_status="ready",
         doctor_review_reason="Case is ready for doctor review.",
         ai_boundary_label=(
@@ -71,6 +73,9 @@ def test_doctor_case_card_contract_is_typed_and_minimal() -> None:
         "case_id": "case_ready_003",
         "current_case_status": "ready_for_doctor",
         "shared_status": SharedCaseStatusCode.READY_FOR_DOCTOR,
+        "runtime_profile": "operational",
+        "presentation_state": "operational",
+        "presentation_markers": (),
         "doctor_review_status": "ready",
         "doctor_review_reason": "Case is ready for doctor review.",
         "ai_boundary_label": (

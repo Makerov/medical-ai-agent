@@ -117,6 +117,9 @@ class AuditService:
         safety_check_result: SafetyCheckResult,
         retrievals: Sequence[KnowledgeRetrievalResult] = (),
         applicability_decisions: Sequence[KnowledgeApplicabilityDecision] = (),
+        runtime_profile: str | None = None,
+        presentation_state: str | None = None,
+        presentation_markers: Sequence[str] = (),
         trace_id: str | None = None,
         failure_reason: str | None = None,
     ) -> SummaryAuditTrace:
@@ -132,6 +135,9 @@ class AuditService:
                 safety_check_result=safety_check_result,
                 retrievals=retrievals,
                 applicability_decisions=applicability_decisions,
+                runtime_profile=runtime_profile,
+                presentation_state=presentation_state,
+                presentation_markers=presentation_markers,
                 failure_reason=failure_reason,
             )
             if existing_trace == candidate:
@@ -150,6 +156,9 @@ class AuditService:
             safety_check_result=safety_check_result,
             retrievals=retrievals,
             applicability_decisions=applicability_decisions,
+            runtime_profile=runtime_profile,
+            presentation_state=presentation_state,
+            presentation_markers=presentation_markers,
             failure_reason=failure_reason,
         )
         event = self.record_event(
@@ -241,6 +250,9 @@ class AuditService:
         safety_check_result: SafetyCheckResult,
         retrievals: Sequence[KnowledgeRetrievalResult],
         applicability_decisions: Sequence[KnowledgeApplicabilityDecision],
+        runtime_profile: str | None,
+        presentation_state: str | None,
+        presentation_markers: Sequence[str],
         failure_reason: str | None,
     ) -> SummaryAuditTrace:
         grounded_fact_refs = tuple(
@@ -264,6 +276,9 @@ class AuditService:
             citation_count=len(citation_keys),
             unsupported_claim_count=len(grounded_summary.validation.unsupported_claims),
             safety_issue_count=len(safety_check_result.issues),
+            runtime_profile=runtime_profile,
+            presentation_state=presentation_state,
+            presentation_markers=tuple(presentation_markers),
         )
         decision_status = AuditService._decide_trace_status(
             grounded_summary=grounded_summary,

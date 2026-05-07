@@ -4,7 +4,11 @@ from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from app.integrations.qdrant_client import QdrantVectorStore, build_deterministic_vector
+from app.integrations.qdrant_client import (
+    QdrantClientError,
+    QdrantVectorStore,
+    build_deterministic_vector,
+)
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.knowledge_base import KnowledgeSeedEntry
 from app.schemas.rag import (
@@ -42,12 +46,24 @@ class RAGService:
     ) -> KnowledgeRetrievalResult:
         context = RetrievalIndicatorContext.from_indicator(indicator)
         query_vector = self._build_query_vector(context)
-        raw_matches = self._vector_store.query_points(
-            collection_name=self._collection_name,
-            vector=query_vector,
-            limit=limit,
-            query_filter=self._build_filter(context),
-        )
+        try:
+            raw_matches = self._vector_store.query_points(
+                collection_name=self._collection_name,
+                vector=query_vector,
+                limit=limit,
+                query_filter=self._build_filter(context),
+            )
+        except QdrantClientError as exc:
+            return KnowledgeRetrievalResult(
+                indicator=context,
+                matches=(),
+                grounded=False,
+                status="retrieval_failed",
+                reason="qdrant_retrieval_unavailable",
+                failure_code=exc.code,
+                failure_detail=str(exc),
+                retrieved_at=self._clock(),
+            )
         matches = tuple(
             match
             for match in (self._to_match(raw_match) for raw_match in raw_matches)
@@ -58,7 +74,10 @@ class RAGService:
                 indicator=context,
                 matches=(),
                 grounded=False,
+                status="retrieval_failed",
                 reason="no_trustworthy_knowledge_entries_found",
+                failure_code="no_applicable_sources",
+                failure_detail="Qdrant returned no applicable knowledge entries",
                 retrieved_at=self._clock(),
             )
         return KnowledgeRetrievalResult(
@@ -66,6 +85,9 @@ class RAGService:
             matches=matches,
             grounded=True,
             reason=None,
+            status="grounded" if len(matches) == 1 else "limited",
+            failure_code=None,
+            failure_detail=None,
             retrieved_at=self._clock(),
         )
 

@@ -56,6 +56,9 @@ def test_summary_audit_trace_serializes_typed_boundaries_and_minimal_payload() -
             citation_count=2,
             unsupported_claim_count=0,
             safety_issue_count=0,
+            runtime_profile="operational",
+            presentation_state="operational",
+            presentation_markers=(),
         ),
     )
 
@@ -73,6 +76,26 @@ def test_summary_audit_trace_serializes_typed_boundaries_and_minimal_payload() -
         "citation_key",
         "source_identifier",
     }
+
+
+def test_summary_audit_trace_metadata_keeps_runtime_profile_and_presentation_markers() -> None:
+    metadata = SummaryAuditTraceMetadata(
+        grounded_fact_count=0,
+        retrieved_source_count=0,
+        citation_count=0,
+        unsupported_claim_count=0,
+        safety_issue_count=1,
+        runtime_profile="fallback_stub",
+        presentation_state="unverified",
+        presentation_markers=("runtime_profile:fallback_stub", "uncertainty_visible"),
+    )
+
+    assert metadata.runtime_profile == "fallback_stub"
+    assert metadata.presentation_state == "unverified"
+    assert metadata.presentation_markers == (
+        "runtime_profile:fallback_stub",
+        "uncertainty_visible",
+    )
 
 
 def test_summary_audit_trace_rejects_mismatched_recovery_state() -> None:
@@ -105,5 +128,8 @@ def test_summary_audit_trace_rejects_mismatched_recovery_state() -> None:
                 citation_count=0,
                 unsupported_claim_count=0,
                 safety_issue_count=0,
+                runtime_profile="operational",
+                presentation_state="operational",
+                presentation_markers=(),
             ),
         )

@@ -28,13 +28,7 @@ class SafetyService:
         "confirmed diagnosis",
     )
     _BORDERLINE_PATTERNS = (
-        "might",
-        "may",
         "borderline",
-        "possibly",
-        "unclear",
-        "uncertain",
-        "low-confidence",
     )
 
     def validate_doctor_facing_summary(
@@ -73,8 +67,6 @@ class SafetyService:
     def _compose_validation_text(self, draft: DoctorFacingSummaryDraft) -> str:
         parts = [draft.narrative]
         parts.extend(question.text for question in draft.questions_for_doctor)
-        parts.extend(marker.text for marker in draft.uncertainty_markers)
-        parts.extend(marker.text for marker in draft.possible_deviations)
         parts.extend(claim.text for claim in draft.grounded_summary.claims)
         return " ".join(parts).lower()
 

@@ -14,6 +14,7 @@ class CaseStatus(StrEnum):
     PROCESSING_DOCUMENTS = "processing_documents"
     EXTRACTION_FAILED = "extraction_failed"
     PARTIAL_EXTRACTION = "partial_extraction"
+    RETRIEVAL_FAILED = "retrieval_failed"
     READY_FOR_SUMMARY = "ready_for_summary"
     SUMMARY_FAILED = "summary_failed"
     SAFETY_FAILED = "safety_failed"
@@ -183,8 +184,12 @@ class CaseTransitionError(Exception):
         error: dict[str, object] = {
             "code": self.code,
             "case_id": self.case_id,
-            "from_status": self.from_status.value if isinstance(self.from_status, CaseStatus) else None,
-            "to_status": self.to_status.value if isinstance(self.to_status, CaseStatus) else self.to_status,
+            "from_status": (
+                self.from_status.value if isinstance(self.from_status, CaseStatus) else None
+            ),
+            "to_status": (
+                self.to_status.value if isinstance(self.to_status, CaseStatus) else self.to_status
+            ),
             "details": self.details,
         }
         return error

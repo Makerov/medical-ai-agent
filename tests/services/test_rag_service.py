@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 
+from app.integrations.qdrant_client import QdrantClientError
 from app.schemas.case import CaseRecordKind, CaseRecordReference
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.knowledge_base import (
@@ -128,7 +129,10 @@ def test_rag_service_returns_typed_result_for_indicator_context() -> None:
     result = service.retrieve_for_indicator(indicator=indicator)
 
     assert result.grounded is True
+    assert result.status == "grounded"
     assert result.reason is None
+    assert result.failure_code is None
+    assert result.failure_detail is None
     assert result.indicator.name == "Hemoglobin"
     assert len(result.matches) == 1
     assert result.matches[0].knowledge_id == "medlineplus_hemoglobin_test"
@@ -152,7 +156,33 @@ def test_rag_service_marks_empty_results_as_not_grounded() -> None:
 
     assert result.grounded is False
     assert result.is_not_grounded is True
+    assert result.status == "retrieval_failed"
     assert result.reason == "no_trustworthy_knowledge_entries_found"
+    assert result.failure_code == "no_applicable_sources"
+    assert result.failure_detail == "Qdrant returned no applicable knowledge entries"
+    assert result.matches == ()
+
+
+def test_rag_service_surfaces_qdrant_failure_as_recoverable_failure() -> None:
+    class FailingQdrantVectorStore(FakeQdrantVectorStore):
+        def query_points(self, **kwargs):  # type: ignore[override]
+            raise QdrantClientError("connection_failed", "Qdrant request failed")
+
+    indicator = _build_indicator()
+    store = FailingQdrantVectorStore(results=[])
+    service = RAGService(
+        vector_store=store,
+        clock=lambda: datetime(2026, 5, 1, 9, 0, tzinfo=UTC),
+    )
+
+    result = service.retrieve_for_indicator(indicator=indicator)
+
+    assert result.grounded is False
+    assert result.is_recoverable_failure is True
+    assert result.status == "retrieval_failed"
+    assert result.reason == "qdrant_retrieval_unavailable"
+    assert result.failure_code == "connection_failed"
+    assert result.failure_detail == "Qdrant request failed"
     assert result.matches == ()
 
 
@@ -278,3 +308,25 @@ def test_rag_service_downgrades_claims_without_grounded_support() -> None:
     assert contract.validation.has_unsupported_claims is True
     assert contract.claims[0].status == "unsupported"
     assert contract.claims[0].rejection_reason == "claim_lacks_grounded_support"
+
+
+def test_rag_service_does_not_fabricate_grounded_facts_after_retrieval_failure() -> None:
+    class TimeoutQdrantVectorStore(FakeQdrantVectorStore):
+        def query_points(self, **kwargs):  # type: ignore[override]
+            raise QdrantClientError("timeout", "Qdrant request timed out")
+
+    indicator = _build_indicator()
+    store = TimeoutQdrantVectorStore(results=[])
+    service = RAGService(vector_store=store)
+    retrieval = service.retrieve_for_indicator(indicator=indicator)
+    contract = service.build_summary_contract(
+        indicators=(indicator,),
+        retrievals=(retrieval,),
+        narrative="Separate narrative.",
+    )
+
+    assert retrieval.grounded is False
+    assert retrieval.status == "retrieval_failed"
+    assert len(contract.grounded_facts) == 1
+    assert contract.grounded_facts[0].source_kind == "indicator"
+    assert contract.validation.grounded_fact_count == 1

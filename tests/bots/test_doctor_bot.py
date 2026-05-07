@@ -108,6 +108,8 @@ def test_render_doctor_case_card_is_minimal() -> None:
         case_id="case_ready_002",
         current_case_status="ready_for_doctor",
         shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+        runtime_profile="operational",
+        presentation_state="operational",
         doctor_review_status="ready",
         doctor_review_reason="Case is ready for doctor review.",
         ai_boundary_label=(
@@ -188,6 +190,8 @@ def test_render_doctor_case_card_shows_safe_problem_explanation_without_internal
         case_id="case_problem_001",
         current_case_status="processing_documents",
         shared_status=SharedCaseStatusCode.PROCESSING_PENDING,
+        runtime_profile="operational",
+        presentation_state="operational",
         doctor_review_status="partial",
         doctor_review_reason="Processing is partial and the case needs more work before review.",
         ai_boundary_label=(
@@ -243,6 +247,8 @@ def test_send_doctor_case_card_delivery_routes_card_to_doctor_chat() -> None:
             case_id="case_ready_002",
             current_case_status="ready_for_doctor",
             shared_status=SharedCaseStatusCode.READY_FOR_DOCTOR,
+            runtime_profile="operational",
+            presentation_state="operational",
             doctor_review_status="ready",
             doctor_review_reason="Case is ready for doctor review.",
             ai_boundary_label=(
