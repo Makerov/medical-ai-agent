@@ -1,6 +1,6 @@
 # Story 4.4: Degraded and Fallback Profile Presentation Rules
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -22,18 +22,18 @@ so that I do not mistake an upstream-failed result for a fully grounded summary.
 
 ## Tasks / Subtasks
 
-- [ ] Add presentation rules that keep degraded or fallback-generated doctor-facing output visibly marked. (AC: 1, 2)
-  - [ ] Review the current doctor-facing handoff and presentation path after Stories 4.1 to 4.3.
-  - [ ] Preserve the backend service/workflow boundary; do not move degraded-state formatting into Telegram handlers.
-  - [ ] Ensure uncertainty, limitation, and fallback markers survive into the final doctor-facing surface and audit trail.
-- [ ] Enforce explicit profile labeling for non-operational doctor-facing content. (AC: 2)
-  - [ ] Distinguish normal `operational profile` behavior from explicit fallback profile behavior in the returned model.
-  - [ ] Mark fallback-generated content as degraded or unverified instead of letting it read like a fully grounded case.
-  - [ ] Expose the active runtime profile and degraded markers in machine-readable artifacts for later review.
-- [ ] Add deterministic regression coverage for degraded and fallback presentation rules. (AC: 1, 2)
-  - [ ] Cover retrieval/OCR/provider degradation and verify the doctor-facing output carries uncertainty and limitation markers.
-  - [ ] Cover explicit fallback profile behavior and verify the output is visibly labeled degraded or unverified.
-  - [ ] Verify audit artifacts retain the chosen profile and degradation markers.
+- [x] Add presentation rules that keep degraded or fallback-generated doctor-facing output visibly marked. (AC: 1, 2)
+  - [x] Review the current doctor-facing handoff and presentation path after Stories 4.1 to 4.3.
+  - [x] Preserve the backend service/workflow boundary; do not move degraded-state formatting into Telegram handlers.
+  - [x] Ensure uncertainty, limitation, and fallback markers survive into the final doctor-facing surface and audit trail.
+- [x] Enforce explicit profile labeling for non-operational doctor-facing content. (AC: 2)
+  - [x] Distinguish normal `operational profile` behavior from explicit fallback profile behavior in the returned model.
+  - [x] Mark fallback-generated content as degraded or unverified instead of letting it read like a fully grounded case.
+  - [x] Expose the active runtime profile and degraded markers in machine-readable artifacts for later review.
+- [x] Add deterministic regression coverage for degraded and fallback presentation rules. (AC: 1, 2)
+  - [x] Cover retrieval/OCR/provider degradation and verify the doctor-facing output carries uncertainty and limitation markers.
+  - [x] Cover explicit fallback profile behavior and verify the output is visibly labeled degraded or unverified.
+  - [x] Verify audit artifacts retain the chosen profile and degradation markers.
 
 ## Dev Notes
 
@@ -167,6 +167,29 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- Implemented typed presentation metadata on doctor-facing handoff cards and audit trace metadata.
+- Preserved backend-only presentation logic in `HandoffService`; Telegram handlers were not touched.
+- Added regression coverage for degraded markers, explicit fallback profile labeling, and audit propagation.
+
 ### Completion Notes List
 
+- Added `runtime_profile`, `presentation_state`, and `presentation_markers` to `DoctorCaseCard`.
+- Added runtime/profile presentation metadata to `SummaryAuditTraceMetadata` and audit trace creation.
+- `HandoffService` now classifies doctor-facing output as `unverified` for non-operational runtime profiles and records those markers in audit metadata.
+- Verified the change with targeted tests and the full test suite.
+
 ### File List
+
+- `app/schemas/audit.py`
+- `app/schemas/handoff.py`
+- `app/services/audit_service.py`
+- `app/services/handoff_service.py`
+- `tests/bots/test_doctor_bot.py`
+- `tests/schemas/test_audit_contract.py`
+- `tests/schemas/test_handoff_contract.py`
+- `tests/services/test_audit_service.py`
+- `tests/services/test_handoff_service.py`
+
+### Change Log
+
+- 2026-05-07: Implemented degraded/fallback doctor-facing presentation rules with typed runtime profile metadata and regression coverage.
