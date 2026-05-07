@@ -12,6 +12,8 @@ from app.schemas.rag import (
     GeneratedNarrativeClaim,
     GroundedSummaryContract,
     KnowledgeApplicabilityDecision,
+    SummaryGenerationResult,
+    SummaryGenerationInput,
     SummaryValidationResult,
 )
 from app.services.boundary_copy import HUMAN_REVIEW_STATEMENT, SAFETY_BOUNDARY_STATEMENT
@@ -180,3 +182,103 @@ def test_summary_service_keeps_narrative_separate_from_grounded_facts() -> None:
     assert HUMAN_REVIEW_STATEMENT in dumped["narrative"]
     assert "questions_for_doctor" in dumped
     assert dumped["questions_for_doctor"][0]["focus"] == "missing_context"
+
+
+class FakeLLMClient:
+    def __init__(self, *, response=None, error=None) -> None:
+        self.response = response
+        self.error = error
+        self.requests: list[SummaryGenerationInput] = []
+
+    def generate_summary(self, request: SummaryGenerationInput):
+        self.requests.append(request)
+        if self.error is not None:
+            raise self.error
+        return self.response
+
+
+def test_summary_service_generates_summary_with_structured_grounding_inputs() -> None:
+    grounded_summary = _build_grounded_summary()
+    client = FakeLLMClient(
+        response=SummaryGenerationResult(
+            status="generated",
+            grounded_summary=grounded_summary.model_copy(
+                update={"narrative": "Structured summary output."}
+            ),
+            failure=None,
+            grounding_is_complete=False,
+            grounding_notes=("partial_applicability",),
+            llm_provider_name="provider-a",
+            structured_inputs=SummaryGenerationInput(
+                case_id="case_summary_001",
+                patient_goal_context="Understand whether follow-up is needed.",
+                grounded_summary=grounded_summary,
+                retrievals=(),
+                applicability_decisions=(),
+                extracted_facts=grounded_summary.grounded_facts,
+            ),
+        )
+    )
+    service = SummaryService(llm_client=client)
+    indicator = _build_indicator()
+    decision = _build_applicability_decision()
+
+    result = service.generate_grounded_summary(
+        case_id="case_summary_001",
+        grounded_summary=grounded_summary,
+        patient_goal_context="Understand whether follow-up is needed.",
+        indicators=(indicator,),
+        retrievals=(),
+        applicability_decisions=(decision,),
+    )
+
+    assert result.status == "generated"
+    assert result.grounded_summary is not None
+    assert result.grounded_summary.narrative == "Structured summary output."
+    assert result.grounding_is_complete is False
+    assert result.grounding_notes == ("partial_applicability",)
+    assert client.requests
+    assert client.requests[0].case_id == "case_summary_001"
+    assert client.requests[0].grounded_summary == grounded_summary
+    assert client.requests[0].retrievals == ()
+    assert client.requests[0].applicability_decisions == (decision,)
+    assert client.requests[0].extracted_facts == grounded_summary.grounded_facts
+
+
+def test_summary_service_returns_recoverable_failure_without_llm_client() -> None:
+    service = SummaryService()
+    grounded_summary = _build_grounded_summary()
+
+    result = service.generate_grounded_summary(
+        case_id="case_summary_001",
+        grounded_summary=grounded_summary,
+    )
+
+    assert result.status == "summary_failed"
+    assert result.failure is not None
+    assert result.failure.code == "llm_client_unavailable"
+    assert result.failure.reason == "llm_provider_missing"
+    assert result.grounded_summary is None
+    assert result.grounding_is_complete is False
+    assert result.grounding_notes == ("grounding_complete",)
+
+
+def test_summary_service_maps_llm_client_failure_to_recoverable_summary_failed() -> None:
+    grounded_summary = _build_grounded_summary()
+
+    class FakeError(Exception):
+        pass
+
+    client = FakeLLMClient(error=FakeError("timeout"))
+    service = SummaryService(llm_client=client)
+
+    result = service.generate_grounded_summary(
+        case_id="case_summary_001",
+        grounded_summary=grounded_summary,
+    )
+
+    assert result.status == "summary_failed"
+    assert result.failure is not None
+    assert result.failure.code == "provider_request_failed"
+    assert result.failure.reason == "llm_provider_failure"
+    assert result.grounded_summary is None
