@@ -178,13 +178,20 @@ GPT-5 Codex
 
 ### Completion Notes
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Story prepared for implementation with a focus on ready-case notification and structured case card delivery.
+- Implemented and verified doctor-facing ready-case notification and structured case card delivery behavior through existing handoff/runtime code paths.
+- Confirmed allowlist gating, not-ready rejection, safety-blocked rejection, degraded presentation markers, and thin async bot delivery adapters with targeted tests.
+- Validation run: `uv run pytest tests/services/test_handoff_service.py tests/bots/test_doctor_bot.py tests/schemas/test_handoff_contract.py tests/test_runtime_topology.py` (32 passed).
+
+## File List
+
+- `_bmad-output/implementation-artifacts/5-2-ready-for-doctor-notification-and-case-card.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created the story context for ready-for-doctor notification and case card.
+- 2026-05-07: Validated the doctor notification and case card handoff implementation and moved the story to review.
