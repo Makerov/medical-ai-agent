@@ -71,7 +71,7 @@ development_status:
   epic-4-retrospective: optional
   epic-5: in-progress
   5-1-doctor-runtime-and-access-allowlist: done
-  5-2-ready-for-doctor-notification-and-case-card: ready-for-dev
+  5-2-ready-for-doctor-notification-and-case-card: review
   5-3-doctor-review-surface-for-facts-questions-and-provenance: backlog
   5-4-case-scoped-audit-review-by-case-id: backlog
   epic-5-retrospective: optional
