@@ -76,7 +76,7 @@ development_status:
   5-4-case-scoped-audit-review-by-case-id: done
   epic-5-retrospective: optional
   epic-6: in-progress
-  6-1-runtime-health-and-readiness-checks: ready-for-dev
+  6-1-runtime-health-and-readiness-checks: review
   6-2-startup-verification-for-migrations-and-knowledge-base: backlog
   6-3-restart-and-recovery-behavior: backlog
   6-4-operational-documentation-and-profile-guardrails: backlog
