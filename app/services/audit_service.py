@@ -8,7 +8,16 @@ from app.schemas.audit import (
     AuditEvent,
     AuditEventType,
     AuditMetadataValue,
+    AuditReviewLimitation,
+    AuditReviewProviderOutcomeReference,
+    AuditReviewRecoveryEvent,
+    AuditReviewRetrievalCitation,
+    AuditReviewSafetyDecision,
+    AuditReviewSummaryArtifact,
+    AuditReviewTransitionReference,
     CaseArtifactPath,
+    CaseAuditReview,
+    CaseAuditReviewStatus,
     SummaryAuditDecisionStatus,
     SummaryAuditFactReference,
     SummaryAuditRecoveryState,
@@ -204,6 +213,157 @@ class AuditService:
 
     def get_summary_trace(self, trace_id: str) -> SummaryAuditTrace | None:
         return self._summary_traces_by_id.get(trace_id)
+
+    def get_case_audit_review(self, *, case_id: str) -> CaseAuditReview:
+        records = self._case_service.get_case_core_records(case_id)
+        runtime_profile, degraded_markers, fallback_markers = self._case_review_markers(case_id)
+        transitions = []
+        provider_outcomes = []
+        for reference in records.audit_events:
+            event = self._events_by_id.get(reference.record_id)
+            if event is None:
+                continue
+            if event.event_type == AuditEventType.CASE_STATUS_CHANGED:
+                transitions.append(
+                    AuditReviewTransitionReference(
+                        event_id=event.event_id,
+                        event_type=event.event_type,
+                        created_at=event.created_at,
+                        from_status=self._metadata_text(event.metadata, "from_status"),
+                        to_status=self._metadata_text(event.metadata, "to_status"),
+                    )
+                )
+                continue
+            if event.event_type in {
+                AuditEventType.HANDOFF_READINESS_EVALUATED,
+                AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_SENT,
+                AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_REJECTED,
+                AuditEventType.SUMMARY_TRACE_RECORDED,
+            }:
+                provider_outcomes.append(
+                    AuditReviewProviderOutcomeReference(
+                        event_id=event.event_id,
+                        event_type=event.event_type,
+                        created_at=event.created_at,
+                        outcome_code=self._metadata_text(event.metadata, "notification_status")
+                        or self._metadata_text(event.metadata, "decision_status")
+                        or self._metadata_text(event.metadata, "rejection_code")
+                        or self._metadata_text(event.metadata, "shared_status")
+                        or self._metadata_text(event.metadata, "failure_reason_code")
+                        or "recorded",
+                        detail=self._metadata_text(event.metadata, "reason")
+                        or self._metadata_text(event.metadata, "rejection_message")
+                        or self._metadata_text(event.metadata, "decision_rationale"),
+                    )
+                )
+
+        retrieval_citations: list[AuditReviewRetrievalCitation] = []
+        retry_recovery_events: list[AuditReviewRecoveryEvent] = []
+        summary_artifacts: list[AuditReviewSummaryArtifact] = []
+        safety_decisions: list[AuditReviewSafetyDecision] = []
+        for trace in self._summary_traces_by_id.values():
+            if trace.case_id != case_id:
+                continue
+            for source in trace.retrieved_sources:
+                retrieval_citations.append(
+                    AuditReviewRetrievalCitation(
+                        citation_key=source.citation_key,
+                        label=source.label,
+                        source_kind=source.source_kind,
+                        source_identifier=source.source_identifier,
+                        grounded=source.grounded,
+                    )
+                )
+            retry_recovery_events.append(
+                AuditReviewRecoveryEvent(
+                    trace_id=trace.trace_id,
+                    decision_status=trace.decision_status,
+                    recoverable_state=trace.recoverable_state,
+                    failure_reason_code=self._failure_reason_code(trace),
+                    failure_reason=trace.failure_reason,
+                )
+            )
+            summary_artifacts.append(
+                AuditReviewSummaryArtifact(
+                    trace_id=trace.trace_id,
+                    summary_record=trace.summary_reference,
+                    decision_status=trace.decision_status,
+                    recoverable_state=trace.recoverable_state,
+                    runtime_profile=trace.metadata.runtime_profile,
+                    presentation_state=trace.metadata.presentation_state,
+                    presentation_markers=trace.metadata.presentation_markers,
+                    minimized_payload=trace.metadata.minimized_payload,
+                )
+            )
+            safety_decisions.append(
+                AuditReviewSafetyDecision(
+                    case_id=case_id,
+                    decision=trace.safety_check_result.decision,
+                    decision_rationale=trace.safety_check_result.decision_rationale,
+                    correction_path=trace.safety_check_result.correction_path,
+                    issue_count=len(trace.safety_check_result.issues),
+                )
+            )
+
+        limitations: list[AuditReviewLimitation] = []
+        if records.patient_case.status == CaseStatus.DELETED:
+            return CaseAuditReview(
+                case_id=case_id,
+                status=CaseAuditReviewStatus.REJECTED,
+                runtime_profile=runtime_profile,
+                degraded_markers=degraded_markers,
+                fallback_markers=fallback_markers,
+                limitations=(
+                    AuditReviewLimitation(
+                        code="case_deleted",
+                        detail="Case is deleted and unavailable for audit review.",
+                    ),
+                ),
+            )
+        if not records.summaries and not summary_artifacts:
+            limitations.append(
+                AuditReviewLimitation(
+                    code="summary_missing",
+                    detail="Summary artifacts are not available for this case.",
+                )
+            )
+        if not records.audit_events:
+            limitations.append(
+                AuditReviewLimitation(
+                    code="audit_events_missing",
+                    detail="Audit events are not available for this case.",
+                )
+            )
+        if not transitions:
+            limitations.append(
+                AuditReviewLimitation(
+                    code="transitions_missing",
+                    detail="Case status transitions are not available for this case.",
+                )
+            )
+        if limitations:
+            status = (
+                CaseAuditReviewStatus.PARTIAL
+                if records.patient_case.status != CaseStatus.DELETED
+                else CaseAuditReviewStatus.REJECTED
+            )
+        else:
+            status = CaseAuditReviewStatus.COMPLETE
+
+        return CaseAuditReview(
+            case_id=case_id,
+            status=status,
+            runtime_profile=runtime_profile,
+            degraded_markers=degraded_markers,
+            fallback_markers=fallback_markers,
+            state_transitions=tuple(transitions),
+            provider_outcomes=tuple(provider_outcomes),
+            retrieval_citations=tuple(retrieval_citations),
+            retry_recovery_events=tuple(retry_recovery_events),
+            summary_artifacts=tuple(summary_artifacts),
+            safety_decisions=tuple(safety_decisions),
+            limitations=tuple(limitations),
+        )
 
     @staticmethod
     def _generate_event_id() -> str:
@@ -422,6 +582,35 @@ class AuditService:
         if trace.decision_status == "corrected":
             return "recoverable_correction"
         return "insufficient_grounding"
+
+    def _case_review_markers(
+        self,
+        case_id: str,
+    ) -> tuple[str | None, tuple[str, ...], tuple[str, ...]]:
+        runtime_profile: str | None = None
+        degraded_markers: list[str] = []
+        fallback_markers: list[str] = []
+        for trace in self._summary_traces_by_id.values():
+            if trace.case_id != case_id:
+                continue
+            runtime_profile = runtime_profile or trace.metadata.runtime_profile
+            for marker in trace.metadata.presentation_markers:
+                if marker.startswith("runtime_profile:") or marker.startswith("degraded:"):
+                    degraded_markers.append(marker)
+                if "fallback" in marker:
+                    fallback_markers.append(marker)
+        return (
+            runtime_profile,
+            tuple(dict.fromkeys(degraded_markers)),
+            tuple(dict.fromkeys(fallback_markers)),
+        )
+
+    @staticmethod
+    def _metadata_text(metadata: Mapping[str, AuditMetadataValue], key: str) -> str | None:
+        value = metadata.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+        return None
 
     def _ensure_case_accepts_audit_events(self, case_id: str) -> None:
         records = self._case_service.get_case_core_records(case_id)

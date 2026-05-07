@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.audit import (
+    CaseAuditReview,
     SummaryAuditFactReference,
     SummaryAuditSourceReference,
     SummaryAuditTrace,
@@ -133,3 +134,22 @@ def test_summary_audit_trace_rejects_mismatched_recovery_state() -> None:
                 presentation_markers=(),
             ),
         )
+
+
+def test_case_audit_review_preserves_provenance_links_and_visibility_markers() -> None:
+    review = CaseAuditReview(
+        case_id="case_001",
+        status="complete",
+        runtime_profile="operational",
+        degraded_markers=("runtime_profile:fallback_stub",),
+        fallback_markers=("fallback_stub",),
+        limitations=(),
+    )
+
+    dumped = review.model_dump(mode="json")
+
+    assert dumped["case_id"] == "case_001"
+    assert dumped["status"] == "complete"
+    assert dumped["runtime_profile"] == "operational"
+    assert dumped["degraded_markers"] == ["runtime_profile:fallback_stub"]
+    assert dumped["fallback_markers"] == ["fallback_stub"]

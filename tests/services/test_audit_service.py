@@ -236,6 +236,107 @@ def test_build_case_artifact_path_rejects_separator_abuse() -> None:
         )
 
 
+def test_get_case_audit_review_assembles_case_scoped_review_bundle() -> None:
+    now = datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_audit_review")
+    patient_case = case_service.create_case()
+    audit_service = AuditService(
+        case_service=case_service,
+        artifact_root_dir=Path("data/artifacts"),
+        clock=lambda: now,
+    )
+
+    audit_service.record_event(
+        case_id=patient_case.case_id,
+        event_type=AuditEventType.CASE_STATUS_CHANGED,
+        metadata={"from_status": "draft", "to_status": "ready_for_summary"},
+        event_id="audit_event_transition_001",
+        created_at=now,
+    )
+    audit_service.record_event(
+        case_id=patient_case.case_id,
+        event_type=AuditEventType.HANDOFF_READINESS_EVALUATED,
+        metadata={"shared_status": "ready_for_doctor", "reason": "readiness_approved"},
+        event_id="audit_event_provider_001",
+        created_at=now,
+    )
+    grounded_summary, retrieval, summary_reference = _build_grounded_summary(
+        case_id=patient_case.case_id
+    )
+    safety_result = SafetyCheckResult(
+        case_id=patient_case.case_id,
+        decision="pass",
+        issues=(),
+        decision_rationale="Summary draft contains no blocked safety language.",
+    )
+    audit_service.record_summary_trace(
+        case_id=patient_case.case_id,
+        summary_reference=summary_reference,
+        grounded_summary=grounded_summary,
+        safety_check_result=safety_result,
+        retrievals=(retrieval,),
+        runtime_profile="fallback_stub",
+        presentation_state="unverified",
+        presentation_markers=("runtime_profile:fallback_stub", "degraded:retrieval_limited"),
+        trace_id="audit_trace_review_001",
+    )
+
+    review = audit_service.get_case_audit_review(case_id=patient_case.case_id)
+
+    assert review.case_id == patient_case.case_id
+    assert review.status == "complete"
+    assert review.runtime_profile == "fallback_stub"
+    assert review.degraded_markers == (
+        "runtime_profile:fallback_stub",
+        "degraded:retrieval_limited",
+    )
+    assert review.provider_outcomes[0].outcome_code == "ready_for_doctor"
+    assert review.state_transitions[0].from_status == "draft"
+    assert review.state_transitions[0].to_status == "ready_for_summary"
+    assert review.retrieval_citations[0].citation_key == "medlineplus-hemoglobin-test"
+    assert review.retry_recovery_events[0].failure_reason_code == "none"
+    assert review.summary_artifacts[0].summary_record.record_kind == CaseRecordKind.SUMMARY
+    assert review.safety_decisions[0].decision == "pass"
+    assert review.limitations == ()
+    assert review.minimized_payload is True
+
+
+def test_get_case_audit_review_returns_partial_view_when_transitions_missing() -> None:
+    now = datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_audit_partial")
+    patient_case = case_service.create_case()
+    audit_service = AuditService(
+        case_service=case_service,
+        artifact_root_dir=Path("data/artifacts"),
+        clock=lambda: now,
+    )
+
+    review = audit_service.get_case_audit_review(case_id=patient_case.case_id)
+
+    assert review.status == "partial"
+    assert review.limitations[0].code == "summary_missing"
+    assert any(item.code == "transitions_missing" for item in review.limitations)
+
+
+def test_get_case_audit_review_rejects_deleted_case() -> None:
+    now = datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_audit_review_deleted")
+    patient_case = case_service.create_case()
+    case_service.transition_case(patient_case.case_id, CaseStatus.DELETION_REQUESTED)
+    case_service.transition_case(patient_case.case_id, CaseStatus.DELETED)
+    audit_service = AuditService(
+        case_service=case_service,
+        artifact_root_dir=Path("data/artifacts"),
+        clock=lambda: now,
+    )
+
+    review = audit_service.get_case_audit_review(case_id=patient_case.case_id)
+
+    assert review.status == "rejected"
+    assert review.limitations[0].code == "case_deleted"
+    assert review.provider_outcomes == ()
+
+
 def _build_seed_entry() -> KnowledgeSeedEntry:
     return KnowledgeSeedEntry(
         knowledge_id="medlineplus_hemoglobin_test",
