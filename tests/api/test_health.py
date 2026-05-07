@@ -159,6 +159,7 @@ def test_openapi_schema_contains_health_route() -> None:
     assert "/api/v1/health" in response.json()["paths"]
     assert "/api/v1/health/readiness" in response.json()["paths"]
     assert "/api/v1/health/startup" in response.json()["paths"]
+    assert "/api/v1/doctor/protected-smoke" in response.json()["paths"]
 
 
 def test_settings_reject_invalid_api_prefix(monkeypatch) -> None:
