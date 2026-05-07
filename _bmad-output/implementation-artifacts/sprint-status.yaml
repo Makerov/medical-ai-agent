@@ -64,9 +64,9 @@ development_status:
   3-5-recoverable-ocr-and-extraction-failure-handling: done
   epic-3-retrospective: optional
   epic-4: in-progress
-  4-1-operational-retrieval-through-qdrant: review
-  4-2-real-llm-summary-generation-with-grounding-inputs: review
-  4-3-safety-validation-before-doctor-facing-output: backlog
+  4-1-operational-retrieval-through-qdrant: done
+  4-2-real-llm-summary-generation-with-grounding-inputs: done
+  4-3-safety-validation-before-doctor-facing-output: ready-for-dev
   4-4-degraded-and-fallback-profile-presentation-rules: backlog
   epic-4-retrospective: optional
   epic-5: backlog
