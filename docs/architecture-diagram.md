@@ -1,6 +1,6 @@
 # Architecture Diagram
 
-This diagram is intended to be readable as a standalone portfolio artifact.
+This diagram is intended to be readable as a standalone operational verification artifact.
 
 ```mermaid
 flowchart LR
@@ -17,7 +17,7 @@ flowchart LR
   Graph --> Safety[Safety Validation Gate]
   Graph --> Handoff[Doctor Handoff Preparation]
   Graph --> Audit[Audit Trail and Case Artifacts]
-  Graph --> Eval[Demo Exports and Minimal Eval Suite]
+  Graph --> Eval[Verification Exports and Minimal Eval Suite]
 
   Intake --> PG[(PostgreSQL)]
   Docs --> PG
@@ -40,7 +40,7 @@ flowchart LR
 
   Safety -->|blocks or corrects unsupported output| Handoff
   Handoff -->|human review required| Doctor
-  Artifacts --> Reviewer[Reviewer Export Bundle]
+  Artifacts --> Reviewer[Operational Verification Bundle]
 
   classDef boundary fill:#f7f2e8,stroke:#7a5c2e,color:#1f1f1f;
   classDef storage fill:#e8f1f7,stroke:#3c6e8f,color:#1f1f1f;
@@ -59,7 +59,9 @@ flowchart LR
 - PostgreSQL holds case-linked state and audit records.
 - Qdrant holds retrieval data separately from relational case data.
 - Typed schemas sit between workflow steps so AI outputs are validated before use.
-- Demo exports and reviewer bundles remain under `data/artifacts/<case_id>/...`.
+- Verification exports and operational bundles remain under `data/artifacts/<case_id>/...`.
+- The canonical runtime path is operational verification with an explicit `local` synthetic/anonymized default, while `operational` requires real providers and `Qdrant`.
+- Explicit fallback profiles remain visible downstream rather than silently replacing the real-provider path.
 
 ## Stable location
 
