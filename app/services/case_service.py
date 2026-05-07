@@ -48,6 +48,7 @@ class CaseService:
             CaseStatus.PROCESSING_DOCUMENTS,
             CaseStatus.EXTRACTION_FAILED,
             CaseStatus.PARTIAL_EXTRACTION,
+            CaseStatus.RETRIEVAL_FAILED,
             CaseStatus.SUMMARY_FAILED,
         }
     )
