@@ -63,11 +63,11 @@ development_status:
   3-4-structured-medical-extraction-with-provenance-and-confidence: done
   3-5-recoverable-ocr-and-extraction-failure-handling: done
   epic-3-retrospective: optional
-  epic-4: in-progress
+  epic-4: done
   4-1-operational-retrieval-through-qdrant: done
   4-2-real-llm-summary-generation-with-grounding-inputs: done
   4-3-safety-validation-before-doctor-facing-output: done
-  4-4-degraded-and-fallback-profile-presentation-rules: review
+  4-4-degraded-and-fallback-profile-presentation-rules: done
   epic-4-retrospective: optional
   epic-5: backlog
   5-1-doctor-runtime-and-access-allowlist: backlog

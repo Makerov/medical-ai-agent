@@ -1,6 +1,6 @@
 # Story 4.4: Degraded and Fallback Profile Presentation Rules
 
-Status: review
+Status: done
 
 ## Story
 
