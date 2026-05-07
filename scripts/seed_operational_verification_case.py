@@ -8,17 +8,31 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.main import app as fastapi_app
 from app.core.settings import Settings, get_settings
 from app.integrations.ocr_client import OCRClient
 from app.schemas.audit import ArtifactKind
-from app.schemas.case import CaseReadinessSnapshot, CaseRecordKind, CaseRecordReference, CaseStatus
+from app.schemas.auth import AuthorizationError, Capability, CallerRole
+from app.schemas.case import (
+    CaseReadinessSnapshot,
+    CaseRecordKind,
+    CaseRecordReference,
+    CaseStatus,
+    CaseTransitionError,
+)
 from app.schemas.demo_export import (
     DemoArtifactExportContract,
     DemoExportArtifactReference,
     DemoExportOverview,
 )
-from app.schemas.document import DocumentUploadMetadata
-from app.schemas.extraction import StructuredExtractionExampleSet
+from app.schemas.document import (
+    DocumentUploadMessageKind,
+    DocumentUploadMetadata,
+    DocumentUploadRejectionReasonCode,
+    DocumentUploadResult,
+    DocumentUploadValidationContext,
+)
+from app.schemas.extraction import DocumentProcessingResult, StructuredExtractionExampleSet
 from app.schemas.indicator import CaseIndicatorExtractionRecord
 from app.schemas.knowledge_base import (
     KnowledgeApplicability,
@@ -149,6 +163,11 @@ def seed_operational_verification_case(
     )
     intake_service.handle_document_upload(telegram_user_id=777001, document=document)
     processing_result = process_worker.process_case(case_id=fixture["case_id"], document=document)
+    doctor_case_card_delivery = handoff_service.get_doctor_case_card(
+        case_id=fixture["case_id"],
+        doctor_telegram_id=int(fixture["doctor_telegram_id"]),
+    )
+    openapi_snapshot = fastapi_app.openapi()
 
     shared_view = case_service.get_shared_status_view(fixture["case_id"])
     extracted_facts = _build_extracted_facts(
@@ -293,6 +312,42 @@ def seed_operational_verification_case(
                 extracted_facts=extracted_facts,
                 grounded_summary=grounded_summary,
                 clock=current_time,
+            ),
+        ),
+        "openapi_snapshot": _write_verification_json_artifact(
+            artifact_root=artifact_root,
+            case_id=fixture["case_id"],
+            file_name="openapi.json",
+            payload=openapi_snapshot,
+        ),
+        "example_payloads": _write_verification_json_artifact(
+            artifact_root=artifact_root,
+            case_id=fixture["case_id"],
+            file_name="example-payloads.json",
+            payload=_build_example_payloads(
+                case_id=fixture["case_id"],
+                data_classification=str(fixture["data_classification"]),
+                current_time=current_time,
+                document=document,
+                processing_result=processing_result,
+                shared_view=shared_view,
+                safety_result=safety_result,
+                handoff_delivery=handoff_delivery,
+                doctor_case_card_delivery=doctor_case_card_delivery,
+                extracted_facts=extracted_facts,
+                indicator_records=case_service.get_case_indicator_records(fixture["case_id"]),
+            ),
+        ),
+        "api_runtime_reference": _write_verification_json_artifact(
+            artifact_root=artifact_root,
+            case_id=fixture["case_id"],
+            file_name="api-runtime-reference.json",
+            payload=_build_api_runtime_reference_bundle(
+                case_id=fixture["case_id"],
+                data_classification=str(fixture["data_classification"]),
+                artifact_root=artifact_root,
+                generated_at=current_time(),
+                openapi_paths=tuple(sorted(openapi_snapshot["paths"].keys())),
             ),
         ),
     }
@@ -629,6 +684,266 @@ def _build_rag_provenance_examples(
     return example_set.model_dump(mode="json")
 
 
+def _build_example_payloads(
+    *,
+    case_id: str,
+    data_classification: str,
+    current_time: Callable[[], datetime],
+    document: DocumentUploadMetadata,
+    processing_result,
+    shared_view,
+    safety_result: SafetyCheckResult,
+    handoff_delivery,
+    doctor_case_card_delivery,
+    extracted_facts: tuple[GroundedFact, ...],
+    indicator_records: tuple[CaseIndicatorExtractionRecord, ...],
+) -> dict[str, Any]:
+    openapi_example_failure = DocumentProcessingResult(
+        case_id=case_id,
+        case_status=CaseStatus.PROCESSING_DOCUMENTS,
+        source_document=document,
+        source_document_reference=processing_result.source_document_reference,
+        extraction_reference=None,
+        extraction=None,
+        was_duplicate=False,
+        is_recoverable_failure=True,
+        failure_code="ocr_failed",
+        failure_message="OCR provider unavailable for the prepared verification case.",
+    )
+    upload_rejection = DocumentUploadResult(
+        case_id=case_id,
+        case_status=CaseStatus.DOCUMENTS_UPLOADED,
+        message_kind=DocumentUploadMessageKind.REJECTED,
+        document_metadata=document,
+        rejection_reason_code=DocumentUploadRejectionReasonCode.UNSUPPORTED_FILE_TYPE,
+        validation_context=DocumentUploadValidationContext(
+            supported_mime_types=("application/pdf", "image/jpeg", "image/png"),
+            configured_max_file_size_bytes=20_000_000,
+            configured_max_documents_per_case=1,
+            file_name=document.file_name,
+            mime_type=document.mime_type,
+            file_size=document.file_size,
+        ),
+    )
+    doctor_ready_notification = (
+        handoff_delivery.notification.model_dump(mode="json")
+        if getattr(handoff_delivery, "notification", None) is not None
+        else None
+    )
+    doctor_case_card = (
+        doctor_case_card_delivery.card.model_dump(mode="json")
+        if getattr(doctor_case_card_delivery, "card", None) is not None
+        else None
+    )
+
+    return {
+        "case_id": case_id,
+        "generated_at": current_time().isoformat(),
+        "data_classification": data_classification,
+        "canonical_path": {
+            "verification_root": f"data/artifacts/{case_id}/verification",
+            "canonical_export_bundle": f"{case_id}/verification/operational-verification-export.json",
+            "runtime_reference_bundle": f"{case_id}/verification/api-runtime-reference.json",
+            "example_payloads": f"{case_id}/verification/example-payloads.json",
+            "openapi_snapshot": f"{case_id}/verification/openapi.json",
+        },
+        "typed_examples": {
+            "shared_status": shared_view.model_dump(mode="json"),
+            "document_processing_result": processing_result.model_dump(mode="json"),
+            "document_processing_recoverable_failure": openapi_example_failure.model_dump(mode="json"),
+            "structured_extraction_examples": _build_structured_extraction_examples(
+                case_id=case_id,
+                data_classification=data_classification,
+                indicator_records=indicator_records,
+            ),
+            "safety_check_result": safety_result.model_dump(mode="json"),
+            "safety_check_examples": _build_safety_check_examples(
+                case_id=case_id,
+                data_classification=data_classification,
+                pass_result=safety_result,
+            ),
+            "doctor_ready_case_notification": doctor_ready_notification,
+            "doctor_ready_case_notification_delivery": handoff_delivery.model_dump(mode="json"),
+            "doctor_case_card": doctor_case_card,
+            "doctor_case_card_delivery": doctor_case_card_delivery.model_dump(mode="json"),
+            "document_upload_rejection": upload_rejection.model_dump(mode="json"),
+            "extracted_facts": [fact.model_dump(mode="json") for fact in extracted_facts],
+        },
+        "recoverable_error_shapes": [
+            {
+                "surface": "document_processing",
+                "code": openapi_example_failure.failure_code,
+                "recoverable": openapi_example_failure.is_recoverable_failure,
+                "payload": openapi_example_failure.model_dump(mode="json"),
+            },
+            {
+                "surface": "document_upload",
+                "code": upload_rejection.rejection_reason_code.value,
+                "recoverable": True,
+                "payload": upload_rejection.model_dump(mode="json"),
+            },
+            {
+                "surface": "doctor_access",
+                "code": "doctor_not_allowlisted",
+                "recoverable": False,
+                "payload": AuthorizationError(
+                    code="doctor_not_allowlisted",
+                    required_capability=Capability.DOCTOR_CASE_READ,
+                    caller_role=CallerRole.PATIENT,
+                ).to_public_error(),
+            },
+            {
+                "surface": "case_transition",
+                "code": "case_transition_failed",
+                "recoverable": True,
+                "payload": CaseTransitionError(
+                    code="case_transition_failed",
+                    case_id=case_id,
+                    from_status=CaseStatus.PROCESSING_DOCUMENTS,
+                    to_status=CaseStatus.READY_FOR_DOCTOR,
+                    details={
+                        "reason": "transition rejected while materializing the verification bundle",
+                    },
+                ).to_public_error(),
+            },
+        ],
+    }
+
+
+def _build_api_runtime_reference_bundle(
+    *,
+    case_id: str,
+    data_classification: str,
+    artifact_root: Path,
+    generated_at: datetime,
+    openapi_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    verification_root = artifact_root / case_id / "verification"
+    return {
+        "case_id": case_id,
+        "generated_at": generated_at.isoformat(),
+        "data_classification": data_classification,
+        "canonical_path": {
+            "verification_root": verification_root.as_posix(),
+            "docs_route": "/docs",
+            "openapi_route": "/openapi.json",
+            "canonical_path": "verification/",
+            "non_canonical_legacy_path": "demo/",
+        },
+        "source_of_truth": {
+            "openapi_snapshot": f"{case_id}/verification/openapi.json",
+            "example_payloads": f"{case_id}/verification/example-payloads.json",
+            "typed_schemas": (
+                "app.schemas.case",
+                "app.schemas.document",
+                "app.schemas.extraction",
+                "app.schemas.safety",
+                "app.schemas.handoff",
+                "app.schemas.runtime_health",
+                "app.schemas.auth",
+            ),
+            "documented_paths": openapi_paths,
+        },
+        "environment_inputs": [
+            {
+                "name": "ARTIFACT_ROOT_DIR",
+                "required": True,
+                "purpose": "Case-scoped artifact storage for verification bundles.",
+                "profile_scope": "all",
+            },
+            {
+                "name": "API_V1_PREFIX",
+                "required": True,
+                "purpose": "Canonical API prefix for runtime docs and internal routes.",
+                "profile_scope": "all",
+            },
+            {
+                "name": "DATABASE_URL",
+                "required": True,
+                "purpose": "Database connection required for operational runtime services.",
+                "profile_scope": "operational",
+            },
+            {
+                "name": "QDRANT_URL",
+                "required": True,
+                "purpose": "Retrieval backend endpoint used by operational runtime checks.",
+                "profile_scope": "operational",
+            },
+            {
+                "name": "QDRANT_COLLECTION_NAME",
+                "required": True,
+                "purpose": "Collection used by the canonical operational verification path.",
+                "profile_scope": "operational",
+            },
+            {
+                "name": "DOCTOR_TELEGRAM_ID_ALLOWLIST",
+                "required": True,
+                "purpose": "Doctor access control surface for handoff and protected routes.",
+                "profile_scope": "doctor_runtime",
+            },
+            {
+                "name": "PATIENT_BOT_TOKEN",
+                "required": False,
+                "purpose": "Only required for patient bot runtime paths.",
+                "profile_scope": "patient_bot",
+            },
+            {
+                "name": "DOCTOR_BOT_TOKEN",
+                "required": False,
+                "purpose": "Only required for doctor bot runtime paths.",
+                "profile_scope": "doctor_bot",
+            },
+            {
+                "name": "HF_TOKEN",
+                "required": False,
+                "purpose": "Only required for operational profile provider access.",
+                "profile_scope": "operational",
+            },
+            {
+                "name": "OCR_PROVIDER_NAME",
+                "required": False,
+                "purpose": "Only required when the operational OCR provider is configured.",
+                "profile_scope": "operational",
+            },
+        ],
+        "canonical_operational_guidance": [
+            "Use the typed schema payloads in example-payloads.json as the contract source.",
+            "Use machine-readable error codes from recoverable_error_shapes instead of stack traces.",
+            "Keep the verification workflow under verification/ and treat demo/ as non-canonical.",
+            "No live provider calls or real patient data are required to review these artifacts.",
+        ],
+        "recoverable_error_shapes": [
+            {
+                "surface": item["surface"],
+                "code": item["code"],
+                "recoverable": item["recoverable"],
+            }
+            for item in (
+                {
+                    "surface": "document_processing",
+                    "code": "ocr_failed",
+                    "recoverable": True,
+                },
+                {
+                    "surface": "document_upload",
+                    "code": "unsupported_file_type",
+                    "recoverable": True,
+                },
+                {
+                    "surface": "doctor_access",
+                    "code": "doctor_not_allowlisted",
+                    "recoverable": False,
+                },
+                {
+                    "surface": "case_transition",
+                    "code": "case_transition_failed",
+                    "recoverable": True,
+                },
+            )
+        ],
+    }
+
+
 def _write_json_artifact(
     audit_service: AuditService,
     *,
@@ -648,6 +963,22 @@ def _write_json_artifact(
         encoding="utf-8",
     )
     return artifact_path.absolute_path
+
+
+def _write_verification_json_artifact(
+    *,
+    artifact_root: Path,
+    case_id: str,
+    file_name: str,
+    payload: Any,
+) -> Path:
+    artifact_path = artifact_root / case_id / "verification" / file_name
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    artifact_path.write_text(
+        json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return artifact_path
 
 
 def _build_operational_verification_export_contract(
@@ -673,6 +1004,24 @@ def _build_operational_verification_export_contract(
         ),
     )
     required_artifacts = (
+        DemoExportArtifactReference(
+            label="api_runtime_reference",
+            artifact_path=artifact_paths["api_runtime_reference"].as_posix(),
+            description=(
+                "Canonical runtime API reference bundle with operational guidance and "
+                "recoverable error shapes."
+            ),
+        ),
+        DemoExportArtifactReference(
+            label="openapi_snapshot",
+            artifact_path=artifact_paths["openapi_snapshot"].as_posix(),
+            description="FastAPI OpenAPI snapshot for the internal backend surface.",
+        ),
+        DemoExportArtifactReference(
+            label="example_payloads",
+            artifact_path=artifact_paths["example_payloads"].as_posix(),
+            description="Schema-derived example payloads for case lifecycle and handoff flows.",
+        ),
         DemoExportArtifactReference(
             label="structured_extraction_examples",
             artifact_path=artifact_paths["structured_extraction_examples"].as_posix(),
