@@ -30,6 +30,8 @@ def test_readme_documents_canonical_fresh_checkout_bootstrap_path() -> None:
         "scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready"
         in readme
     )
+    assert "structured JSON" in readme
+    assert "reviewed without raw provider traces" in readme
     assert "Startup order, health checks, and recovery are part of the operator contract" in readme
     assert "api/v1/health/startup" in readme
     assert "ocr_failed" in readme
