@@ -26,6 +26,12 @@ class AuditEventType(StrEnum):
     SUMMARY_TRACE_RECORDED = "summary_trace_recorded"
 
 
+class CaseAuditReviewStatus(StrEnum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    REJECTED = "rejected"
+
+
 class ArtifactKind(StrEnum):
     EXTRACTION = "extraction"
     RAG = "rag"
@@ -303,3 +309,178 @@ class SummaryAuditTrace(BaseModel):
             msg = "Corrected summary audit traces must remain recoverable"
             raise ValueError(msg)
         return self
+
+
+class AuditReviewTransitionReference(BaseModel):
+    event_id: str = Field(min_length=1)
+    event_type: AuditEventType
+    created_at: datetime
+    from_status: str | None = None
+    to_status: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("event_id")
+    @classmethod
+    def normalize_event_id(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "Audit review transition references must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+
+class AuditReviewProviderOutcomeReference(BaseModel):
+    event_id: str = Field(min_length=1)
+    event_type: AuditEventType
+    created_at: datetime
+    outcome_code: str
+    detail: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("event_id", "outcome_code", "detail")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Audit review provider outcome references must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+
+class AuditReviewRetrievalCitation(BaseModel):
+    citation_key: str = Field(min_length=1)
+    label: str = Field(min_length=1)
+    source_kind: Literal["indicator", "knowledge"]
+    source_identifier: str = Field(min_length=1)
+    grounded: bool = False
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("citation_key", "label", "source_identifier")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "Audit review retrieval citations must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+
+class AuditReviewRecoveryEvent(BaseModel):
+    trace_id: str = Field(min_length=1)
+    decision_status: SummaryAuditDecisionStatus
+    recoverable_state: SummaryAuditRecoveryState | None = None
+    failure_reason_code: str = Field(min_length=1)
+    failure_reason: str | None = None
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("trace_id", "failure_reason_code", "failure_reason")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Audit review recovery events must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+
+class AuditReviewSummaryArtifact(BaseModel):
+    trace_id: str = Field(min_length=1)
+    summary_record: CaseRecordReference
+    decision_status: SummaryAuditDecisionStatus
+    recoverable_state: SummaryAuditRecoveryState | None = None
+    runtime_profile: str | None = None
+    presentation_state: str | None = None
+    presentation_markers: tuple[str, ...] = ()
+    minimized_payload: bool = True
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("trace_id", "runtime_profile", "presentation_state")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Audit review summary artifacts must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+
+class AuditReviewSafetyDecision(BaseModel):
+    case_id: str = Field(min_length=1)
+    decision: str = Field(min_length=1)
+    decision_rationale: str = Field(min_length=1)
+    correction_path: str | None = None
+    issue_count: int = Field(ge=0)
+
+    model_config = ConfigDict(frozen=True)
+
+
+class AuditReviewLimitation(BaseModel):
+    code: str = Field(min_length=1)
+    detail: str = Field(min_length=1)
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("code", "detail")
+    @classmethod
+    def normalize_text_fields(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            msg = "Audit review limitations must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+
+class CaseAuditReview(BaseModel):
+    case_id: str = Field(min_length=1)
+    status: CaseAuditReviewStatus
+    runtime_profile: str | None = None
+    degraded_markers: tuple[str, ...] = ()
+    fallback_markers: tuple[str, ...] = ()
+    state_transitions: tuple[AuditReviewTransitionReference, ...] = ()
+    provider_outcomes: tuple[AuditReviewProviderOutcomeReference, ...] = ()
+    retrieval_citations: tuple[AuditReviewRetrievalCitation, ...] = ()
+    retry_recovery_events: tuple[AuditReviewRecoveryEvent, ...] = ()
+    summary_artifacts: tuple[AuditReviewSummaryArtifact, ...] = ()
+    safety_decisions: tuple[AuditReviewSafetyDecision, ...] = ()
+    limitations: tuple[AuditReviewLimitation, ...] = ()
+    minimized_payload: bool = True
+
+    model_config = ConfigDict(frozen=True)
+
+    @field_validator("case_id", "runtime_profile")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Case audit review text fields must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("degraded_markers", "fallback_markers")
+    @classmethod
+    def normalize_marker_lists(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for marker in value:
+            stripped = marker.strip()
+            if not stripped:
+                msg = "Case audit review markers must not be empty"
+                raise ValueError(msg)
+            if stripped in seen:
+                continue
+            normalized.append(stripped)
+            seen.add(stripped)
+        return tuple(normalized)
