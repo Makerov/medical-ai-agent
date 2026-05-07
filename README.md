@@ -62,6 +62,7 @@ After the stack is up, run the deterministic bootstrap scripts in this order:
 ```bash
 uv run python scripts/setup_qdrant_collections.py
 uv run python scripts/seed_knowledge_base.py
+uv run python scripts/verify_startup.py --process api
 uv run python scripts/seed_operational_verification_case.py
 ```
 
@@ -180,6 +181,7 @@ uv run pytest
 Useful local URLs:
 
 - Health: http://localhost:8000/api/v1/health
+- Startup verification: http://localhost:8000/api/v1/health/startup
 - OpenAPI docs: http://localhost:8000/docs
 
 This MVP is an operational verification system. It is not production medical software and is not compliance-ready for clinical use.
