@@ -77,7 +77,7 @@ development_status:
   epic-5-retrospective: optional
   epic-6: in-progress
   6-1-runtime-health-and-readiness-checks: done
-  6-2-startup-verification-for-migrations-and-knowledge-base: ready-for-dev
+  6-2-startup-verification-for-migrations-and-knowledge-base: review
   6-3-restart-and-recovery-behavior: backlog
   6-4-operational-documentation-and-profile-guardrails: backlog
   6-5-prepared-anonymized-operational-verification-case: backlog
