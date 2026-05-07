@@ -23,6 +23,18 @@ class RuntimeReadinessStatus(StrEnum):
     NOT_READY = "not_ready"
 
 
+class StartupVerificationStatus(StrEnum):
+    PASSED = "passed"
+    DEGRADED = "degraded"
+    BLOCKED = "blocked"
+
+
+class StartupVerificationStepStatus(StrEnum):
+    READY = "ready"
+    DEGRADED = "degraded"
+    BLOCKED = "blocked"
+
+
 class RuntimeLivenessResponse(BaseModel):
     process: RuntimeProcess = RuntimeProcess.API
     status: Literal["live"] = "live"
@@ -44,4 +56,21 @@ class RuntimeReadinessResponse(BaseModel):
     status: RuntimeReadinessStatus
     runtime_profile: str = Field(min_length=1)
     dependencies: tuple[RuntimeDependencyCheck, ...]
+    reason_codes: tuple[str, ...] = ()
+
+
+class StartupVerificationStep(BaseModel):
+    name: str = Field(min_length=1)
+    required: bool
+    status: StartupVerificationStepStatus
+    reason_code: str | None = None
+    detail: str | None = None
+
+
+class StartupVerificationResponse(BaseModel):
+    process: RuntimeProcess
+    status: StartupVerificationStatus
+    runtime_profile: str = Field(min_length=1)
+    can_process_cases: bool
+    steps: tuple[StartupVerificationStep, ...]
     reason_codes: tuple[str, ...] = ()
