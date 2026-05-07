@@ -3,10 +3,10 @@
     "case_id": "case_operational_verification_ready",
     "data_classification": "synthetic_anonymized_verification",
     "example_note": "Synthetic operational verification extraction example derived from the prepared anonymized case.",
-    "extracted_at": "2026-05-04T13:49:22.318460Z",
+    "extracted_at": "2026-05-07T11:50:33.040350Z",
     "indicator_reference": {
       "case_id": "case_operational_verification_ready",
-      "created_at": "2026-05-04T13:49:22.318351Z",
+      "created_at": "2026-05-07T11:50:33.040255Z",
       "record_id": "structured_indicator:telegram_document:demo_lab_panel_pdf_v1",
       "record_kind": "indicator"
     },
@@ -14,14 +14,14 @@
       {
         "case_id": "case_operational_verification_ready",
         "confidence": 0.95,
-        "extracted_at": "2026-05-04T13:49:22.318460Z",
+        "extracted_at": "2026-05-07T11:50:33.040350Z",
         "is_uncertain": false,
         "missing_fields": [],
         "name": "Hemoglobin",
         "provider_name": "synthetic_operational_verification_fixture",
         "source_document_reference": {
           "case_id": "case_operational_verification_ready",
-          "created_at": "2026-05-04T13:49:22.318351Z",
+          "created_at": "2026-05-07T11:50:33.040255Z",
           "record_id": "telegram_document:demo_lab_panel_pdf_v1",
           "record_kind": "document"
         },
@@ -32,14 +32,14 @@
       {
         "case_id": "case_operational_verification_ready",
         "confidence": 0.95,
-        "extracted_at": "2026-05-04T13:49:22.318460Z",
+        "extracted_at": "2026-05-07T11:50:33.040350Z",
         "is_uncertain": false,
         "missing_fields": [],
         "name": "Glucose",
         "provider_name": "synthetic_operational_verification_fixture",
         "source_document_reference": {
           "case_id": "case_operational_verification_ready",
-          "created_at": "2026-05-04T13:49:22.318351Z",
+          "created_at": "2026-05-07T11:50:33.040255Z",
           "record_id": "telegram_document:demo_lab_panel_pdf_v1",
           "record_kind": "document"
         },
@@ -50,14 +50,14 @@
       {
         "case_id": "case_operational_verification_ready",
         "confidence": 0.95,
-        "extracted_at": "2026-05-04T13:49:22.318460Z",
+        "extracted_at": "2026-05-07T11:50:33.040350Z",
         "is_uncertain": false,
         "missing_fields": [],
         "name": "Creatinine",
         "provider_name": "synthetic_operational_verification_fixture",
         "source_document_reference": {
           "case_id": "case_operational_verification_ready",
-          "created_at": "2026-05-04T13:49:22.318351Z",
+          "created_at": "2026-05-07T11:50:33.040255Z",
           "record_id": "telegram_document:demo_lab_panel_pdf_v1",
           "record_kind": "document"
         },
@@ -69,7 +69,7 @@
     "provider_name": "synthetic_operational_verification_fixture",
     "raw_extraction_reference": {
       "case_id": "case_operational_verification_ready",
-      "created_at": "2026-05-04T13:49:22.318460Z",
+      "created_at": "2026-05-07T11:50:33.040350Z",
       "record_id": "extraction:telegram_document:demo_lab_panel_pdf_v1",
       "record_kind": "extraction"
     },
@@ -82,7 +82,7 @@
     },
     "source_document_reference": {
       "case_id": "case_operational_verification_ready",
-      "created_at": "2026-05-04T13:49:22.318351Z",
+      "created_at": "2026-05-07T11:50:33.040255Z",
       "record_id": "telegram_document:demo_lab_panel_pdf_v1",
       "record_kind": "document"
     },
@@ -90,7 +90,7 @@
       {
         "case_id": "case_operational_verification_ready",
         "confidence": 0.95,
-        "extracted_at": "2026-05-04T13:49:22.318460Z",
+        "extracted_at": "2026-05-07T11:50:33.040350Z",
         "is_uncertain": true,
         "missing_fields": [
           "unit"
@@ -99,7 +99,7 @@
         "provider_name": "synthetic_operational_verification_fixture",
         "source_document_reference": {
           "case_id": "case_operational_verification_ready",
-          "created_at": "2026-05-04T13:49:22.318351Z",
+          "created_at": "2026-05-07T11:50:33.040255Z",
           "record_id": "telegram_document:demo_lab_panel_pdf_v1",
           "record_kind": "document"
         },
