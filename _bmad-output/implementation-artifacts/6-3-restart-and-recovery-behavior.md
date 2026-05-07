@@ -1,6 +1,6 @@
 # Story 6.3: Restart and Recovery Behavior
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,24 +10,24 @@ Status: review
 
 ## Acceptance Criteria
 
-1. **Дано** bot или worker restart произошёл during or after case processing  
-   **Когда** runtime resumes  
-   **Тогда** system continues from persisted state or leaves the case in an explicit recoverable stop-state  
+1. **Дано** bot или worker restart произошёл during or after case processing
+   **Когда** runtime resumes
+   **Тогда** system continues from persisted state or leaves the case in an explicit recoverable stop-state
    **И** restart не marks case as successful by accident.
 
-2. **Дано** retry budget exhausted или transient failure became persistent  
-   **Когда** recovery is evaluated  
-   **Тогда** case remains in an explicit operator-visible recoverable state  
+2. **Дано** retry budget exhausted или transient failure became persistent
+   **Когда** recovery is evaluated
+   **Тогда** case remains in an explicit operator-visible recoverable state
    **И** next action is distinguishable as retry, re-upload, or manual review.
 
-3. **Дано** maintainer follows documented operational setup  
-   **Когда** runtime is started or restarted  
-   **Тогда** docs describe startup order, secret/config expectations, health checks, restart behavior, and recovery paths  
+3. **Дано** maintainer follows documented operational setup
+   **Когда** runtime is started or restarted
+   **Тогда** docs describe startup order, secret/config expectations, health checks, restart behavior, and recovery paths
    **И** the documented path remains reproducible on the canonical operational stack.
 
-4. **Дано** case is reviewed after a restart or recovery event  
-   **Когда** operator inspects audit artifacts by `case_id`  
-   **Тогда** state transitions, provider outcomes, and retry/recovery events remain visible  
+4. **Дано** case is reviewed after a restart or recovery event
+   **Когда** operator inspects audit artifacts by `case_id`
+   **Тогда** state transitions, provider outcomes, and retry/recovery events remain visible
    **И** they are not collapsed into a generic success signal.
 
 ## Tasks / Subtasks

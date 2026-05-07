@@ -1,6 +1,6 @@
 # Story 6.4: Operational Documentation and Profile Guardrails
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,14 +10,14 @@ Status: review
 
 ## Acceptance Criteria
 
-1. **Дано** maintainer читает runtime и operations docs  
-   **Когда** он следует startup и verification guidance  
-   **Тогда** docs описывают startup order, secret/config expectations, health checks, restart behavior и recovery paths  
+1. **Дано** maintainer читает runtime и operations docs
+   **Когда** он следует startup и verification guidance
+   **Тогда** docs описывают startup order, secret/config expectations, health checks, restart behavior и recovery paths
    **И** docs явно define anonymized data as the default path.
 
-2. **Дано** docs describe supported profiles  
-   **Когда** `operational`, `dev/test`, или explicit fallback behavior explained  
-   **Тогда** docs state that real providers and `Qdrant` are required in `operational profile`  
+2. **Дано** docs describe supported profiles
+   **Когда** `operational`, `dev/test`, или explicit fallback behavior explained
+   **Тогда** docs state that real providers and `Qdrant` are required in `operational profile`
    **И** they explicitly keep full production legal/compliance stack out of MVP scope.
 
 ## Tasks / Subtasks

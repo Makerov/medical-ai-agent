@@ -79,8 +79,8 @@ development_status:
   6-1-runtime-health-and-readiness-checks: done
   6-2-startup-verification-for-migrations-and-knowledge-base: done
   6-3-restart-and-recovery-behavior: done
-  6-4-operational-documentation-and-profile-guardrails: review
-  6-5-prepared-anonymized-operational-verification-case: backlog
+  6-4-operational-documentation-and-profile-guardrails: done
+  6-5-prepared-anonymized-operational-verification-case: ready-for-dev
   6-6-minimal-eval-suite-and-reviewable-quality-results: backlog
   6-7-runtime-api-reference-artifacts-and-operational-examples: backlog
   6-8-demo-path-cleanup-and-operational-verification-refactor: done
