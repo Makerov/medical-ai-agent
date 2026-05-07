@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from app.core.settings import Settings, get_settings
 from app.schemas.eval import EvalCheckResult, EvalSuiteSummary
@@ -20,14 +20,19 @@ class MinimalEvalSuite:
     def __init__(self, *, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
 
-    def run(self, *, case_id: str) -> MinimalEvalSuiteResult:
+    def run(
+        self,
+        *,
+        case_id: str,
+        artifact_layout: Literal["verification", "demo"] = "verification",
+    ) -> MinimalEvalSuiteResult:
         artifact_root = Path(self._settings.artifact_root_dir)
-        output_dir = self._resolve_output_dir(case_id=case_id)
+        output_dir = self._resolve_output_dir(case_id=case_id, artifact_layout=artifact_layout)
         artifact_path = output_dir / "minimal-eval-suite.json"
         results = (
-            self._build_extraction_check(case_id=case_id),
-            self._build_groundedness_check(case_id=case_id),
-            self._build_safety_check(case_id=case_id),
+            self._build_extraction_check(case_id=case_id, artifact_layout=artifact_layout),
+            self._build_groundedness_check(case_id=case_id, artifact_layout=artifact_layout),
+            self._build_safety_check(case_id=case_id, artifact_layout=artifact_layout),
         )
         summary = EvalSuiteSummary(
             case_id=case_id,
@@ -39,9 +44,15 @@ class MinimalEvalSuite:
         self._write_json(artifact_path, summary.model_dump(mode="json"))
         return MinimalEvalSuiteResult(summary=summary, artifact_path=artifact_path)
 
-    def _build_extraction_check(self, *, case_id: str) -> EvalCheckResult:
+    def _build_extraction_check(
+        self,
+        *,
+        case_id: str,
+        artifact_layout: Literal["verification", "demo"],
+    ) -> EvalCheckResult:
         path = self._resolve_input_path(
             case_id=case_id,
+            artifact_layout=artifact_layout,
             verification_path="export/verification/structured-extraction-examples.json",
             legacy_demo_path="export/demo/structured-extraction-examples.json",
         )
@@ -118,9 +129,15 @@ class MinimalEvalSuite:
                 return [indicator for indicator in raw_indicators if isinstance(indicator, dict)]
         return []
 
-    def _build_groundedness_check(self, *, case_id: str) -> EvalCheckResult:
+    def _build_groundedness_check(
+        self,
+        *,
+        case_id: str,
+        artifact_layout: Literal["verification", "demo"],
+    ) -> EvalCheckResult:
         path = self._resolve_input_path(
             case_id=case_id,
+            artifact_layout=artifact_layout,
             verification_path="export/verification/rag-provenance-examples.json",
             legacy_demo_path="export/demo/rag-provenance-examples.json",
         )
@@ -189,9 +206,15 @@ class MinimalEvalSuite:
             source_artifact=path,
         )
 
-    def _build_safety_check(self, *, case_id: str) -> EvalCheckResult:
+    def _build_safety_check(
+        self,
+        *,
+        case_id: str,
+        artifact_layout: Literal["verification", "demo"],
+    ) -> EvalCheckResult:
         path = self._resolve_input_path(
             case_id=case_id,
+            artifact_layout=artifact_layout,
             verification_path="safety/verification/safety-check-examples.json",
             legacy_demo_path="safety/demo/safety-check-examples.json",
         )
@@ -270,27 +293,28 @@ class MinimalEvalSuite:
         self,
         *,
         case_id: str,
+        artifact_layout: Literal["verification", "demo"],
         verification_path: str,
         legacy_demo_path: str,
     ) -> str:
         artifact_root = Path(self._settings.artifact_root_dir)
-        verification_candidate = artifact_root / case_id / verification_path
-        if verification_candidate.exists():
-            return f"{case_id}/{verification_path}"
-        legacy_candidate = artifact_root / case_id / legacy_demo_path
-        if legacy_candidate.exists():
+        if artifact_layout == "demo":
+            legacy_candidate = artifact_root / case_id / legacy_demo_path
+            if legacy_candidate.exists():
+                return f"{case_id}/{legacy_demo_path}"
             return f"{case_id}/{legacy_demo_path}"
         return f"{case_id}/{verification_path}"
 
-    def _resolve_output_dir(self, *, case_id: str) -> Path:
+    def _resolve_output_dir(
+        self,
+        *,
+        case_id: str,
+        artifact_layout: Literal["verification", "demo"],
+    ) -> Path:
         artifact_root = Path(self._settings.artifact_root_dir)
-        verification_dir = artifact_root / case_id / "verification"
-        if verification_dir.exists():
-            return verification_dir
-        legacy_demo_dir = artifact_root / case_id / "demo"
-        if legacy_demo_dir.exists():
-            return legacy_demo_dir
-        return verification_dir
+        if artifact_layout == "demo":
+            return artifact_root / case_id / "demo"
+        return artifact_root / case_id / "verification"
 
     @staticmethod
     def _write_json(path: Path, payload: dict[str, object]) -> None:
