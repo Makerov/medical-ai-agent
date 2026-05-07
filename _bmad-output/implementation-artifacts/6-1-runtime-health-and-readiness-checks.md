@@ -35,6 +35,13 @@ Status: ready-for-dev
    **Then** the endpoints are covered by deterministic tests
    **And** the public health surface remains minimal and does not leak sensitive configuration values.
 
+## Tasks/Subtasks
+
+- [x] Add typed liveness and readiness models for runtime process health.
+- [x] Implement process-aware `/api/v1/health` and `/api/v1/health/readiness` endpoints.
+- [x] Cover ready, not-ready, degraded, and process-specific readiness cases with deterministic tests.
+- [x] Verify the public health surface stays minimal and secret-free.
+
 ## Story Foundation
 
 Epic 6 is about operational verification, startup, and recovery. This story is the first operational guardrail in that epic: it separates "the process is alive" from "the runtime is actually usable" so downstream startup verification, recovery behavior, and verification case flows can rely on precise signals instead of a single ambiguous health bit.
@@ -179,17 +186,34 @@ GPT-5 Codex
 - The repository currently has only a basic liveness-style health endpoint.
 - `CaseService` already models readiness concepts that can inform operational readiness semantics.
 - This story should establish the health/readiness contract that later startup and recovery stories can depend on.
+- Implemented a shared runtime health service with typed liveness/readiness responses.
+- Added process-aware checks for `api`, `patient_bot`, `doctor_bot`, and `worker`.
+- Readiness now reports explicit dependency names and reason codes without exposing secret values.
 
 ### Completion Notes
 
 - Story context created for separate runtime health and readiness checks.
 - The story emphasizes a strict split between process liveness and dependency readiness.
 - The implementation should stay typed, minimal, and explicit about missing dependencies.
+- Implemented `RuntimeHealthService` and shared runtime health schemas.
+- Added `/api/v1/health/readiness` alongside the existing liveness endpoint.
+- Added deterministic API and service tests for ready, not-ready, degraded, and process-specific cases.
+
+## File List
+
+- `_bmad-output/implementation-artifacts/6-1-runtime-health-and-readiness-checks.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `app/api/v1/health.py`
+- `app/schemas/runtime_health.py`
+- `app/services/runtime_health_service.py`
+- `tests/api/test_health.py`
+- `tests/services/test_runtime_health_service.py`
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created story context for runtime health and readiness checks.
+- 2026-05-07: Implemented typed liveness/readiness runtime health checks, process-aware dependency evaluation, and deterministic tests.
