@@ -66,7 +66,7 @@ development_status:
   epic-4: in-progress
   4-1-operational-retrieval-through-qdrant: done
   4-2-real-llm-summary-generation-with-grounding-inputs: done
-  4-3-safety-validation-before-doctor-facing-output: ready-for-dev
+  4-3-safety-validation-before-doctor-facing-output: done
   4-4-degraded-and-fallback-profile-presentation-rules: backlog
   epic-4-retrospective: optional
   epic-5: backlog
