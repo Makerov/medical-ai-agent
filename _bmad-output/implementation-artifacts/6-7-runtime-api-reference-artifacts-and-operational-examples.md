@@ -1,6 +1,6 @@
 # Story 6.7: Runtime API Reference Artifacts and Operational Examples
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

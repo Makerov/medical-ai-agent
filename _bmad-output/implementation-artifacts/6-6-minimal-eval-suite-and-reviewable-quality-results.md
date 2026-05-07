@@ -1,6 +1,6 @@
 # Story 6.6: Minimal Eval Suite and Reviewable Quality Results
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -10,14 +10,14 @@ Status: ready-for-dev
 
 ## Acceptance Criteria
 
-1. **Дано** maintainer запускает documented eval command или workflow  
-   **Когда** eval execution completes  
-   **Тогда** проект produces results for extraction quality, groundedness, and safety boundary behavior  
+1. **Дано** maintainer запускает documented eval command или workflow
+   **Когда** eval execution completes
+   **Тогда** проект produces results for extraction quality, groundedness, and safety boundary behavior
    **И** results are reviewable without raw provider traces by default.
 
-2. **Дано** eval detects regression or failure  
-   **Когда** result is reviewed  
-   **Тогда** failing capability area is visible in structured output or summarized report  
+2. **Дано** eval detects regression or failure
+   **Когда** result is reviewed
+   **Тогда** failing capability area is visible in structured output or summarized report
    **И** outcome can be linked to the relevant case fixture, scenario, or capability under test.
 
 ## Tasks / Subtasks
