@@ -14,6 +14,7 @@ def test_readme_documents_canonical_fresh_checkout_bootstrap_path() -> None:
     assert "docker compose up --build" in readme
     assert "scripts/setup_qdrant_collections.py" in readme
     assert "scripts/seed_knowledge_base.py" in readme
+    assert "scripts/verify_startup.py --process api" in readme
     assert "scripts/seed_operational_verification_case.py" in readme
     assert (
         "scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready"
@@ -72,6 +73,7 @@ def test_readme_documents_portfolio_architecture_and_limits() -> None:
     assert "No EHR, LIS, or MIS integrations are included in the MVP." in readme
     assert "The low-concurrency assumption" in readme
     assert "docs/architecture-diagram.md" in readme
+    assert "api/v1/health/startup" in readme
 
 
 def test_architecture_diagram_exists_and_is_referenced() -> None:
@@ -98,7 +100,10 @@ def test_compose_documents_fresh_checkout_api_entrypoint() -> None:
     assert 'postgres:' in compose
     assert 'qdrant:' in compose
     assert 'image: qdrant/qdrant:v1.17.1' in compose
-    assert 'DATABASE_URL: postgresql://medical_ai_agent:medical_ai_agent@postgres:5432/medical_ai_agent' in compose
+    assert (
+        "DATABASE_URL: postgresql://medical_ai_agent:medical_ai_agent@postgres:5432/"
+        "medical_ai_agent"
+    ) in compose
     assert '"127.0.0.1:8000:8000"' in compose
     assert '"127.0.0.1:5432:5432"' in compose
     assert '"127.0.0.1:6333:6333"' in compose
