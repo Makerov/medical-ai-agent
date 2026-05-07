@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from app.core.settings import Settings, get_settings
+from app.integrations.llm_client import LLMClient, LLMClientError
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.rag import (
     DoctorFacingDeviationMarker,
@@ -11,11 +13,23 @@ from app.schemas.rag import (
     GroundedSummaryContract,
     KnowledgeApplicabilityDecision,
     KnowledgeRetrievalResult,
+    SummaryGenerationFailure,
+    SummaryGenerationInput,
+    SummaryGenerationResult,
 )
 from app.services.boundary_copy import HUMAN_REVIEW_STATEMENT, SAFETY_BOUNDARY_STATEMENT
 
 
 class SummaryService:
+    def __init__(
+        self,
+        *,
+        llm_client: LLMClient | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self._llm_client = llm_client
+        self._settings = settings or get_settings()
+
     def build_doctor_facing_summary_draft(
         self,
         *,
@@ -56,6 +70,53 @@ class SummaryService:
             uncertainty_markers=uncertainty_markers,
             questions_for_doctor=questions_for_doctor,
         )
+
+    def generate_grounded_summary(
+        self,
+        *,
+        case_id: str,
+        grounded_summary: GroundedSummaryContract,
+        patient_goal_context: str | None = None,
+        indicators: Sequence[StructuredMedicalIndicator] = (),
+        retrievals: Sequence[KnowledgeRetrievalResult] = (),
+        applicability_decisions: Sequence[KnowledgeApplicabilityDecision] = (),
+    ) -> SummaryGenerationResult:
+        request = SummaryGenerationInput(
+            case_id=case_id,
+            patient_goal_context=patient_goal_context,
+            grounded_summary=grounded_summary,
+            retrievals=tuple(retrievals),
+            applicability_decisions=tuple(applicability_decisions),
+            extracted_facts=grounded_summary.grounded_facts,
+        )
+        grounding_notes = self._build_grounding_notes(
+            grounded_summary=grounded_summary,
+            retrievals=retrievals,
+            applicability_decisions=applicability_decisions,
+        )
+        if self._llm_client is None:
+            return self._build_failure_result(
+                request=request,
+                failure=SummaryGenerationFailure(
+                    code="llm_client_unavailable",
+                    reason="llm_provider_missing",
+                    detail="No LLM client is configured for summary generation",
+                ),
+                grounding_notes=grounding_notes,
+            )
+        try:
+            result = self._llm_client.generate_summary(request)
+        except (LLMClientError, Exception) as exc:
+            return self._build_failure_result(
+                request=request,
+                failure=SummaryGenerationFailure(
+                    code=getattr(exc, "code", "provider_request_failed"),
+                    reason="llm_provider_failure",
+                    detail=str(exc),
+                ),
+                grounding_notes=grounding_notes,
+            )
+        return result
 
     def _build_possible_deviations(
         self,
@@ -243,3 +304,38 @@ class SummaryService:
         if questions_for_doctor:
             parts.append(f"Questions for doctor: {len(questions_for_doctor)}.")
         return " ".join(parts)
+
+    def _build_grounding_notes(
+        self,
+        *,
+        grounded_summary: GroundedSummaryContract,
+        retrievals: Sequence[KnowledgeRetrievalResult],
+        applicability_decisions: Sequence[KnowledgeApplicabilityDecision],
+    ) -> tuple[str, ...]:
+        notes: list[str] = []
+        if any(not retrieval.grounded for retrieval in retrievals):
+            notes.append("incomplete_retrieval_grounding")
+        if any(not decision.is_applicable for decision in applicability_decisions):
+            notes.append("partial_applicability")
+        if grounded_summary.validation.has_unsupported_claims:
+            notes.append("unsupported_claims_present")
+        if not notes:
+            notes.append("grounding_complete")
+        return tuple(notes)
+
+    def _build_failure_result(
+        self,
+        *,
+        request: SummaryGenerationInput,
+        failure: SummaryGenerationFailure,
+        grounding_notes: tuple[str, ...],
+    ) -> SummaryGenerationResult:
+        return SummaryGenerationResult(
+            status="summary_failed",
+            grounded_summary=None,
+            failure=failure,
+            grounding_is_complete=False,
+            grounding_notes=grounding_notes,
+            llm_provider_name=None,
+            structured_inputs=request,
+        )
