@@ -1,6 +1,6 @@
 # Story 5.3: Doctor Review Surface for Facts, Questions, and Provenance
 
-Status: review
+Status: done
 
 ## Story
 

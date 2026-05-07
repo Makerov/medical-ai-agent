@@ -1,6 +1,6 @@
 # Story 5.4: Case-Scoped Audit Review by `case_id`
 
-Status: review
+Status: done
 
 ## Story
 

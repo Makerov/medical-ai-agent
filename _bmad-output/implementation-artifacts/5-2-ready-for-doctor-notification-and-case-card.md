@@ -1,6 +1,6 @@
 # Story 5.2: Ready for Doctor Notification and Case Card
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
