@@ -256,7 +256,7 @@ The suite checks three typed categories:
 - groundedness: retrieval evidence stays linked to extracted facts or curated sources;
 - safety: unsupported diagnosis, treatment, and overconfident clinical language remain blocked or corrected.
 
-The default outputs are synthetic or anonymized, case-linked, and deterministic in artifact shape. The suite does not use real patient documents or live model calls for the default verification fixture set.
+The default outputs are synthetic or anonymized, case-linked, deterministic in artifact shape, and emitted as structured JSON that can be reviewed without raw provider traces. The suite does not use real patient documents or live model calls for the default verification fixture set.
 
 ## Architecture Diagram
 
