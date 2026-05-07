@@ -75,6 +75,7 @@ ALLOWED_CASE_TRANSITIONS: dict[CaseStatus, frozenset[CaseStatus]] = {
     CaseStatus.READY_FOR_DOCTOR: frozenset(
         {
             CaseStatus.DOCTOR_REVIEWED,
+            CaseStatus.SAFETY_FAILED,
             CaseStatus.DELETION_REQUESTED,
         }
     ),
