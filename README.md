@@ -72,6 +72,21 @@ Optional verification for the prepared anonymized verification case:
 uv run python scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready
 ```
 
+### Restart and recovery
+
+If the bot, API worker, or a provider restarts during processing, resume from the persisted case state instead of treating the run as successful by default.
+
+- Re-run the interrupted workflow step after the service comes back up.
+- Treat `partial_extraction`, `retrieval_failed`, `summary_failed`, and `safety_failed` as explicit recoverable states.
+- Use `retry_recovery_events` in the audit review bundle to see whether the next action is a retry, a re-upload, or manual review.
+- Use `case_id`-scoped audit artifacts to confirm the last state transition and provider outcome before deciding the next operator action.
+
+Typical next actions:
+
+- Retry when the failure was transient and the underlying service is healthy again.
+- Re-upload when the missing input or source document was never linked to the case.
+- Manual review when safety blocked the draft or the failure remains persistent after retries.
+
 Expected operational verification processing time:
 
 - API startup is usually a few seconds on a warm machine.
