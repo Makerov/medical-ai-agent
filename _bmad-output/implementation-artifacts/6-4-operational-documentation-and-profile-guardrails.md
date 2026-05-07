@@ -1,6 +1,6 @@
 # Story 6.4: Operational Documentation and Profile Guardrails
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -22,19 +22,19 @@ Status: ready-for-dev
 
 ## Tasks / Subtasks
 
-- [ ] Update `README.md` so the canonical operational verification path clearly distinguishes:
-  - `local` as the default synthetic/anonymized path
-  - `operational` as the explicit real-provider path
-  - `dev/test` as non-operational usage
-  - explicit fallback profiles as intentionally degraded and visible downstream
-- [ ] Align `docs/architecture-diagram.md` with the operational profile guardrails and remove any leftover portfolio/demo-first framing from the active canonical description.
-- [ ] Extend `tests/docs/test_demo_setup_docs.py` to lock the docs contract around:
-  - startup order
-  - health/readiness and restart/recovery references
-  - anonymized default data path
-  - operational profile requirements for real providers and `Qdrant`
-  - explicit fallback visibility and MVP compliance scope
-- [ ] Keep any doc wording aligned with existing typed runtime settings and health contracts instead of inventing new profile names or env variables.
+- [x] Update `README.md` so the canonical operational verification path clearly distinguishes:
+  - [x] `local` as the default synthetic/anonymized path
+  - [x] `operational` as the explicit real-provider path
+  - [x] `dev/test` as non-operational usage
+  - [x] explicit fallback profiles as intentionally degraded and visible downstream
+- [x] Align `docs/architecture-diagram.md` with the operational profile guardrails and remove any leftover portfolio/demo-first framing from the active canonical description.
+- [x] Extend `tests/docs/test_demo_setup_docs.py` to lock the docs contract around:
+  - [x] startup order
+  - [x] health/readiness and restart/recovery references
+  - [x] anonymized default data path
+  - [x] operational profile requirements for real providers and `Qdrant`
+  - [x] explicit fallback visibility and MVP compliance scope
+- [x] Keep any doc wording aligned with existing typed runtime settings and health contracts instead of inventing new profile names or env variables.
 
 ## Dev Notes
 
@@ -137,18 +137,28 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-05-07: Updated README operational profile guidance, architecture diagram wording, and docs regression tests; verified with `uv run pytest`.
+
 ### Completion Notes List
+
+- Reworded the README to make `local` the default synthetic/anonymized path, `operational` the explicit real-provider path, `dev/test` non-operational, and explicit fallback profiles intentionally visible downstream.
+- Reworked `docs/architecture-diagram.md` to describe the operational verification artifact instead of a portfolio/demo-first artifact.
+- Extended `tests/docs/test_demo_setup_docs.py` to lock startup order, health/readiness and recovery guidance, anonymized defaults, operational provider requirements, fallback visibility, and MVP compliance scope.
+- Verified the full test suite with `uv run pytest` and confirmed all 329 tests passed.
 
 ### File List
 
 - [`README.md`](/Users/maker/Work/medical-ai-agent/README.md)
 - [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md)
 - [`tests/docs/test_demo_setup_docs.py`](/Users/maker/Work/medical-ai-agent/tests/docs/test_demo_setup_docs.py)
+- [`_bmad-output/implementation-artifacts/sprint-status.yaml`](/Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts/sprint-status.yaml)
+- [`_bmad-output/implementation-artifacts/6-4-operational-documentation-and-profile-guardrails.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts/6-4-operational-documentation-and-profile-guardrails.md)
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created story context for operational documentation and profile guardrails.
+- 2026-05-07: Implemented operational documentation guardrails and docs regression coverage; updated status to review.
