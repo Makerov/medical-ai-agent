@@ -146,9 +146,39 @@ class SummaryAuditTraceMetadata(BaseModel):
     citation_count: int = Field(ge=0)
     unsupported_claim_count: int = Field(ge=0)
     safety_issue_count: int = Field(ge=0)
+    runtime_profile: str | None = None
+    presentation_state: str | None = None
+    presentation_markers: tuple[str, ...] = ()
     minimized_payload: bool = True
 
     model_config = ConfigDict(frozen=True)
+
+    @field_validator("runtime_profile", "presentation_state")
+    @classmethod
+    def normalize_optional_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Summary audit trace metadata text fields must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("presentation_markers")
+    @classmethod
+    def normalize_presentation_markers(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for marker in value:
+            stripped = marker.strip()
+            if not stripped:
+                msg = "Summary audit trace metadata presentation markers must not be empty"
+                raise ValueError(msg)
+            if stripped in seen:
+                continue
+            normalized.append(stripped)
+            seen.add(stripped)
+        return tuple(normalized)
 
 
 class SummaryAuditFactReference(BaseModel):
