@@ -26,7 +26,7 @@
         "provenance_summary": "Hemoglobin Test (medlineplus-hemoglobin-test)",
         "reason": "indicator_context_matches_curated_applicability",
         "source_metadata": {
-          "accessed_at": "2026-05-04",
+          "accessed_at": "2026-05-07",
           "citation_key": "medlineplus-hemoglobin-test",
           "publisher": "MedlinePlus / National Library of Medicine",
           "source_id": "medlineplus_hemoglobin_test",
@@ -203,6 +203,8 @@
       },
       "limitation_notes": "Lab-specific reference ranges still govern final interpretation.",
       "retrieval": {
+        "failure_code": null,
+        "failure_detail": null,
         "grounded": true,
         "indicator": {
           "name": "Hemoglobin",
@@ -234,7 +236,7 @@
             "retrieval_text": "Hemoglobin reference ranges vary by laboratory and patient factors.",
             "score": 0.93,
             "source_metadata": {
-              "accessed_at": "2026-05-04",
+              "accessed_at": "2026-05-07",
               "citation_key": "medlineplus-hemoglobin-test",
               "publisher": "MedlinePlus / National Library of Medicine",
               "source_id": "medlineplus_hemoglobin_test",
@@ -245,11 +247,12 @@
           }
         ],
         "reason": null,
-        "retrieved_at": "2026-05-04T13:49:22.329620Z"
+        "retrieved_at": "2026-05-07T11:50:33.085926Z",
+        "status": "grounded"
       },
       "summary_reference": {
         "case_id": "case_operational_verification_ready",
-        "created_at": "2026-05-04T13:49:22.329646Z",
+        "created_at": "2026-05-07T11:50:33.085951Z",
         "record_id": "summary_operational_verification_ready",
         "record_kind": "summary"
       }
@@ -423,6 +426,8 @@
       },
       "limitation_notes": "Retrieval failed because no trustworthy knowledge entries were found for the indicator.",
       "retrieval": {
+        "failure_code": null,
+        "failure_detail": null,
         "grounded": false,
         "indicator": {
           "name": "Creatinine",
@@ -432,11 +437,12 @@
         },
         "matches": [],
         "reason": "no_trustworthy_knowledge_entries_found",
-        "retrieved_at": "2026-05-04T13:49:22.329688Z"
+        "retrieved_at": "2026-05-07T11:50:33.085989Z",
+        "status": "grounded"
       },
       "summary_reference": {
         "case_id": "case_operational_verification_ready",
-        "created_at": "2026-05-04T13:49:22.329695Z",
+        "created_at": "2026-05-07T11:50:33.085997Z",
         "record_id": "summary_operational_verification_ready",
         "record_kind": "summary"
       }
