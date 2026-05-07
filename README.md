@@ -169,10 +169,15 @@ Stable verification artifact locations:
 
 - Seed data and generated outputs: `data/artifacts/<case_id>/`
 - Operational verification export bundle: `data/artifacts/<case_id>/verification/operational-verification-export.json`
+- Runtime API reference bundle: `data/artifacts/<case_id>/verification/api-runtime-reference.json`
+- Schema-derived example payloads: `data/artifacts/<case_id>/verification/example-payloads.json`
+- OpenAPI snapshot: `data/artifacts/<case_id>/verification/openapi.json`
 - Synthetic extraction, grounding, and safety examples: `data/artifacts/<case_id>/export/verification/`
 - Minimal eval suite output: `data/artifacts/<case_id>/verification/minimal-eval-suite.json`
 
-The repo uses synthetic or anonymized defaults for the operational verification path. The documented paths are intended to make seed data, export outputs, and eval results easy to find from the README alone.
+The repo uses synthetic or anonymized defaults for the operational verification path. The documented paths are intended to make seed data, export outputs, runtime API references, and eval results easy to find from the README alone.
+
+The runtime reference bundle stays aligned with the typed schemas and the FastAPI OpenAPI snapshot. It includes the canonical `verification/` path, required environment/config inputs, schema-derived payload examples for case lifecycle, document processing, extraction, safety, and handoff, plus structured recoverable error shapes. No live provider calls or real patient data are required to review the canonical bundle.
 
 ## Backend scaffold
 
