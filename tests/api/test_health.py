@@ -106,6 +106,30 @@ def test_readiness_endpoint_returns_machine_readable_dependency_details(
     assert "hf-token" not in str(payload)
 
 
+def test_startup_endpoint_returns_structured_verification_report(tmp_path: Path) -> None:
+    service = _build_ready_runtime_health_service(tmp_path)
+    app.dependency_overrides[get_runtime_health_service] = lambda: service
+    try:
+        response = TestClient(app).get("/api/v1/health/startup")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["process"] == RuntimeProcess.API.value
+    assert payload["status"] == "passed"
+    assert payload["can_process_cases"] is True
+    assert [step["name"] for step in payload["steps"]] == [
+        "runtime_profile",
+        "schema_compatibility",
+        "qdrant_collection",
+    ]
+    assert "postgresql://localhost:5432/medical" not in str(payload)
+    assert "patient-token" not in str(payload)
+    assert "doctor-token" not in str(payload)
+    assert "hf-token" not in str(payload)
+
+
 def test_readiness_endpoint_can_report_other_processes(tmp_path: Path) -> None:
     service = _build_ready_runtime_health_service(tmp_path)
     app.dependency_overrides[get_runtime_health_service] = lambda: service
@@ -134,6 +158,7 @@ def test_openapi_schema_contains_health_route() -> None:
     assert response.status_code == 200
     assert "/api/v1/health" in response.json()["paths"]
     assert "/api/v1/health/readiness" in response.json()["paths"]
+    assert "/api/v1/health/startup" in response.json()["paths"]
 
 
 def test_settings_reject_invalid_api_prefix(monkeypatch) -> None:
