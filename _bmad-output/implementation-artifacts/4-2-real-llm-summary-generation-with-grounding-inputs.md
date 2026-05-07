@@ -1,6 +1,6 @@
 # Story 4.2: Real `LLM` Summary Generation with Grounding Inputs
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -22,22 +22,22 @@ so that the produced case package reflects actual runtime behavior and provider 
 
 ## Tasks / Subtasks
 
-- [ ] Wire summary generation to the configured real `LLM` provider in `operational profile`. (AC: 1, 2)
-  - [ ] Confirm the current summary orchestration path and where the provider boundary is resolved.
-  - [ ] Keep `LLM` access behind the backend service/integration boundary; do not call provider SDKs from bot handlers or workflow nodes directly.
-  - [ ] Ensure the generation step consumes structured grounding inputs from retrieval, not ad hoc concatenated text.
-- [ ] Preserve the grounding contract expected by downstream safety and doctor-facing presentation steps. (AC: 1)
-  - [ ] Reuse retrieval output from Story 4.1 as structured context, including source metadata, applicability notes, and limitations.
-  - [ ] Keep generated summary artifacts machine-readable so safety validation can inspect claims, citations, and limitations.
-  - [ ] Distinguish “generated with incomplete grounding” from “generation failed” in the returned status model.
-- [ ] Add explicit recoverable failure handling for missing or invalid `LLM` configuration. (AC: 2)
-  - [ ] Map provider initialization, request, timeout, and transport failures to `summary_failed` or an equivalent explicit recoverable state.
-  - [ ] Prevent any fallback path from silently swapping in a mock/stub provider in `operational profile`.
-  - [ ] Keep failure reasons machine-readable so later workflow steps can branch deterministically.
-- [ ] Add deterministic regression coverage for summary generation boundaries. (AC: 1, 2)
-  - [ ] Cover success with structured grounded inputs from retrieval.
-  - [ ] Cover provider unavailability or invalid configuration and verify the case is recoverable.
-  - [ ] Cover the no-silent-fallback rule and verify the workflow does not present a fake success.
+- [x] Wire summary generation to the configured real `LLM` provider in `operational profile`. (AC: 1, 2)
+  - [x] Confirm the current summary orchestration path and where the provider boundary is resolved.
+  - [x] Keep `LLM` access behind the backend service/integration boundary; do not call provider SDKs from bot handlers or workflow nodes directly.
+  - [x] Ensure the generation step consumes structured grounding inputs from retrieval, not ad hoc concatenated text.
+- [x] Preserve the grounding contract expected by downstream safety and doctor-facing presentation steps. (AC: 1)
+  - [x] Reuse retrieval output from Story 4.1 as structured context, including source metadata, applicability notes, and limitations.
+  - [x] Keep generated summary artifacts machine-readable so safety validation can inspect claims, citations, and limitations.
+  - [x] Distinguish “generated with incomplete grounding” from “generation failed” in the returned status model.
+- [x] Add explicit recoverable failure handling for missing or invalid `LLM` configuration. (AC: 2)
+  - [x] Map provider initialization, request, timeout, and transport failures to `summary_failed` or an equivalent explicit recoverable state.
+  - [x] Prevent any fallback path from silently swapping in a mock/stub provider in `operational profile`.
+  - [x] Keep failure reasons machine-readable so later workflow steps can branch deterministically.
+- [x] Add deterministic regression coverage for summary generation boundaries. (AC: 1, 2)
+  - [x] Cover success with structured grounded inputs from retrieval.
+  - [x] Cover provider unavailability or invalid configuration and verify the case is recoverable.
+  - [x] Cover the no-silent-fallback rule and verify the workflow does not present a fake success.
 
 ## Dev Notes
 
@@ -181,6 +181,9 @@ GPT-5 Codex
 - `epic-4` is already `in-progress`, so this story should stay within the existing epic lifecycle.
 - Story 4.1 is already the retrieval dependency; this story must consume its structured grounding output and keep the contract stable for Story 4.3.
 - The main implementation risk is a fake-summary path: the code must never present a mock/stub provider as a real operational `LLM` or hide provider failure behind a happy path.
+- Implemented a typed `LLM` boundary in `app/integrations/llm_client.py` and a summary generation path in `SummaryService` that returns explicit recoverable failure states instead of silently falling back.
+- Added `GenerateSummaryNode` to keep workflow orchestration behind the backend service boundary.
+- Added regression coverage for structured generation inputs, provider failure mapping, and no-silent-fallback behavior.
 
 ### Implementation Plan
 
@@ -195,19 +198,23 @@ GPT-5 Codex
 - Epic 4 status should remain `in-progress` when sprint status is updated.
 - Story 4.1 already supplies structured retrieval context; this story must not rebuild or weaken that contract.
 - Summary generation should feed forward into safety validation without collapsing grounding, citations, or limitation signals.
+- Summary generation now uses structured grounding inputs and reports `summary_failed` with machine-readable failure details when provider access is missing or broken.
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created the story context for real `LLM` summary generation with grounding inputs.
+- 2026-05-07: Implemented real provider boundary handling, structured summary generation inputs, recoverable failure mapping, and regression tests.
 
 ## Completion Notes
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
 - Summary generation must use the real provider boundary, accept structured grounding inputs, and surface provider failures as explicit recoverable state.
+- Implemented `SummaryService.generate_grounded_summary`, `app/integrations/llm_client.py`, and `app/workflow/nodes/generate_summary.py`.
+- Full test suite passed locally: `294 passed`.
 
 ## File List
 
@@ -219,3 +226,8 @@ ready-for-dev
 - `app/services/rag_service.py`
 - `app/services/summary_service.py`
 - `app/workflow/transitions.py`
+- `app/integrations/llm_client.py`
+- `app/workflow/nodes/generate_summary.py`
+- `app/workflow/nodes/__init__.py`
+- `tests/services/test_summary_service.py`
+- `tests/workflow/test_generate_summary.py`
