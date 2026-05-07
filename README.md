@@ -93,7 +93,7 @@ Startup order, health checks, and recovery are part of the operator contract:
 If the bot, API worker, or a provider restarts during processing, resume from the persisted case state instead of treating the run as successful by default.
 
 - Re-run the interrupted workflow step after the service comes back up.
-- Treat `partial_extraction`, `retrieval_failed`, `summary_failed`, and `safety_failed` as explicit recoverable states.
+- Treat `ocr_failed`, `partial_extraction`, `retrieval_failed`, `summary_failed`, `safety_failed`, and `manual_review_required` as explicit recoverable states.
 - Use `retry_recovery_events` in the audit review bundle to see whether the next action is a retry, a re-upload, or manual review.
 - Use `case_id`-scoped audit artifacts to confirm the last state transition and provider outcome before deciding the next operator action.
 
@@ -102,6 +102,7 @@ Typical next actions:
 - Retry when the failure was transient and the underlying service is healthy again.
 - Re-upload when the missing input or source document was never linked to the case.
 - Manual review when safety blocked the draft or the failure remains persistent after retries.
+- Inspect logs when OCR, provider access, or startup verification failed before attempting a retry.
 
 Expected operational verification processing time:
 
