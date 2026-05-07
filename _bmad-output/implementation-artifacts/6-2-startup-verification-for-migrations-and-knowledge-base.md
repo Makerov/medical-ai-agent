@@ -1,6 +1,6 @@
 # Story 6.2: Startup Verification for Migrations and Knowledge Base
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -22,11 +22,11 @@ So that broken schema, missing collections, or invalid setup are caught before h
 
 ## Tasks / Subtasks
 
-- [ ] Add a structured startup verification contract for schema compatibility and knowledge-base readiness.
-- [ ] Implement or extend a startup verification command that checks persistence setup and required `Qdrant` collections.
-- [ ] Surface verification failures in operator-facing output without leaking secrets or raw connection values.
-- [ ] Wire verification outcomes into readiness so failed setup remains explicitly not-ready.
-- [ ] Cover success, schema-compatibility failure, missing collection, and degraded/partial setup cases with deterministic tests.
+- [x] Add a structured startup verification contract for schema compatibility and knowledge-base readiness.
+- [x] Implement or extend a startup verification command that checks persistence setup and required `Qdrant` collections.
+- [x] Surface verification failures in operator-facing output without leaking secrets or raw connection values.
+- [x] Wire verification outcomes into readiness so failed setup remains explicitly not-ready.
+- [x] Cover success, schema-compatibility failure, missing collection, and degraded/partial setup cases with deterministic tests.
 
 ## Story Foundation
 
@@ -200,27 +200,31 @@ GPT-5 Codex
 - Story context created for startup verification of migrations/schema compatibility and knowledge-base readiness.
 - The story emphasizes structured startup output and a strict link between verification failure and not-ready runtime state.
 - The implementation should stay typed, explicit, and operational rather than demo-centric.
+- Implemented a typed startup verification report in `app/schemas/runtime_health.py` plus a `verify_startup` command in `scripts/verify_startup.py`.
+- Wired startup verification into `RuntimeHealthService` and exposed it through `GET /api/v1/health/startup` so readiness now reflects blocked setup explicitly.
+- Added deterministic coverage for passed, blocked, and degraded startup states, plus secret-redaction checks for the CLI and API responses.
 
 ## File List
 
 - `_bmad-output/implementation-artifacts/6-2-startup-verification-for-migrations-and-knowledge-base.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `README.md`
 - `app/api/v1/health.py`
-- `app/core/settings.py`
 - `app/schemas/runtime_health.py`
 - `app/services/runtime_health_service.py`
-- `scripts/setup_qdrant_collections.py`
-- `scripts/seed_knowledge_base.py`
-- `README.md`
+- `scripts/verify_startup.py`
 - `tests/api/test_health.py`
+- `tests/docs/test_demo_setup_docs.py`
+- `tests/schemas/test_runtime_health.py`
+- `tests/scripts/test_verify_startup.py`
 - `tests/services/test_runtime_health_service.py`
-- `tests/scripts/test_knowledge_base_seed.py`
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created story context for startup verification of migrations/schema compatibility and knowledge-base readiness.
 - 2026-05-07: Marked the story ready for development.
+- 2026-05-07: Implemented typed startup verification, CLI/API exposure, readiness wiring, README updates, and deterministic regression coverage.
