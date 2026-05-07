@@ -65,7 +65,12 @@ def test_readme_lists_env_vars_profile_guardrails_and_safety_warning() -> None:
     assert "real provider configuration, `Qdrant`, and the startup verification gate" in readme
     assert "case_operational_verification_ready" in readme
     assert "data/artifacts/<case_id>/verification/operational-verification-export.json" in readme
+    assert "data/artifacts/<case_id>/verification/api-runtime-reference.json" in readme
+    assert "data/artifacts/<case_id>/verification/example-payloads.json" in readme
+    assert "data/artifacts/<case_id>/verification/openapi.json" in readme
     assert "data/artifacts/<case_id>/verification/minimal-eval-suite.json" in readme
+    assert "required environment/config inputs" in readme
+    assert "structured recoverable error shapes" in readme
     assert "manual_review_required" in readme
 
 
