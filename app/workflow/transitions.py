@@ -29,6 +29,7 @@ ALLOWED_CASE_TRANSITIONS: dict[CaseStatus, frozenset[CaseStatus]] = {
         {
             CaseStatus.PARTIAL_EXTRACTION,
             CaseStatus.EXTRACTION_FAILED,
+            CaseStatus.RETRIEVAL_FAILED,
             CaseStatus.READY_FOR_SUMMARY,
             CaseStatus.DELETION_REQUESTED,
         }
@@ -42,6 +43,12 @@ ALLOWED_CASE_TRANSITIONS: dict[CaseStatus, frozenset[CaseStatus]] = {
     CaseStatus.PARTIAL_EXTRACTION: frozenset(
         {
             CaseStatus.DOCUMENTS_UPLOADED,
+            CaseStatus.DELETION_REQUESTED,
+        }
+    ),
+    CaseStatus.RETRIEVAL_FAILED: frozenset(
+        {
+            CaseStatus.READY_FOR_SUMMARY,
             CaseStatus.DELETION_REQUESTED,
         }
     ),
