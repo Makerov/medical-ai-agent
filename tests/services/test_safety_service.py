@@ -130,6 +130,17 @@ def test_safety_service_blocks_diagnosis_and_treatment_language() -> None:
     assert result.correction_path == "manual_review_required"
 
 
+def test_safety_service_blocks_unsupported_certainty_language() -> None:
+    service = SafetyService()
+    draft = _build_summary_draft(narrative="This is definitely confirmed diagnosis wording.")
+
+    result = service.validate_doctor_facing_summary(case_id="case_123", draft=draft)
+
+    assert result.decision == "blocked"
+    assert "unsupported_clinical_certainty" in {issue.category for issue in result.issues}
+    assert result.correction_path == "manual_review_required"
+
+
 def test_safety_service_marks_borderline_phrasing_as_recoverable() -> None:
     service = SafetyService()
     draft = _build_summary_draft(narrative="This may be borderline and uncertain.")
