@@ -10,7 +10,11 @@ def test_readme_documents_canonical_fresh_checkout_bootstrap_path() -> None:
     readme = README_PATH.read_text(encoding="utf-8")
 
     assert "## Local operational verification setup" in readme
-    assert "canonical fresh-checkout path uses the `local` runtime profile and synthetic/anonymized defaults" in readme
+    assert (
+        "canonical fresh-checkout path uses the `local` runtime profile and "
+        "synthetic/anonymized defaults"
+        in readme
+    )
     assert "Copy `.env.example` to `.env`" in readme
     assert "Supported runtime profiles" in readme
     assert "`local` is the default synthetic/anonymized path" in readme
@@ -28,6 +32,9 @@ def test_readme_documents_canonical_fresh_checkout_bootstrap_path() -> None:
     )
     assert "Startup order, health checks, and recovery are part of the operator contract" in readme
     assert "api/v1/health/startup" in readme
+    assert "ocr_failed" in readme
+    assert "manual_review_required" in readme
+    assert "Inspect logs when OCR, provider access, or startup verification failed" in readme
     assert "uv sync" in readme
     assert "uv run uvicorn app.main:app --reload" in readme
     assert "uv run medical-ai-api" in readme
@@ -47,12 +54,17 @@ def test_readme_lists_env_vars_profile_guardrails_and_safety_warning() -> None:
     assert "Expected operational verification processing time" in readme
     assert "synthetic or anonymized knowledge-base fixtures" in readme
     assert "Real patient data requires separate legal, security, and compliance review" in readme
-    assert "The MVP intentionally keeps the full production legal/compliance stack out of scope" in readme
+    assert (
+        "The MVP intentionally keeps the full production legal/compliance stack out of "
+        "scope"
+        in readme
+    )
     assert "`operational` profile is separate from the default `local` path" in readme
     assert "real provider configuration, `Qdrant`, and the startup verification gate" in readme
     assert "case_operational_verification_ready" in readme
     assert "data/artifacts/<case_id>/verification/operational-verification-export.json" in readme
     assert "data/artifacts/<case_id>/verification/minimal-eval-suite.json" in readme
+    assert "manual_review_required" in readme
 
 
 def test_env_example_documents_local_demo_contract() -> None:
