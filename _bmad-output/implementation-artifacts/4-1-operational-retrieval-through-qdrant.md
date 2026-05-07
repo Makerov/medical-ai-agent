@@ -1,6 +1,6 @@
 # Story 4.1: Operational Retrieval Through `Qdrant`
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,14 +10,14 @@ So that doctor-facing reasoning is based on real retrieval rather than simulated
 
 ## Acceptance Criteria
 
-1. **Given** extracted indicators are ready for grounding  
-   **When** retrieval is executed in `operational profile`  
-   **Then** the workflow queries the configured `Qdrant` retrieval boundary  
+1. **Given** extracted indicators are ready for grounding
+   **When** retrieval is executed in `operational profile`
+   **Then** the workflow queries the configured `Qdrant` retrieval boundary
    **And** the result captures source metadata, applicability notes, and limitations.
 
-2. **Given** retrieval cannot access `Qdrant` or finds no applicable sources  
-   **When** the step completes  
-   **Then** the case enters `retrieval_failed` or an equivalent recoverable state  
+2. **Given** retrieval cannot access `Qdrant` or finds no applicable sources
+   **When** the step completes
+   **Then** the case enters `retrieval_failed` or an equivalent recoverable state
    **And** the workflow does not silently fabricate grounded citations.
 
 ## Tasks / Subtasks

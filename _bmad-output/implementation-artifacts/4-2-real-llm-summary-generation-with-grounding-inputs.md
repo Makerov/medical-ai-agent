@@ -1,6 +1,6 @@
 # Story 4.2: Real `LLM` Summary Generation with Grounding Inputs
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,14 +10,14 @@ so that the produced case package reflects actual runtime behavior and provider 
 
 ## Acceptance Criteria
 
-1. **Given** the runtime is in `operational profile`  
-   **When** summary generation is triggered  
-   **Then** the workflow uses the configured real `LLM` provider  
+1. **Given** the runtime is in `operational profile`
+   **When** summary generation is triggered
+   **Then** the workflow uses the configured real `LLM` provider
    **And** the generation step receives extracted facts and retrieval context as structured inputs.
 
-2. **Given** the `LLM` provider is unavailable or invalidly configured  
-   **When** generation is attempted  
-   **Then** the case enters `summary_failed` or an equivalent recoverable state  
+2. **Given** the `LLM` provider is unavailable or invalidly configured
+   **When** generation is attempted
+   **Then** the case enters `summary_failed` or an equivalent recoverable state
    **And** the system does not silently replace the provider with a `mock` or `stub`.
 
 ## Tasks / Subtasks
