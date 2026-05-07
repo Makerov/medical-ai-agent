@@ -90,11 +90,14 @@ class KnowledgeRetrievalResult(BaseModel):
     matches: tuple[KnowledgeRetrievalMatch, ...] = ()
     grounded: bool = False
     reason: str | None = None
+    status: Literal["grounded", "limited", "retrieval_failed"] = "grounded"
+    failure_code: str | None = None
+    failure_detail: str | None = None
     retrieved_at: datetime
 
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("reason")
+    @field_validator("reason", "failure_code", "failure_detail")
     @classmethod
     def normalize_reason(cls, value: str | None) -> str | None:
         if value is None:
@@ -104,6 +107,10 @@ class KnowledgeRetrievalResult(BaseModel):
     @property
     def is_not_grounded(self) -> bool:
         return not self.grounded
+
+    @property
+    def is_recoverable_failure(self) -> bool:
+        return self.status == "retrieval_failed"
 
 
 ApplicabilityDecisionStatus = Literal["applicable", "not_applicable", "insufficient_context"]
