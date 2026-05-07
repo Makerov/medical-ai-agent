@@ -65,7 +65,7 @@ development_status:
   epic-3-retrospective: optional
   epic-4: in-progress
   4-1-operational-retrieval-through-qdrant: review
-  4-2-real-llm-summary-generation-with-grounding-inputs: backlog
+  4-2-real-llm-summary-generation-with-grounding-inputs: ready-for-dev
   4-3-safety-validation-before-doctor-facing-output: backlog
   4-4-degraded-and-fallback-profile-presentation-rules: backlog
   epic-4-retrospective: optional
