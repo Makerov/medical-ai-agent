@@ -140,6 +140,7 @@ def test_minimal_eval_suite_writes_case_linked_synthetic_results(tmp_path: Path)
         "groundedness",
         "safety",
     ]
+    assert all(item["case_id"] == case_id for item in payload["results"])
     assert payload["results"][0]["threshold_signal"] == "required_fields_present"
     assert payload["results"][1]["fixture_id"] == "grounded_hemoglobin_provenance"
     assert payload["results"][2]["failure_reason"] is None
@@ -172,12 +173,81 @@ def test_minimal_eval_suite_reruns_with_stable_artifact_shape(tmp_path: Path, mo
     ]
 
 
-def test_minimal_eval_suite_supports_legacy_demo_artifact_layout(tmp_path: Path) -> None:
+def test_minimal_eval_suite_defaults_to_verification_artifact_layout(
+    tmp_path: Path,
+) -> None:
+    case_id = "case_demo_happy_path"
+    _write_legacy_demo_artifacts(tmp_path, case_id)
+    verification_dir = tmp_path / case_id / "export" / "verification"
+    verification_dir.mkdir(parents=True, exist_ok=True)
+    (verification_dir / "structured-extraction-examples.json").write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "data_classification": "synthetic_anonymized_verification",
+                "indicators": [
+                    {
+                        "name": "Hemoglobin",
+                        "value": 13.2,
+                        "unit": "g/dL",
+                        "confidence": 0.98,
+                        "source_document_reference": {"record_id": "doc-1"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (verification_dir / "rag-provenance-examples.json").write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "data_classification": "synthetic_anonymized_verification",
+                "examples": [
+                    {
+                        "example_id": "grounded_hemoglobin_provenance",
+                        "grounded": True,
+                        "summary_reference": {"case_id": case_id, "record_id": "summary-1"},
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    safety_dir = tmp_path / case_id / "safety" / "verification"
+    safety_dir.mkdir(parents=True, exist_ok=True)
+    (safety_dir / "safety-check-examples.json").write_text(
+        json.dumps(
+            {
+                "case_id": case_id,
+                "data_classification": "synthetic_anonymized_verification",
+                "examples": [
+                    {"decision": "pass", "issues": []},
+                    {"decision": "blocked", "issues": [{"category": "diagnosis_language"}]},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
+
+    result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
+
+    assert result.summary.case_id == case_id
+    assert result.artifact_path == tmp_path / case_id / "verification" / "minimal-eval-suite.json"
+    assert not (tmp_path / case_id / "demo" / "minimal-eval-suite.json").exists()
+    assert [item.outcome for item in result.summary.results] == ["pass", "pass", "pass"]
+
+
+def test_minimal_eval_suite_can_run_in_explicit_legacy_demo_mode(tmp_path: Path) -> None:
     case_id = "case_demo_happy_path"
     _write_legacy_demo_artifacts(tmp_path, case_id)
     settings = Settings(artifact_root_dir=tmp_path, doctor_telegram_id_allowlist=(123456,))
 
-    result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
+    result = MinimalEvalSuite(settings=settings).run(
+        case_id=case_id,
+        artifact_layout="demo",
+    )
 
     assert result.summary.case_id == case_id
     assert result.artifact_path == tmp_path / case_id / "demo" / "minimal-eval-suite.json"
@@ -209,6 +279,16 @@ def test_minimal_eval_suite_returns_failures_for_partial_verification_artifacts(
     result = MinimalEvalSuite(settings=settings).run(case_id=case_id)
 
     assert [item.outcome for item in result.summary.results] == ["fail", "fail", "fail"]
+    assert [item.category for item in result.summary.results] == [
+        "extraction",
+        "groundedness",
+        "safety",
+    ]
+    assert result.summary.results[0].fixture_id == "structured_extraction_examples"
     assert result.summary.results[0].failure_reason is not None
     assert result.summary.results[1].threshold_signal == "missing_grounded_example"
+    assert result.summary.results[1].fixture_id == "grounded_provenance_examples"
+    assert result.summary.results[1].failure_reason is not None
     assert result.summary.results[2].threshold_signal == "missing_safety_block"
+    assert result.summary.results[2].fixture_id == f"{case_id}:blocked_example"
+    assert result.summary.results[2].failure_reason is not None

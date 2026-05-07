@@ -587,3 +587,94 @@ def test_record_summary_trace_marks_insufficient_grounding_as_recoverable() -> N
     assert trace.recoverable_state == "grounding_retry_required"
     assert trace.failure_reason == "claim_lacks_grounded_support"
     assert trace.metadata.unsupported_claim_count == 1
+
+
+def test_get_case_audit_review_preserves_retry_and_recovery_visibility_across_restart() -> None:
+    now = datetime(2026, 5, 1, 10, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_audit_restart")
+    patient_case = case_service.create_case()
+    audit_service = AuditService(
+        case_service=case_service,
+        artifact_root_dir=Path("data/artifacts"),
+        clock=lambda: now,
+    )
+    grounded_summary, retrieval, summary_reference = _build_grounded_summary(
+        case_id=patient_case.case_id,
+    )
+    blocked_safety_result = SafetyCheckResult(
+        case_id=patient_case.case_id,
+        decision="blocked",
+        issues=(
+            SafetyIssue(
+                category="diagnosis_language",
+                severity="high",
+                message="Diagnosis language is not allowed in the doctor-facing summary draft.",
+                evidence="diagnosis",
+            ),
+        ),
+        decision_rationale="Unsafe clinical language requires blocking before handoff.",
+        correction_path="manual_review_required",
+    )
+    passed_safety_result = SafetyCheckResult(
+        case_id=patient_case.case_id,
+        decision="pass",
+        issues=(),
+        decision_rationale="Summary draft contains no blocked safety language.",
+    )
+
+    audit_service.record_event(
+        case_id=patient_case.case_id,
+        event_type=AuditEventType.CASE_STATUS_CHANGED,
+        metadata={"from_status": "processing_documents", "to_status": "summary_failed"},
+        event_id="audit_transition_restart_001",
+        created_at=now,
+    )
+    blocked_trace = audit_service.record_summary_trace(
+        case_id=patient_case.case_id,
+        summary_reference=summary_reference,
+        grounded_summary=grounded_summary,
+        safety_check_result=blocked_safety_result,
+        retrievals=(retrieval,),
+        trace_id="audit_trace_restart_blocked_001",
+    )
+    audit_service.record_event(
+        case_id=patient_case.case_id,
+        event_type=AuditEventType.CASE_STATUS_CHANGED,
+        metadata={"from_status": "summary_failed", "to_status": "ready_for_summary"},
+        event_id="audit_transition_restart_002",
+        created_at=now,
+    )
+    passed_trace = audit_service.record_summary_trace(
+        case_id=patient_case.case_id,
+        summary_reference=summary_reference,
+        grounded_summary=grounded_summary,
+        safety_check_result=passed_safety_result,
+        retrievals=(retrieval,),
+        trace_id="audit_trace_restart_passed_001",
+    )
+
+    review = audit_service.get_case_audit_review(case_id=patient_case.case_id)
+
+    assert review.status == "complete"
+    assert [transition.to_status for transition in review.state_transitions] == [
+        "summary_failed",
+        "ready_for_summary",
+    ]
+    assert [outcome.outcome_code for outcome in review.provider_outcomes] == [
+        "blocked",
+        "passed",
+    ]
+    assert [event.decision_status for event in review.retry_recovery_events] == [
+        "blocked",
+        "passed",
+    ]
+    assert [event.recoverable_state for event in review.retry_recovery_events] == [
+        "manual_review_required",
+        "ready_for_doctor",
+    ]
+    assert [artifact.trace_id for artifact in review.summary_artifacts] == [
+        blocked_trace.trace_id,
+        passed_trace.trace_id,
+    ]
+    assert review.retry_recovery_events[0].failure_reason_code == "blocked_by_safety"
+    assert review.retry_recovery_events[1].failure_reason_code == "none"

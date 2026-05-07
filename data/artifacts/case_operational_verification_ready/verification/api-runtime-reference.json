@@ -1,0 +1,121 @@
+{
+  "canonical_operational_guidance": [
+    "Use the typed schema payloads in example-payloads.json as the contract source.",
+    "Use machine-readable error codes from recoverable_error_shapes instead of stack traces.",
+    "Keep the verification workflow under verification/ and treat demo/ as non-canonical.",
+    "No live provider calls or real patient data are required to review these artifacts."
+  ],
+  "canonical_path": {
+    "canonical_path": "verification/",
+    "docs_route": "/docs",
+    "non_canonical_legacy_path": "demo/",
+    "openapi_route": "/openapi.json",
+    "verification_root": "/Users/maker/Work/medical-ai-agent/data/artifacts/case_operational_verification_ready/verification"
+  },
+  "case_id": "case_operational_verification_ready",
+  "data_classification": "synthetic_anonymized_verification",
+  "environment_inputs": [
+    {
+      "name": "ARTIFACT_ROOT_DIR",
+      "profile_scope": "all",
+      "purpose": "Case-scoped artifact storage for verification bundles.",
+      "required": true
+    },
+    {
+      "name": "API_V1_PREFIX",
+      "profile_scope": "all",
+      "purpose": "Canonical API prefix for runtime docs and internal routes.",
+      "required": true
+    },
+    {
+      "name": "DATABASE_URL",
+      "profile_scope": "operational",
+      "purpose": "Database connection required for operational runtime services.",
+      "required": true
+    },
+    {
+      "name": "QDRANT_URL",
+      "profile_scope": "operational",
+      "purpose": "Retrieval backend endpoint used by operational runtime checks.",
+      "required": true
+    },
+    {
+      "name": "QDRANT_COLLECTION_NAME",
+      "profile_scope": "operational",
+      "purpose": "Collection used by the canonical operational verification path.",
+      "required": true
+    },
+    {
+      "name": "DOCTOR_TELEGRAM_ID_ALLOWLIST",
+      "profile_scope": "doctor_runtime",
+      "purpose": "Doctor access control surface for handoff and protected routes.",
+      "required": true
+    },
+    {
+      "name": "PATIENT_BOT_TOKEN",
+      "profile_scope": "patient_bot",
+      "purpose": "Only required for patient bot runtime paths.",
+      "required": false
+    },
+    {
+      "name": "DOCTOR_BOT_TOKEN",
+      "profile_scope": "doctor_bot",
+      "purpose": "Only required for doctor bot runtime paths.",
+      "required": false
+    },
+    {
+      "name": "HF_TOKEN",
+      "profile_scope": "operational",
+      "purpose": "Only required for operational profile provider access.",
+      "required": false
+    },
+    {
+      "name": "OCR_PROVIDER_NAME",
+      "profile_scope": "operational",
+      "purpose": "Only required when the operational OCR provider is configured.",
+      "required": false
+    }
+  ],
+  "generated_at": "2026-05-07T11:50:33.088625+00:00",
+  "recoverable_error_shapes": [
+    {
+      "code": "ocr_failed",
+      "recoverable": true,
+      "surface": "document_processing"
+    },
+    {
+      "code": "unsupported_file_type",
+      "recoverable": true,
+      "surface": "document_upload"
+    },
+    {
+      "code": "doctor_not_allowlisted",
+      "recoverable": false,
+      "surface": "doctor_access"
+    },
+    {
+      "code": "case_transition_failed",
+      "recoverable": true,
+      "surface": "case_transition"
+    }
+  ],
+  "source_of_truth": {
+    "documented_paths": [
+      "/api/v1/doctor/protected-smoke",
+      "/api/v1/health",
+      "/api/v1/health/readiness",
+      "/api/v1/health/startup"
+    ],
+    "example_payloads": "case_operational_verification_ready/verification/example-payloads.json",
+    "openapi_snapshot": "case_operational_verification_ready/verification/openapi.json",
+    "typed_schemas": [
+      "app.schemas.case",
+      "app.schemas.document",
+      "app.schemas.extraction",
+      "app.schemas.safety",
+      "app.schemas.handoff",
+      "app.schemas.runtime_health",
+      "app.schemas.auth"
+    ]
+  }
+}

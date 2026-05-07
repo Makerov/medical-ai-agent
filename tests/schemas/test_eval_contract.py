@@ -37,3 +37,21 @@ def test_eval_suite_summary_links_all_results_to_same_case() -> None:
 
     assert summary.synthetic_by_default is True
     assert summary.case_id == "case-1"
+
+
+def test_eval_check_result_exposes_stable_failure_fields() -> None:
+    result = EvalCheckResult(
+        category="groundedness",
+        fixture_id="grounded_provenance_examples",
+        case_id="case-1",
+        outcome="fail",
+        score=0.0,
+        threshold_signal="missing_grounded_example",
+        failure_reason="RAG provenance examples did not include a grounded example",
+        source_artifact="case-1/export/verification/rag-provenance-examples.json",
+    )
+
+    assert result.category == "groundedness"
+    assert result.fixture_id == "grounded_provenance_examples"
+    assert result.threshold_signal == "missing_grounded_example"
+    assert result.failure_reason is not None

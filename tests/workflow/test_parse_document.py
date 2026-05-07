@@ -428,7 +428,7 @@ def test_parse_document_marks_failure_without_exposing_raw_error_details() -> No
 
     assert result.case_status == CaseStatus.EXTRACTION_FAILED
     assert result.is_recoverable_failure is True
-    assert result.failure_code == "ocr_processing_failed"
+    assert result.failure_code == "ocr_failed"
     assert "timeout" not in result.failure_message.lower()
     assert case_service.get_case_core_records(patient_case.case_id).extractions == ()
     assert (
@@ -455,7 +455,10 @@ def test_parse_document_maps_ocr_provider_unavailable_to_recoverable_failure() -
         now=now,
     )
 
-    def unavailable_parser(document_bytes: bytes, payload: DocumentUploadMetadata) -> tuple[str, float]:
+    def unavailable_parser(
+        document_bytes: bytes,
+        payload: DocumentUploadMetadata,
+    ) -> tuple[str, float]:
         raise RuntimeError("provider unavailable: maintenance window")
 
     client = OCRClient(
@@ -469,7 +472,7 @@ def test_parse_document_maps_ocr_provider_unavailable_to_recoverable_failure() -
 
     assert result.case_status == CaseStatus.EXTRACTION_FAILED
     assert result.is_recoverable_failure is True
-    assert result.failure_code == "ocr_processing_failed"
+    assert result.failure_code == "ocr_failed"
     assert result.failure_message == "Не удалось обработать документ."
     assert "maintenance" not in result.failure_message.lower()
     assert case_service.get_case_core_records(patient_case.case_id).extractions == ()
@@ -510,7 +513,7 @@ def test_parse_document_maps_timeout_style_ocr_failure_to_recoverable_failure() 
 
     assert result.case_status == CaseStatus.EXTRACTION_FAILED
     assert result.is_recoverable_failure is True
-    assert result.failure_code == "ocr_processing_failed"
+    assert result.failure_code == "ocr_failed"
     assert "timed out" not in result.failure_message.lower()
     assert case_service.get_case_core_records(patient_case.case_id).patient_case.status == (
         CaseStatus.EXTRACTION_FAILED
@@ -545,7 +548,7 @@ def test_parse_document_is_idempotent_for_repeated_failure_execution() -> None:
     first_result = node.parse_document(case_id=patient_case.case_id, document=document)
     second_result = node.parse_document(case_id=patient_case.case_id, document=document)
 
-    assert first_result.failure_code == "ocr_processing_failed"
+    assert first_result.failure_code == "ocr_failed"
     assert second_result.failure_code == "processing_state_unavailable"
     assert second_result.was_duplicate is False
     assert len(case_service.get_case_extraction_records(patient_case.case_id)) == 0

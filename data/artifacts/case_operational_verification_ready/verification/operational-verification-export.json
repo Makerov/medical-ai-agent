@@ -16,7 +16,7 @@
     }
   ],
   "export_path": "case_operational_verification_ready/verification/operational-verification-export.json",
-  "generated_at": "2026-05-04T13:49:22.331352Z",
+  "generated_at": "2026-05-07T11:50:33.089454Z",
   "optional_artifacts": [
     {
       "artifact_path": "case_operational_verification_ready/export/verification/shared-status.json",
@@ -34,7 +34,7 @@
   "overview": {
     "case_id": "case_operational_verification_ready",
     "data_classification": "synthetic_anonymized_verification",
-    "generated_at": "2026-05-04T13:49:22.331352Z",
+    "generated_at": "2026-05-07T11:50:33.089454Z",
     "non_goals": [
       "No autonomous diagnosis or treatment guidance.",
       "No real patient documents required.",
@@ -45,6 +45,24 @@
     "title": "Operational verification artifact export"
   },
   "required_artifacts": [
+    {
+      "artifact_path": "case_operational_verification_ready/verification/api-runtime-reference.json",
+      "description": "Canonical runtime API reference bundle with operational guidance and recoverable error shapes.",
+      "label": "api_runtime_reference",
+      "optional": false
+    },
+    {
+      "artifact_path": "case_operational_verification_ready/verification/openapi.json",
+      "description": "FastAPI OpenAPI snapshot for the internal backend surface.",
+      "label": "openapi_snapshot",
+      "optional": false
+    },
+    {
+      "artifact_path": "case_operational_verification_ready/verification/example-payloads.json",
+      "description": "Schema-derived example payloads for case lifecycle and handoff flows.",
+      "label": "example_payloads",
+      "optional": false
+    },
     {
       "artifact_path": "case_operational_verification_ready/export/verification/structured-extraction-examples.json",
       "description": "Structured extraction and indicator payloads derived from the prepared anonymized verification case.",

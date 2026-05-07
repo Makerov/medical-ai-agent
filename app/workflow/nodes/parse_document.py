@@ -195,7 +195,7 @@ class ParseDocumentNode:
                 case_status=failed_case,
                 document=document,
                 source_document_reference=source_document_reference,
-                failure_code="ocr_processing_failed",
+                failure_code="ocr_failed",
                 failure_message="Не удалось обработать документ.",
                 is_recoverable_failure=True,
             )

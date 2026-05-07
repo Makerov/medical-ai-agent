@@ -14,13 +14,20 @@ This repository is intended to be runnable from a fresh checkout without manual 
 
 ### Fresh-checkout bootstrap
 
-The canonical operational verification path is:
+The canonical fresh-checkout path uses the `local` runtime profile and synthetic/anonymized defaults.
 
 1. Copy `.env.example` to `.env`.
 2. Keep the synthetic/anonymized defaults unless you are intentionally exercising optional adapters.
 3. Start the local stack with Docker Compose.
 4. Run the documented bootstrap scripts in order.
 5. Optionally run the minimal eval suite on the prepared anonymized verification case.
+
+Supported runtime profiles:
+
+- `local` is the default synthetic/anonymized path for fresh checkout and verification work.
+- `operational` is the explicit real-provider path and requires configured real providers plus `Qdrant`.
+- `dev/test` is for non-operational development and test workflows.
+- explicit fallback profiles such as `fallback_stub` are intentionally degraded and must remain visible downstream.
 
 ### Required environment variables
 
@@ -47,6 +54,8 @@ Copy `.env.example` to `.env` and fill the values that apply to your local run:
 
 For the default local operational verification run, the bot token, allowlist, and HF values can stay empty unless you are exercising the Telegram adapters or model-backed flows. The containerized stack uses the API, PostgreSQL, and Qdrant services defined in `docker-compose.yml`, while host-run scripts use the `.env` file directly.
 
+The `operational` profile is separate from the default `local` path. It requires real provider configuration, `Qdrant`, and the startup verification gate to pass before cases are processed.
+
 ### Documented startup paths
 
 Preferred containerized operational verification path:
@@ -62,6 +71,7 @@ After the stack is up, run the deterministic bootstrap scripts in this order:
 ```bash
 uv run python scripts/setup_qdrant_collections.py
 uv run python scripts/seed_knowledge_base.py
+uv run python scripts/verify_startup.py --process api
 uv run python scripts/seed_operational_verification_case.py
 ```
 
@@ -70,6 +80,29 @@ Optional verification for the prepared anonymized verification case:
 ```bash
 uv run python scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready
 ```
+
+Startup order, health checks, and recovery are part of the operator contract:
+
+- Run `scripts/setup_qdrant_collections.py` before seeding knowledge base content.
+- Run `scripts/verify_startup.py --process api` after the services are up to confirm readiness and startup verification.
+- Use `api/v1/health` and `api/v1/health/startup` to inspect liveness, readiness, and startup verification before retrying or recovering a run.
+- If a service restarts mid-flow, resume from persisted case state instead of assuming success.
+
+### Restart and recovery
+
+If the bot, API worker, or a provider restarts during processing, resume from the persisted case state instead of treating the run as successful by default.
+
+- Re-run the interrupted workflow step after the service comes back up.
+- Treat `ocr_failed`, `partial_extraction`, `retrieval_failed`, `summary_failed`, `safety_failed`, and `manual_review_required` as explicit recoverable states.
+- Use `retry_recovery_events` in the audit review bundle to see whether the next action is a retry, a re-upload, or manual review.
+- Use `case_id`-scoped audit artifacts to confirm the last state transition and provider outcome before deciding the next operator action.
+
+Typical next actions:
+
+- Retry when the failure was transient and the underlying service is healthy again.
+- Re-upload when the missing input or source document was never linked to the case.
+- Manual review when safety blocked the draft or the failure remains persistent after retries.
+- Inspect logs when OCR, provider access, or startup verification failed before attempting a retry.
 
 Expected operational verification processing time:
 
@@ -108,6 +141,7 @@ The default operational verification path uses synthetic or anonymized knowledge
 - `data/knowledge_base/hemoglobin-test.json`
 
 These fixtures keep the local verification path on non-production sample content by default. Real patient data requires separate legal, security, and compliance review before use.
+The MVP intentionally keeps the full production legal/compliance stack out of scope; the repository documents the operational verification contract without claiming clinical deployment readiness.
 
 ## Operational Overview
 
@@ -123,6 +157,7 @@ Major runtime boundaries:
 - Pydantic schemas validate structured contracts before downstream use.
 - The safety gate blocks or corrects unsupported doctor-facing output before it is shown.
 - Verification artifacts remain case-scoped so maintainers can trace every output through the same `case_id`.
+- Explicit fallback profiles stay visible downstream through runtime profile markers rather than being silently substituted.
 
 The architecture diagram is stored at [`docs/architecture-diagram.md`](/Users/maker/Work/medical-ai-agent/docs/architecture-diagram.md) and is linked as a standalone operational artifact.
 
@@ -134,10 +169,15 @@ Stable verification artifact locations:
 
 - Seed data and generated outputs: `data/artifacts/<case_id>/`
 - Operational verification export bundle: `data/artifacts/<case_id>/verification/operational-verification-export.json`
+- Runtime API reference bundle: `data/artifacts/<case_id>/verification/api-runtime-reference.json`
+- Schema-derived example payloads: `data/artifacts/<case_id>/verification/example-payloads.json`
+- OpenAPI snapshot: `data/artifacts/<case_id>/verification/openapi.json`
 - Synthetic extraction, grounding, and safety examples: `data/artifacts/<case_id>/export/verification/`
 - Minimal eval suite output: `data/artifacts/<case_id>/verification/minimal-eval-suite.json`
 
-The repo uses synthetic or anonymized defaults for the operational verification path. The documented paths are intended to make seed data, export outputs, and eval results easy to find from the README alone.
+The repo uses synthetic or anonymized defaults for the operational verification path. The documented paths are intended to make seed data, export outputs, runtime API references, and eval results easy to find from the README alone.
+
+The runtime reference bundle stays aligned with the typed schemas and the FastAPI OpenAPI snapshot. It includes the canonical `verification/` path, required environment/config inputs, schema-derived payload examples for case lifecycle, document processing, extraction, safety, and handoff, plus structured recoverable error shapes. No live provider calls or real patient data are required to review the canonical bundle.
 
 ## Backend scaffold
 
@@ -180,6 +220,7 @@ uv run pytest
 Useful local URLs:
 
 - Health: http://localhost:8000/api/v1/health
+- Startup verification: http://localhost:8000/api/v1/health/startup
 - OpenAPI docs: http://localhost:8000/docs
 
 This MVP is an operational verification system. It is not production medical software and is not compliance-ready for clinical use.
@@ -202,6 +243,7 @@ This is an MVP operational verification environment, not a production clinical p
 - Future growth features should be treated as planned work, not current capability.
 
 The low-concurrency assumption means the verification path is designed for sequential walkthroughs, deterministic artifact review, and local validation rather than high-volume concurrent traffic or hospital-grade operational guarantees.
+The `dev/test` and explicit fallback paths are intentionally non-canonical, while the `operational` profile is reserved for the real-provider runtime contract.
 
 ### Minimal eval suite
 
@@ -219,7 +261,7 @@ The suite checks three typed categories:
 - groundedness: retrieval evidence stays linked to extracted facts or curated sources;
 - safety: unsupported diagnosis, treatment, and overconfident clinical language remain blocked or corrected.
 
-The default outputs are synthetic or anonymized, case-linked, and deterministic in artifact shape. The suite does not use real patient documents or live model calls for the default verification fixture set.
+The default outputs are synthetic or anonymized, case-linked, deterministic in artifact shape, and emitted as structured JSON that can be reviewed without raw provider traces. The suite does not use real patient documents or live model calls for the default verification fixture set.
 
 ## Architecture Diagram
 
