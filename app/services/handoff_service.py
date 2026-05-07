@@ -210,6 +210,11 @@ class HandoffService:
             ),
             indicators=self._flatten_indicators(indicator_records),
         )
+        presentation_state, presentation_markers = self._build_presentation_state(
+            runtime_profile=self._settings.runtime_profile,
+            summary_draft=summary_draft,
+            source_references=source_references,
+        )
         safety_result, safety_failure_detail = self._validate_summary_for_doctor(
             case_id=case_id,
             draft=summary_draft,
@@ -223,6 +228,9 @@ class HandoffService:
                 case_id=case_id,
                 current_case_status=view.lifecycle_status.value,
                 shared_status=view.handoff_readiness.shared_status,
+                runtime_profile=self._settings.runtime_profile,
+                presentation_state=presentation_state,
+                presentation_markers=presentation_markers,
                 doctor_review_status=view.doctor_review_status,
                 doctor_review_reason=view.doctor_review_reason,
                 ai_boundary_label=SAFETY_BOUNDARY_STATEMENT,
@@ -249,6 +257,9 @@ class HandoffService:
                     "doctor_telegram_id": doctor_telegram_id,
                     "delivery_status": "sent",
                     "card_status": view.handoff_readiness.shared_status.value,
+                    "runtime_profile": self._settings.runtime_profile,
+                    "presentation_state": presentation_state,
+                    "presentation_marker_count": len(presentation_markers),
                 },
             )
             return DoctorCaseCardDelivery(
@@ -638,6 +649,29 @@ class HandoffService:
                 ),
             )
         return DoctorCaseSourceReferenceState(case_id=case_id, references=tuple(references))
+
+    @staticmethod
+    def _build_presentation_state(
+        *,
+        runtime_profile: str,
+        summary_draft: DoctorFacingSummaryDraft,
+        source_references: DoctorCaseSourceReferenceState,
+    ) -> tuple[str, tuple[str, ...]]:
+        markers: list[str] = []
+        if runtime_profile != "operational":
+            markers.append(f"runtime_profile:{runtime_profile}")
+        if summary_draft.uncertainty_markers:
+            markers.append("uncertainty_visible")
+        if summary_draft.possible_deviations:
+            markers.append("limitations_visible")
+        if source_references.unavailable_reason is not None:
+            markers.append("source_limitations_visible")
+        unique_markers = tuple(dict.fromkeys(markers))
+        if runtime_profile != "operational":
+            return "unverified", unique_markers
+        if unique_markers:
+            return "degraded", unique_markers
+        return "operational", ()
 
     @staticmethod
     def _build_grounded_summary(
