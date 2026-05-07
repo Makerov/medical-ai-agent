@@ -1,6 +1,6 @@
 # Story 6.5: Prepared Anonymized Operational Verification Case
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -12,14 +12,14 @@ Status: review
 
 ## Acceptance Criteria
 
-1. **Дано** operational stack поднят и доступен  
-   **Когда** maintainer запускает documented verification flow  
-   **Тогда** prepared anonymized case проходит через intake, document processing, grounding, summary generation, safety validation и doctor handoff  
+1. **Дано** operational stack поднят и доступен
+   **Когда** maintainer запускает documented verification flow
+   **Тогда** prepared anonymized case проходит через intake, document processing, grounding, summary generation, safety validation и doctor handoff
    **И** verification flow использует те же runtime boundaries, что и real operational path.
 
-2. **Дано** verification case падает на dependency или workflow step  
-   **Когда** outcome reviewed  
-   **Тогда** failure visible через case state, operational logs или verification output  
+2. **Дано** verification case падает на dependency или workflow step
+   **Когда** outcome reviewed
+   **Тогда** failure visible через case state, operational logs или verification output
    **И** next remediation step documented для operator.
 
 ## Tasks / Subtasks
