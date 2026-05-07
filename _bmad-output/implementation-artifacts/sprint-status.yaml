@@ -69,8 +69,8 @@ development_status:
   4-3-safety-validation-before-doctor-facing-output: done
   4-4-degraded-and-fallback-profile-presentation-rules: done
   epic-4-retrospective: optional
-  epic-5: backlog
-  5-1-doctor-runtime-and-access-allowlist: backlog
+  epic-5: in-progress
+  5-1-doctor-runtime-and-access-allowlist: ready-for-dev
   5-2-ready-for-doctor-notification-and-case-card: backlog
   5-3-doctor-review-surface-for-facts-questions-and-provenance: backlog
   5-4-case-scoped-audit-review-by-case-id: backlog
