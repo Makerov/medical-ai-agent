@@ -11,7 +11,9 @@ from app.schemas.case import (
 )
 from app.schemas.document import DocumentUploadMetadata
 from app.schemas.handoff import DoctorReadyCaseNotificationStatus
+from app.schemas.rag import DoctorFacingSummaryDraft
 from app.schemas.indicator import CaseIndicatorExtractionRecord, StructuredMedicalIndicator
+from app.schemas.safety import SafetyCheckResult, SafetyIssue
 from app.schemas.patient import ConsultationGoal, PatientIntakePayload, PatientProfile
 from app.services.case_service import CaseService
 from app.services.handoff_service import HandoffService
@@ -34,6 +36,21 @@ class RecordingAuditService:
         _ = event_id, created_at
         self.recorded.append((case_id, event_type, dict(metadata or {})))
         return SimpleNamespace(event_id=f"audit_{len(self.recorded):03d}")
+
+
+class StubSafetyService:
+    def __init__(self, result: SafetyCheckResult) -> None:
+        self.result = result
+        self.calls: list[tuple[str, DoctorFacingSummaryDraft]] = []
+
+    def validate_doctor_facing_summary(
+        self,
+        *,
+        case_id: str,
+        draft: DoctorFacingSummaryDraft,
+    ) -> SafetyCheckResult:
+        self.calls.append((case_id, draft))
+        return self.result
 
 
 def _build_ready_case(case_service: CaseService) -> str:
@@ -177,6 +194,110 @@ def test_mark_case_ready_for_review_sends_minimal_notification_for_allowlisted_d
         )
     ]
 
+
+def test_get_doctor_case_card_passes_safety_and_keeps_ready_for_doctor() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_card_safe_001")
+    audit_service = RecordingAuditService()
+    safety_service = StubSafetyService(
+        SafetyCheckResult(
+            case_id="case_card_safe_001",
+            decision="pass",
+            issues=(),
+            decision_rationale="Summary draft contains no blocked safety language.",
+        )
+    )
+    handoff_service = HandoffService(
+        case_service=case_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        safety_service=safety_service,  # type: ignore[arg-type]
+        settings=Settings(doctor_telegram_id_allowlist=(123456,)),
+    )
+    case_id = _build_ready_case(case_service)
+
+    handoff_service.mark_case_ready_for_review(case_id=case_id, doctor_telegram_id=123456)
+    delivery = handoff_service.get_doctor_case_card(case_id=case_id, doctor_telegram_id=123456)
+
+    assert len(safety_service.calls) == 1
+    assert delivery.card is not None
+    assert delivery.rejection is None
+    assert delivery.card.current_case_status == "ready_for_doctor"
+    assert (
+        case_service.get_shared_status_view(case_id).lifecycle_status == CaseStatus.READY_FOR_DOCTOR
+    )
+
+
+def test_get_doctor_case_card_blocks_unsafe_summary_and_marks_safety_failed() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_card_blocked_001")
+    audit_service = RecordingAuditService()
+    safety_result = SafetyCheckResult(
+        case_id="case_card_blocked_001",
+        decision="blocked",
+        issues=(
+            SafetyIssue(
+                category="diagnosis_language",
+                severity="high",
+                message="Diagnosis language is not allowed in the doctor-facing summary draft.",
+                evidence="diagnosis",
+            ),
+        ),
+        decision_rationale="Unsafe clinical language requires blocking before handoff.",
+        correction_path="manual_review_required",
+    )
+    safety_service = StubSafetyService(safety_result)
+    handoff_service = HandoffService(
+        case_service=case_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        safety_service=safety_service,  # type: ignore[arg-type]
+        settings=Settings(doctor_telegram_id_allowlist=(123456,)),
+    )
+    case_id = _build_ready_case(case_service)
+
+    handoff_service.mark_case_ready_for_review(case_id=case_id, doctor_telegram_id=123456)
+    delivery = handoff_service.get_doctor_case_card(case_id=case_id, doctor_telegram_id=123456)
+
+    assert len(safety_service.calls) == 1
+    assert delivery.card is None
+    assert delivery.rejection is not None
+    assert delivery.rejection.rejection_code == "safety_blocked"
+    assert delivery.rejection.safety_check_result == safety_result
+    assert (
+        case_service.get_shared_status_view(case_id).lifecycle_status == CaseStatus.SAFETY_FAILED
+    )
+    assert audit_service.recorded[-1][2]["safety_decision"] == "blocked"
+    assert audit_service.recorded[-1][2]["safety_issue_count"] == 1
+
+
+def test_get_doctor_case_card_marks_recoverable_validation_failure_as_safety_failed() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_card_failed_001")
+    audit_service = RecordingAuditService()
+
+    class FailingSafetyService:
+        def validate_doctor_facing_summary(self, *, case_id: str, draft: DoctorFacingSummaryDraft):
+            _ = case_id, draft
+            raise RuntimeError("validation subsystem unavailable")
+
+    handoff_service = HandoffService(
+        case_service=case_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        safety_service=FailingSafetyService(),  # type: ignore[arg-type]
+        settings=Settings(doctor_telegram_id_allowlist=(123456,)),
+    )
+    case_id = _build_ready_case(case_service)
+
+    handoff_service.mark_case_ready_for_review(case_id=case_id, doctor_telegram_id=123456)
+    delivery = handoff_service.get_doctor_case_card(case_id=case_id, doctor_telegram_id=123456)
+
+    assert delivery.card is None
+    assert delivery.rejection is not None
+    assert delivery.rejection.rejection_code == "safety_failed"
+    assert delivery.rejection.safety_failure_reason_code == "validation_execution_failure"
+    assert "validation subsystem unavailable" in delivery.rejection.safety_failure_detail
+    assert (
+        case_service.get_shared_status_view(case_id).lifecycle_status == CaseStatus.SAFETY_FAILED
+    )
 
 def test_mark_case_ready_for_review_blocks_unallowlisted_doctor_with_structured_rejection() -> None:
     now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
