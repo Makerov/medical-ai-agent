@@ -1,6 +1,6 @@
 # Story 6.5: Prepared Anonymized Operational Verification Case
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -24,30 +24,30 @@ Status: ready-for-dev
 
 ## Tasks / Subtasks
 
-- [ ] Define and freeze the prepared anonymized verification case contract. (AC: 1, 2)
-  - [ ] Keep the canonical fixture centered on `data/verification_cases/prepared_operational_case.json`.
-  - [ ] Preserve the stable `case_id = case_operational_verification_ready` and deterministic rerun behavior.
-  - [ ] Ensure the fixture remains synthetic/anonymized by default and does not require real patient documents.
+- [x] Define and freeze the prepared anonymized verification case contract. (AC: 1, 2)
+  - [x] Keep the canonical fixture centered on `data/verification_cases/prepared_operational_case.json`.
+  - [x] Preserve the stable `case_id = case_operational_verification_ready` and deterministic rerun behavior.
+  - [x] Ensure the fixture remains synthetic/anonymized by default and does not require real patient documents.
 
-- [ ] Wire the verification case through the real operational runtime boundaries. (AC: 1)
-  - [ ] Reuse the existing `api`, `patient_bot`, `doctor_bot`, optional `worker`, `PostgreSQL`, and `Qdrant` boundaries.
-  - [ ] Keep the happy path aligned with intake, document ingestion, OCR/extraction, RAG grounding, summary generation, safety validation, and doctor handoff.
-  - [ ] Do not introduce a second demo pipeline or a separate persistence layer.
+- [x] Wire the verification case through the real operational runtime boundaries. (AC: 1)
+  - [x] Reuse the existing `api`, `patient_bot`, `doctor_bot`, optional `worker`, `PostgreSQL`, and `Qdrant` boundaries.
+  - [x] Keep the happy path aligned with intake, document ingestion, OCR/extraction, RAG grounding, summary generation, safety validation, and doctor handoff.
+  - [x] Do not introduce a second demo pipeline or a separate persistence layer.
 
-- [ ] Make dependency and workflow failures explicit and recoverable. (AC: 2)
-  - [ ] Surface the failure in case state, operational logs, and verification output.
-  - [ ] Preserve machine-readable reasons for `ocr_failed`, `partial_extraction`, `retrieval_failed`, `summary_failed`, `safety_failed`, and `manual_review_required`.
-  - [ ] Document the next operator action clearly enough for restart/recovery checks.
+- [x] Make dependency and workflow failures explicit and recoverable. (AC: 2)
+  - [x] Surface the failure in case state, operational logs, and verification output.
+  - [x] Preserve machine-readable reasons for `ocr_failed`, `partial_extraction`, `retrieval_failed`, `summary_failed`, `safety_failed`, and `manual_review_required`.
+  - [x] Document the next operator action clearly enough for restart/recovery checks.
 
-- [ ] Add regression coverage for deterministic verification reruns. (AC: 1, 2)
-  - [ ] Verify reruns stay case-linked under the same `case_id`.
-  - [ ] Verify repeated verification execution does not create duplicate or conflicting artifacts.
-  - [ ] Verify synthetic/anonymized defaults remain the canonical path.
+- [x] Add regression coverage for deterministic verification reruns. (AC: 1, 2)
+  - [x] Verify reruns stay case-linked under the same `case_id`.
+  - [x] Verify repeated verification execution does not create duplicate or conflicting artifacts.
+  - [x] Verify synthetic/anonymized defaults remain the canonical path.
 
-- [ ] Align runtime docs and operator guidance if wording drift appears. (AC: 1, 2)
-  - [ ] Keep README and runtime guidance aligned with the prepared anonymized verification case wording.
-  - [ ] Avoid demo-first, portfolio-first, or reviewer-first framing in canonical operator instructions.
-  - [ ] Keep startup, recovery, and remediation language consistent with the operational verification contract already documented in Epic 6.
+- [x] Align runtime docs and operator guidance if wording drift appears. (AC: 1, 2)
+  - [x] Keep README and runtime guidance aligned with the prepared anonymized verification case wording.
+  - [x] Avoid demo-first, portfolio-first, or reviewer-first framing in canonical operator instructions.
+  - [x] Keep startup, recovery, and remediation language consistent with the operational verification contract already documented in Epic 6.
 
 ## Dev Notes
 
@@ -181,10 +181,33 @@ Use these as source of truth:
 
 ### Agent Model Used
 
-TBD
+GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-05-07: Added regression coverage for the prepared operational verification case, aligned README recovery wording, and renamed OCR failure output to `ocr_failed`; validated with `uv run pytest` and `uv run ruff check`.
+
 ### Completion Notes List
 
+- Added `tests/scripts/test_operational_verification_case_seed.py` to lock the canonical fixture contract, synthetic default classification, stable `case_operational_verification_ready` identity, and deterministic reruns without duplicate artifacts.
+- Updated `app/workflow/nodes/parse_document.py` and `tests/workflow/test_parse_document.py` so OCR provider failures surface as the canonical machine-readable `ocr_failed` code.
+- Updated `README.md` and `tests/docs/test_demo_setup_docs.py` to keep operator recovery guidance aligned with the operational verification contract, including `ocr_failed` and `manual_review_required` as explicit recoverable states.
+- Verified the full repository test suite and lint on the changed Python files: `uv run pytest` and `uv run ruff check app/workflow/nodes/parse_document.py tests/workflow/test_parse_document.py tests/scripts/test_operational_verification_case_seed.py tests/docs/test_demo_setup_docs.py`.
+
 ### File List
+
+- [`app/workflow/nodes/parse_document.py`](/Users/maker/Work/medical-ai-agent/app/workflow/nodes/parse_document.py)
+- [`README.md`](/Users/maker/Work/medical-ai-agent/README.md)
+- [`tests/docs/test_demo_setup_docs.py`](/Users/maker/Work/medical-ai-agent/tests/docs/test_demo_setup_docs.py)
+- [`tests/scripts/test_operational_verification_case_seed.py`](/Users/maker/Work/medical-ai-agent/tests/scripts/test_operational_verification_case_seed.py)
+- [`tests/workflow/test_parse_document.py`](/Users/maker/Work/medical-ai-agent/tests/workflow/test_parse_document.py)
+- [`_bmad-output/implementation-artifacts/sprint-status.yaml`](/Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts/sprint-status.yaml)
+- [`_bmad-output/implementation-artifacts/6-5-prepared-anonymized-operational-verification-case.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts/6-5-prepared-anonymized-operational-verification-case.md)
+
+## Change Log
+
+- 2026-05-07: Implemented prepared anonymized operational verification case regressions and recovery guidance updates; moved story to review.
+
+## Status
+
+review
