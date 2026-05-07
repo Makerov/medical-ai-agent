@@ -1,6 +1,6 @@
 # Story 6.2: Startup Verification for Migrations and Knowledge Base
 
-Status: review
+Status: done
 
 ## Story
 
