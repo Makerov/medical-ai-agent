@@ -1,6 +1,6 @@
 # Story 6.1: Runtime Health and Readiness Checks
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
