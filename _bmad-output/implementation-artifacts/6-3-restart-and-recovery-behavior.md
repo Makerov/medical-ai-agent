@@ -1,6 +1,6 @@
 # Story 6.3: Restart and Recovery Behavior
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -32,21 +32,21 @@ Status: ready-for-dev
 
 ## Tasks / Subtasks
 
-- [ ] Audit restart-sensitive workflow paths and confirm they are idempotent across repeated execution after process loss. (AC: 1, 2, 4)
-  - [ ] Preserve existing persisted-state semantics in `app/workflow/nodes/parse_document.py`, `app/workflow/nodes/retrieve_knowledge.py`, `app/workflow/nodes/generate_summary.py`, and `app/workflow/nodes/validate_safety.py`.
-  - [ ] Keep `CaseService` transitions from advancing twice or skipping required prerequisites after a restart.
+- [x] Audit restart-sensitive workflow paths and confirm they are idempotent across repeated execution after process loss. (AC: 1, 2, 4)
+  - [x] Preserve existing persisted-state semantics in `app/workflow/nodes/parse_document.py`, `app/workflow/nodes/retrieve_knowledge.py`, `app/workflow/nodes/generate_summary.py`, and `app/workflow/nodes/validate_safety.py`.
+  - [x] Keep `CaseService` transitions from advancing twice or skipping required prerequisites after a restart.
 
-- [ ] Make restart/recovery state explicit in case and audit contracts. (AC: 1, 2, 4)
-  - [ ] Reuse existing recoverable states, `recoverable_state` metadata, and `retry_recovery_events` before adding any new status vocabulary.
-  - [ ] Ensure provider failures continue to surface as explicit recoverable outcomes rather than silent success.
+- [x] Make restart/recovery state explicit in case and audit contracts. (AC: 1, 2, 4)
+  - [x] Reuse existing recoverable states, `recoverable_state` metadata, and `retry_recovery_events` before adding any new status vocabulary.
+  - [x] Ensure provider failures continue to surface as explicit recoverable outcomes rather than silent success.
 
-- [ ] Update operator-facing docs to describe restart and recovery expectations. (AC: 3)
-  - [ ] Keep README startup guidance aligned with the canonical operational verification flow.
-  - [ ] Document the expected next action for retry, re-upload, and manual review scenarios.
+- [x] Update operator-facing docs to describe restart and recovery expectations. (AC: 3)
+  - [x] Keep README startup guidance aligned with the canonical operational verification flow.
+  - [x] Document the expected next action for retry, re-upload, and manual review scenarios.
 
-- [ ] Add deterministic regression coverage for restart-safe reruns and recovery visibility. (AC: 1, 2, 4)
-  - [ ] Cover repeated execution, transient failure recovery, exhausted retry paths, and audit trace preservation.
-  - [ ] Keep tests isolated from live Telegram, PostgreSQL, Qdrant, OCR, and LLM services.
+- [x] Add deterministic regression coverage for restart-safe reruns and recovery visibility. (AC: 1, 2, 4)
+  - [x] Cover repeated execution, transient failure recovery, exhausted retry paths, and audit trace preservation.
+  - [x] Keep tests isolated from live Telegram, PostgreSQL, Qdrant, OCR, and LLM services.
 
 ## Story Foundation
 
@@ -232,46 +232,33 @@ GPT-5 Codex
 
 ### Debug Log References
 
+- 2026-05-07: Verified restart-safe workflow node behavior with repeatable node-level regression tests.
+- 2026-05-07: Added audit review coverage for blocked-to-passed recovery visibility across retry.
+- 2026-05-07: Ran `uv run pytest` (329 passed) and `uv run ruff check` on the changed Python files.
+
 ### Completion Notes List
 
-- Story context created for restart and recovery behavior in Epic 6.
-- The story is grounded in the existing recoverable-state model, audit trail, and idempotent workflow boundaries.
-- The implementation should extend the operational verification contract without introducing a second recovery system.
+- Confirmed restart-safe behavior for the existing workflow boundaries without introducing a new recovery model.
+- Added regression coverage for repeated workflow-node execution and audit review visibility across blocked and recovered traces.
+- Documented operator restart and recovery expectations in `README.md`, including retry, re-upload, and manual review next actions.
+- Verified the full `uv run pytest` suite (329 passed) and `uv run ruff check` on the changed Python files.
 
 ### File List
 
 - `_bmad-output/implementation-artifacts/6-3-restart-and-recovery-behavior.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
-- `app/schemas/case.py`
-- `app/services/case_service.py`
-- `app/services/audit_service.py`
-- `app/services/rag_service.py`
-- `app/services/summary_service.py`
-- `app/services/safety_service.py`
-- `app/workflow/nodes/parse_document.py`
-- `app/workflow/nodes/retrieve_knowledge.py`
-- `app/workflow/nodes/generate_summary.py`
-- `app/workflow/nodes/validate_safety.py`
-- `app/bots/patient_bot.py`
-- `app/bots/doctor_bot.py`
 - `README.md`
-- `docs/architecture-diagram.md`
-- `tests/workflow/test_parse_document.py`
-- `tests/workflow/test_transitions.py`
-- `tests/services/test_case_service.py`
-- `tests/services/test_rag_service.py`
-- `tests/services/test_summary_service.py`
-- `tests/services/test_safety_service.py`
 - `tests/services/test_audit_service.py`
-- `tests/bots/test_patient_bot.py`
-- `tests/bots/test_doctor_bot.py`
-- `tests/docs/test_demo_setup_docs.py`
+- `tests/workflow/test_generate_summary.py`
+- `tests/workflow/test_retrieve_knowledge.py`
+- `tests/workflow/test_validate_safety.py`
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created story context for restart and recovery behavior.
 - 2026-05-07: Marked the story ready for development.
+- 2026-05-07: Implemented restart/recovery regression coverage and operator guidance; story is ready for review.
