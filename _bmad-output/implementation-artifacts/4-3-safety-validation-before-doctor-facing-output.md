@@ -1,6 +1,6 @@
 # Story 4.3: Safety Validation Before Doctor-Facing Output
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -32,22 +32,22 @@ so that the doctor only receives output that is explicitly checked for diagnosis
 
 ## Tasks / Subtasks
 
-- [ ] Wire the existing safety service into the summary-to-handoff workflow so validation runs before any doctor-facing exposure. (AC: 1, 3)
-  - [ ] Review the current orchestration path after Story 4.2 and confirm where the safety gate is invoked.
-  - [ ] Keep safety logic behind backend services/workflow nodes; do not move validation into Telegram handlers.
-  - [ ] Preserve the typed `SafetyCheckResult` contract so downstream audit and handoff code can consume it without ad hoc parsing.
-- [ ] Enforce blocking and correction semantics for unsafe doctor-facing language. (AC: 2)
-  - [ ] Map diagnosis, treatment, and unsupported certainty findings to `blocked` or `corrected` according to current safety policy.
-  - [ ] Ensure borderline phrasing is treated as recoverable correction rather than silent success.
-  - [ ] Prevent any doctor-facing output from being published as normal success when safety validation rejects it.
-- [ ] Add explicit recoverable failure handling for missing grounding or validation execution problems. (AC: 4)
-  - [ ] Map missing draft grounding, invalid draft structure, or validation execution failure to `safety_failed` or an equivalent explicit recoverable state.
-  - [ ] Keep failure reasons machine-readable so later workflow and audit steps can branch deterministically.
-  - [ ] Preserve the distinction between a blocked safety decision and a transport/runtime failure in the service result model.
-- [ ] Add deterministic regression coverage for the safety gate and handoff boundary. (AC: 1, 2, 3, 4)
-  - [ ] Cover a safe draft that passes validation and can progress to `ready_for_doctor`.
-  - [ ] Cover diagnosis, treatment, and unsupported certainty language and verify the result is blocked or corrected.
-  - [ ] Cover recoverable failure behavior and verify no silent handoff occurs.
+- [x] Wire the existing safety service into the summary-to-handoff workflow so validation runs before any doctor-facing exposure. (AC: 1, 3)
+  - [x] Review the current orchestration path after Story 4.2 and confirm where the safety gate is invoked.
+  - [x] Keep safety logic behind backend services/workflow nodes; do not move validation into Telegram handlers.
+  - [x] Preserve the typed `SafetyCheckResult` contract so downstream audit and handoff code can consume it without ad hoc parsing.
+- [x] Enforce blocking and correction semantics for unsafe doctor-facing language. (AC: 2)
+  - [x] Map diagnosis, treatment, and unsupported certainty findings to `blocked` or `corrected` according to current safety policy.
+  - [x] Ensure borderline phrasing is treated as recoverable correction rather than silent success.
+  - [x] Prevent any doctor-facing output from being published as normal success when safety validation rejects it.
+- [x] Add explicit recoverable failure handling for missing grounding or validation execution problems. (AC: 4)
+  - [x] Map missing draft grounding, invalid draft structure, or validation execution failure to `safety_failed` or an equivalent explicit recoverable state.
+  - [x] Keep failure reasons machine-readable so later workflow and audit steps can branch deterministically.
+  - [x] Preserve the distinction between a blocked safety decision and a transport/runtime failure in the service result model.
+- [x] Add deterministic regression coverage for the safety gate and handoff boundary. (AC: 1, 2, 3, 4)
+  - [x] Cover a safe draft that passes validation and can progress to `ready_for_doctor`.
+  - [x] Cover diagnosis, treatment, and unsupported certainty language and verify the result is blocked or corrected.
+  - [x] Cover recoverable failure behavior and verify no silent handoff occurs.
 
 ## Dev Notes
 
@@ -82,6 +82,7 @@ The repository already has the surrounding patterns this story must preserve:
 - `app/workflow/transitions.py` already includes `safety_failed` and `ready_for_doctor` as explicit state outcomes;
 - `app/services/audit_service.py` and `app/schemas/audit.py` already expect a safety result to be attached to doctor handoff artifacts;
 - Story 4.2 provides the grounded summary artifact this story must validate without weakening its structure.
+- The handoff boundary must validate the summary draft before any doctor-facing card is returned, and unsafe outcomes must transition to `safety_failed` instead of exposing a normal success response.
 
 ### Technical Requirements
 
@@ -196,31 +197,34 @@ GPT-5 Codex
 
 - Story created from Epic 4 requirements focused on safety validation before doctor-facing output.
 - Epic 4 status remains `in-progress`; only this story should move from `backlog` to `ready-for-dev`.
-- Safety validation must remain the final backend gate before `ready_for_doctor` handoff.
-- The system must not present blocked, corrected, or invalid drafts as a normal successful doctor-facing handoff.
+- Safety validation now runs inside the handoff boundary before any doctor-facing card is returned.
+- Unsafe or failed validation paths now return structured rejection payloads and transition the case to `safety_failed`.
+- The system no longer presents blocked, corrected, or invalid drafts as a normal successful doctor-facing handoff.
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created the story context for safety validation before doctor-facing output.
+- 2026-05-07: Wired safety validation into the handoff boundary, added recoverable failure handling, and expanded regression coverage.
 
 ## Completion Notes
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
-- Safety validation must run before doctor-facing exposure, preserve typed issue details, and convert validation failures into explicit recoverable outcomes.
+- Wired `SafetyService` into the summary-to-handoff boundary so doctor-facing cards are only produced after a successful safety pass.
+- Added explicit `safety_failed` handling for blocked, corrected, and execution-failure outcomes, including machine-readable rejection metadata.
+- Added regression coverage for safe pass, diagnosis/treatment/certainty blocking, and recoverable validation failure behavior.
+- Full test suite passed: `298 passed`.
 
 ## File List
 
 - `_bmad-output/implementation-artifacts/4-3-safety-validation-before-doctor-facing-output.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
-- `_bmad-output/implementation-artifacts/4-2-real-llm-summary-generation-with-grounding-inputs.md`
-- `_bmad-output/implementation-artifacts/4-1-operational-retrieval-through-qdrant.md`
+- `app/schemas/handoff.py`
 - `app/schemas/safety.py`
-- `app/services/safety_service.py`
-- `app/workflow/nodes/validate_safety.py`
-- `app/workflow/transitions.py`
-- `app/services/audit_service.py`
 - `app/services/handoff_service.py`
+- `app/services/safety_service.py`
+- `app/workflow/transitions.py`
+- `tests/services/test_handoff_service.py`
+- `tests/services/test_safety_service.py`
