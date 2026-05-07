@@ -1,6 +1,6 @@
 # Story 5.1: Doctor Runtime and Access Allowlist
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -19,6 +19,18 @@ Status: ready-for-dev
    **Когда** проверяется readiness
    **Тогда** runtime сообщает `not-ready` или `degraded` status
    **И** он не подменяет unavailable backend data локальными stale-only case artifacts.
+
+## Tasks/Subtasks
+
+- [x] Add a doctor runtime boundary helper that reports `ready` vs `not-ready` when bot token, allowlist, or backend configuration is missing.
+  - [x] Keep doctor bot startup separate from patient runtime dispatchers.
+  - [x] Raise a structured runtime failure before polling when required configuration is absent.
+- [x] Preserve allowlisted doctor access through the existing capability authorization path.
+  - [x] Keep the patient role blocked from doctor-facing capabilities.
+  - [x] Keep structured access denials for unallowlisted doctor identities.
+- [x] Add regression coverage for doctor runtime readiness, bot startup guards, and runtime topology boundaries.
+  - [x] Verify the doctor runtime does not silently fall back to stale local-only case artifacts.
+  - [x] Verify the doctor runtime remains a thin adapter module.
 
 ## Story Foundation
 
@@ -159,11 +171,30 @@ GPT-5 Codex
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
 - Story prepared for implementation with a focus on doctor runtime isolation and allowlist access control.
+- Implemented a separate doctor runtime boundary with `get_doctor_bot_runtime_status()`, `build_doctor_bot()`, `build_doctor_dispatcher()`, and `run_doctor_bot()`.
+- Preserved allowlist authorization behavior and verified patient callers still receive structured denials for doctor capabilities.
+- Added regression tests for doctor runtime readiness, startup token guards, and runtime topology boundaries.
+- Confirmed the implementation does not introduce stale local-only fallback behavior for unavailable backend configuration.
+
+### Debug Log
+
+- Added a minimal `DoctorBotRuntimeStatus` model to surface structured readiness state.
+- Kept doctor polling isolated from patient dispatch by using a dedicated empty `Dispatcher`.
+- Ran targeted doctor/runtime/access tests and then the full pytest suite.
+
+### File List
+
+- app/bots/__init__.py
+- app/bots/doctor_bot.py
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- tests/bots/test_doctor_bot.py
+- tests/test_runtime_topology.py
 
 ## Status
 
-ready-for-dev
+review
 
 ## Change Log
 
 - 2026-05-07: Created the story context for doctor runtime and access allowlist.
+- 2026-05-07: Implemented doctor runtime readiness/status helpers, dispatcher isolation, and regression tests.
