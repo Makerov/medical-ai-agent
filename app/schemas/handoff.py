@@ -14,6 +14,7 @@ from app.schemas.rag import (
     DoctorFacingQuestion,
     DoctorFacingUncertaintyMarker,
 )
+from app.schemas.safety import SafetyCheckResult
 
 
 class DoctorCaseIndicatorFact(BaseModel):
@@ -240,6 +241,9 @@ class DoctorCaseCardRejection(BaseModel):
     rejection_message: str = Field(min_length=1)
     shared_status: SharedCaseStatusCode | None = None
     required_capability: Capability | None = None
+    safety_check_result: SafetyCheckResult | None = None
+    safety_failure_reason_code: str | None = None
+    safety_failure_detail: str | None = None
 
     model_config = ConfigDict(frozen=True)
 
@@ -258,6 +262,17 @@ class DoctorCaseCardRejection(BaseModel):
         normalized = value.strip()
         if not normalized:
             msg = "Doctor case card rejection messages must not be empty"
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("safety_failure_reason_code", "safety_failure_detail")
+    @classmethod
+    def normalize_optional_text_fields(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "Doctor case card safety failure fields must not be empty"
             raise ValueError(msg)
         return normalized
 
