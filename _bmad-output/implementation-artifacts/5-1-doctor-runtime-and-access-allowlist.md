@@ -1,6 +1,6 @@
 # Story 5.1: Doctor Runtime and Access Allowlist
 
-Status: review
+Status: ready-for-dev
 
 ## Story
 
@@ -20,46 +20,35 @@ Status: review
    **Тогда** runtime сообщает `not-ready` или `degraded` status
    **И** он не подменяет unavailable backend data локальными stale-only case artifacts.
 
-## Tasks/Subtasks
-
-- [x] Add a doctor runtime boundary helper that reports `ready` vs `not-ready` when bot token, allowlist, or backend configuration is missing.
-  - [x] Keep doctor bot startup separate from patient runtime dispatchers.
-  - [x] Raise a structured runtime failure before polling when required configuration is absent.
-- [x] Preserve allowlisted doctor access through the existing capability authorization path.
-  - [x] Keep the patient role blocked from doctor-facing capabilities.
-  - [x] Keep structured access denials for unallowlisted doctor identities.
-- [x] Add regression coverage for doctor runtime readiness, bot startup guards, and runtime topology boundaries.
-  - [x] Verify the doctor runtime does not silently fall back to stale local-only case artifacts.
-  - [x] Verify the doctor runtime remains a thin adapter module.
-
 ## Story Foundation
 
-Epic 5 делает doctor handoff и auditability отдельной частью backend-first system. Эта story открывает epic и должна зафиксировать runtime boundary, прежде чем строить case card, provenance views, questions surface или audit drill-down.
+Epic 5 is responsible for doctor handoff and auditability. This story is the first guardrail in that epic: it must lock down the doctor runtime boundary before any case card, provenance view, question surface, or audit drill-down is built on top of it.
 
 ### Business Value
 
-- Разделяет patient intake и doctor-facing runtime boundaries.
-- Делает doctor access explicit, auditable и predictable.
-- Не позволяет `doctor_bot` выглядеть как general-purpose interface без access control.
-- Снижает риск accidental exposure of patient-facing paths через doctor runtime.
+- Separates patient intake and doctor-facing runtime boundaries.
+- Makes doctor access explicit, auditable, and predictable.
+- Prevents `doctor_bot` from becoming a general-purpose interface without access control.
+- Reduces the risk of accidental exposure of patient-facing paths through doctor runtime.
 
 ### Story Scope
 
-Эта story должна создать только runtime and allowlist boundary. Она не должна строить structured case card, source references, AI follow-up questions или case-scoped audit explorer.
+This story should create only the runtime and allowlist boundary. It must not build the structured case card, source references, AI follow-up questions, or case-scoped audit explorer.
 
 ## Developer Context
 
 ### What Already Exists
 
-The repository already contains the core allowlist and role-aware access primitives this story must build on:
+The repository already contains the core building blocks this story must preserve:
 
-- [app/core/settings.py](/Users/maker/Work/medical-ai-agent/app/core/settings.py) parses `DOCTOR_TELEGRAM_ID_ALLOWLIST` and normalizes bot tokens and runtime settings.
-- [app/services/access_control_service.py](/Users/maker/Work/medical-ai-agent/app/services/access_control_service.py) enforces role/capability checks and returns structured `AuthorizationError` values such as `doctor_not_allowlisted`.
-- [app/api/v1/doctor.py](/Users/maker/Work/medical-ai-agent/app/api/v1/doctor.py) already demonstrates a protected doctor-facing API boundary.
-- [tests/services/test_access_control_service.py](/Users/maker/Work/medical-ai-agent/tests/services/test_access_control_service.py) and [tests/api/test_doctor_access.py](/Users/maker/Work/medical-ai-agent/tests/api/test_doctor_access.py) already cover the allowlist contract and structured denial behavior.
-- [app/bots/patient_bot.py](/Users/maker/Work/medical-ai-agent/app/bots/patient_bot.py) shows the thin-adapter pattern that should be preserved for bot runtimes.
+- [`app/core/settings.py`](/Users/maker/Work/medical-ai-agent/app/core/settings.py) parses `DOCTOR_TELEGRAM_ID_ALLOWLIST` and normalizes bot tokens and runtime settings.
+- [`app/services/access_control_service.py`](/Users/maker/Work/medical-ai-agent/app/services/access_control_service.py) enforces role/capability checks and returns structured `AuthorizationError` values such as `doctor_not_allowlisted`.
+- [`app/api/v1/doctor.py`](/Users/maker/Work/medical-ai-agent/app/api/v1/doctor.py) already demonstrates a protected doctor-facing API boundary.
+- [`app/bots/doctor_bot.py`](/Users/maker/Work/medical-ai-agent/app/bots/doctor_bot.py) already contains a separate doctor runtime scaffold with readiness checks and dispatcher isolation.
+- [`tests/services/test_access_control_service.py`](/Users/maker/Work/medical-ai-agent/tests/services/test_access_control_service.py) and [`tests/api/test_doctor_access.py`](/Users/maker/Work/medical-ai-agent/tests/api/test_doctor_access.py) already cover the allowlist contract and structured denial behavior.
+- [`app/bots/patient_bot.py`](/Users/maker/Work/medical-ai-agent/app/bots/patient_bot.py) shows the thin-adapter pattern that should be preserved for bot runtimes.
 
-The implementation effort is therefore boundary hardening and runtime isolation, not invention of a new auth model.
+The implementation effort is boundary hardening and runtime isolation, not invention of a new auth model.
 
 ### Story-Specific Technical Requirements
 
@@ -76,25 +65,25 @@ The implementation effort is therefore boundary hardening and runtime isolation,
 - Telegram remains a thin interface over backend capabilities.
 - `PostgreSQL` remains the system of record for case state and auditability.
 - `Qdrant` remains a backend dependency, not a bot-process concern.
-- No silent fallback or hidden “best effort” doctor review path is allowed when the runtime is degraded.
+- No silent fallback or hidden "best effort" doctor review path is allowed when the runtime is degraded.
 
 ### File Structure Requirements
 
 Likely files to update:
 
-- `app/bots/doctor_bot.py`
-- `app/bots/messages.py`
-- `app/services/access_control_service.py`
-- `app/api/v1/doctor.py`
-- `app/core/settings.py` only if readiness or allowlist parsing needs tightening
-- `app/schemas/auth.py` only if access/readiness metadata needs a typed extension
+- [`app/bots/doctor_bot.py`](/Users/maker/Work/medical-ai-agent/app/bots/doctor_bot.py)
+- [`app/bots/messages.py`](/Users/maker/Work/medical-ai-agent/app/bots/messages.py)
+- [`app/services/access_control_service.py`](/Users/maker/Work/medical-ai-agent/app/services/access_control_service.py)
+- [`app/api/v1/doctor.py`](/Users/maker/Work/medical-ai-agent/app/api/v1/doctor.py)
+- [`app/core/settings.py`](/Users/maker/Work/medical-ai-agent/app/core/settings.py) only if readiness or allowlist parsing needs tightening
+- [`app/schemas/auth.py`](/Users/maker/Work/medical-ai-agent/app/schemas/auth.py) only if access/readiness metadata needs a typed extension
 
 Likely test files:
 
-- `tests/bots/test_doctor_bot.py`
-- `tests/api/test_doctor_access.py`
-- `tests/services/test_access_control_service.py`
-- `tests/api/test_health.py` only if runtime readiness surface is extended
+- [`tests/bots/test_doctor_bot.py`](/Users/maker/Work/medical-ai-agent/tests/bots/test_doctor_bot.py)
+- [`tests/api/test_doctor_access.py`](/Users/maker/Work/medical-ai-agent/tests/api/test_doctor_access.py)
+- [`tests/services/test_access_control_service.py`](/Users/maker/Work/medical-ai-agent/tests/services/test_access_control_service.py)
+- [`tests/api/test_health.py`](/Users/maker/Work/medical-ai-agent/tests/api/test_health.py) only if runtime readiness surface is extended
 
 Avoid touching patient intake flows unless a shared boundary helper is genuinely required.
 
@@ -131,7 +120,11 @@ Avoid touching patient intake flows unless a shared boundary helper is genuinely
 
 ### Previous Story Intelligence
 
-There is no prior story file in epic 5 to inherit from yet. Use the current codebase and the Epic 5 story map as the source of truth for the boundary to implement next.
+The latest work history shows this story area has already been iterated on:
+
+- Recent commits indicate the doctor runtime boundary and allowlist checks were updated and then marked for review.
+- The existing code already contains a dedicated doctor runtime scaffold with `get_doctor_bot_runtime_status()`, `build_doctor_bot()`, `build_doctor_dispatcher()`, and `run_doctor_bot()`.
+- The current risk is not missing primitives; the risk is regression in runtime boundary isolation or readiness signaling.
 
 ### Implementation Constraints
 
@@ -145,15 +138,16 @@ There is no prior story file in epic 5 to inherit from yet. Use the current code
 
 Use the planning artifacts as the source of truth:
 
-- [epics.md](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/epics.md)
-- [prd.md](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/prd.md)
-- [architecture.md](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/architecture.md)
-- [ux-design-specification.md](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/ux-design-specification.md)
-- [app/core/settings.py](/Users/maker/Work/medical-ai-agent/app/core/settings.py)
-- [app/services/access_control_service.py](/Users/maker/Work/medical-ai-agent/app/services/access_control_service.py)
-- [app/api/v1/doctor.py](/Users/maker/Work/medical-ai-agent/app/api/v1/doctor.py)
-- [tests/services/test_access_control_service.py](/Users/maker/Work/medical-ai-agent/tests/services/test_access_control_service.py)
-- [tests/api/test_doctor_access.py](/Users/maker/Work/medical-ai-agent/tests/api/test_doctor_access.py)
+- [`epics.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/epics.md)
+- [`prd.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/prd.md)
+- [`architecture.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/architecture.md)
+- [`ux-design-specification.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/planning-artifacts/ux-design-specification.md)
+- [`app/core/settings.py`](/Users/maker/Work/medical-ai-agent/app/core/settings.py)
+- [`app/services/access_control_service.py`](/Users/maker/Work/medical-ai-agent/app/services/access_control_service.py)
+- [`app/api/v1/doctor.py`](/Users/maker/Work/medical-ai-agent/app/api/v1/doctor.py)
+- [`app/bots/doctor_bot.py`](/Users/maker/Work/medical-ai-agent/app/bots/doctor_bot.py)
+- [`tests/services/test_access_control_service.py`](/Users/maker/Work/medical-ai-agent/tests/services/test_access_control_service.py)
+- [`tests/api/test_doctor_access.py`](/Users/maker/Work/medical-ai-agent/tests/api/test_doctor_access.py)
 
 ## Dev Agent Record
 
@@ -163,38 +157,19 @@ GPT-5 Codex
 
 ### Context Notes
 
-- Epic 5 is still `backlog` at the start of this story.
+- Epic 5 is still `in-progress`.
 - The repository already has allowlist parsing and structured doctor access denials.
-- The main risk is not missing auth primitives; the main risk is runtime boundary drift and unsafe fallback behavior.
+- The main risk is runtime boundary drift and unsafe fallback behavior.
 
 ### Completion Notes
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
 - Story prepared for implementation with a focus on doctor runtime isolation and allowlist access control.
-- Implemented a separate doctor runtime boundary with `get_doctor_bot_runtime_status()`, `build_doctor_bot()`, `build_doctor_dispatcher()`, and `run_doctor_bot()`.
-- Preserved allowlist authorization behavior and verified patient callers still receive structured denials for doctor capabilities.
-- Added regression tests for doctor runtime readiness, startup token guards, and runtime topology boundaries.
-- Confirmed the implementation does not introduce stale local-only fallback behavior for unavailable backend configuration.
-
-### Debug Log
-
-- Added a minimal `DoctorBotRuntimeStatus` model to surface structured readiness state.
-- Kept doctor polling isolated from patient dispatch by using a dedicated empty `Dispatcher`.
-- Ran targeted doctor/runtime/access tests and then the full pytest suite.
-
-### File List
-
-- app/bots/__init__.py
-- app/bots/doctor_bot.py
-- _bmad-output/implementation-artifacts/sprint-status.yaml
-- tests/bots/test_doctor_bot.py
-- tests/test_runtime_topology.py
 
 ## Status
 
-review
+ready-for-dev
 
 ## Change Log
 
 - 2026-05-07: Created the story context for doctor runtime and access allowlist.
-- 2026-05-07: Implemented doctor runtime readiness/status helpers, dispatcher isolation, and regression tests.
