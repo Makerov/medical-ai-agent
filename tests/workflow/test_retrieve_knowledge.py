@@ -143,3 +143,15 @@ def test_check_applicability_node_delegates_to_service() -> None:
     assert service.applicability_calls == [(_build_entry(), indicator)]
     assert decision.status == "applicable"
     assert decision.is_applicable is True
+
+
+def test_retrieve_knowledge_node_is_repeatable_across_restarts() -> None:
+    indicator = _build_indicator()
+    service = FakeRAGService()
+    node = RetrieveKnowledgeNode(rag_service=service)
+
+    first_result = node.retrieve_knowledge(indicator=indicator)
+    second_result = node.retrieve_knowledge(indicator=indicator)
+
+    assert first_result == second_result
+    assert service.retrieve_calls == [indicator, indicator]
