@@ -31,26 +31,26 @@ Status: ready-for-dev
 
 ## Tasks / Subtasks
 
-- [ ] Определить canonical source of truth для reference artifacts: OpenAPI snapshot, schema-derived example payloads и/или case-scoped export bundle. (AC: 1, 2)
-  - [ ] Проверить, какие текущие routes и schemas уже покрывают internal backend surface: health, doctor access, case lifecycle, document processing, extraction, safety и handoff.
-  - [ ] Зафиксировать, должен ли generated artifact быть отдельным JSON/MD bundle или расширением существующего `operational-verification-export.json`.
-  - [ ] Сохранить canonical path на `verification/` и не возвращать `demo/` как основной operational path.
+- [x] Определить canonical source of truth для reference artifacts: OpenAPI snapshot, schema-derived example payloads и/или case-scoped export bundle. (AC: 1, 2)
+  - [x] Проверить, какие текущие routes и schemas уже покрывают internal backend surface: health, doctor access, case lifecycle, document processing, extraction, safety и handoff.
+  - [x] Зафиксировать, должен ли generated artifact быть отдельный JSON/MD bundle или расширением существующего `operational-verification-export.json`.
+  - [x] Сохранить canonical path на `verification/` и не возвращать `demo/` как основной operational path.
 
-- [ ] Сгенерировать или материализовать API/runtime reference artifacts поверх typed schemas. (AC: 1, 2, 3)
-  - [ ] Использовать текущие `Pydantic` models как источник example payloads.
-  - [ ] Включить payload examples для shared case status, document processing result, structured extraction, safety check result, doctor-ready notification и doctor case card / delivery.
-  - [ ] Добавить env/config inputs и recoverable error shapes, которые maintainer должен знать для интеграции.
-  - [ ] Держать артефакты case-linked к `case_operational_verification_ready`.
+- [x] Сгенерировать или материализовать API/runtime reference artifacts поверх typed schemas. (AC: 1, 2, 3)
+  - [x] Использовать текущие `Pydantic` models как источник example payloads.
+  - [x] Включить payload examples для shared case status, document processing result, structured extraction, safety check result, doctor-ready notification и doctor case card / delivery.
+  - [x] Добавить env/config inputs и recoverable error shapes, которые maintainer должен знать для интеграции.
+  - [x] Держать артефакты case-linked к `case_operational_verification_ready`.
 
-- [ ] Обновить maintainer-facing docs и walkthroughs. (AC: 1, 2, 4)
-  - [ ] Обновить `README.md` так, чтобы reference artifacts и examples были найдены рядом с operational verification workflow.
-  - [ ] Убедиться, что docs явно говорят о typed schemas, machine-readable errors и отсутствии необходимости в live provider calls для canonical verification path.
-  - [ ] Не расширять этот story до demo-path cleanup; legacy cleanup остаётся задачей 6.8.
+- [x] Обновить maintainer-facing docs и walkthroughs. (AC: 1, 2, 4)
+  - [x] Обновить `README.md` так, чтобы reference artifacts и examples были найдены рядом с operational verification workflow.
+  - [x] Убедиться, что docs явно говорят о typed schemas, machine-readable errors и отсутствии необходимости в live provider calls для canonical verification path.
+  - [x] Не расширять этот story до demo-path cleanup; legacy cleanup остаётся задачей 6.8.
 
-- [ ] Добавить regression coverage для стабильности формы и schema alignment. (AC: 1, 2, 3, 4)
-  - [ ] Проверить, что reference artifacts остаются case-scoped и deterministic при rerun.
-  - [ ] Проверить, что payload examples валидируются текущими schema contracts.
-  - [ ] Проверить, что docs assertions фиксируют canonical operational wording и нужные artifact paths.
+- [x] Добавить regression coverage для стабильности формы и schema alignment. (AC: 1, 2, 3, 4)
+  - [x] Проверить, что reference artifacts остаются case-scoped и deterministic при rerun.
+  - [x] Проверить, что payload examples валидируются текущими schema contracts.
+  - [x] Проверить, что docs assertions фиксируют canonical operational wording и нужные artifact paths.
 
 ## Dev Notes
 
@@ -210,6 +210,9 @@ GPT-5 Codex
 
 - 2026-05-07: Analyzed Epic 6, PRD, architecture, UX spec, current API and schema surfaces, operational verification seed scripts, README, previous Epic 6 story, and recent git history for the runtime API reference artifacts story.
 - 2026-05-07: Confirmed current canonical operational verification path already exposes FastAPI OpenAPI docs and typed schemas, so this story should materialize schema-backed examples and reference artifacts without reintroducing demo-first framing.
+- 2026-05-07: Added case-scoped runtime API reference bundle, OpenAPI snapshot, and schema-derived example payloads under `data/artifacts/case_operational_verification_ready/verification/`.
+- 2026-05-07: Updated README coverage and regression tests to pin canonical `verification/` wording, env/config inputs, OpenAPI route docs, and structured recoverable errors.
+- 2026-05-07: Regenerated the prepared operational verification case and restored the minimal eval bundle after artifact reset.
 
 ### Completion Notes List
 
@@ -217,9 +220,27 @@ GPT-5 Codex
 - Scope kept on case-scoped, schema-backed reference material for internal backend surface.
 - Canonical `verification/` artifact tree preserved as the operational path.
 - Legacy demo compatibility remains non-canonical and out of scope for this story.
+- Generated `api-runtime-reference.json`, `example-payloads.json`, and `openapi.json` alongside the existing operational verification bundle.
+- Regenerated `verification/minimal-eval-suite.json` and refreshed the case-scoped export artifacts.
+- Added regression coverage for OpenAPI route docs, canonical README wording, and runtime reference payload alignment.
 
 ### File List
 
+- [`README.md`](README.md)
+- [`scripts/seed_operational_verification_case.py`](scripts/seed_operational_verification_case.py)
+- [`tests/api/test_health.py`](tests/api/test_health.py)
+- [`tests/docs/test_demo_setup_docs.py`](tests/docs/test_demo_setup_docs.py)
+- [`tests/scripts/test_operational_verification_case_seed.py`](tests/scripts/test_operational_verification_case_seed.py)
+- [`data/artifacts/case_operational_verification_ready/verification/api-runtime-reference.json`](data/artifacts/case_operational_verification_ready/verification/api-runtime-reference.json)
+- [`data/artifacts/case_operational_verification_ready/verification/example-payloads.json`](data/artifacts/case_operational_verification_ready/verification/example-payloads.json)
+- [`data/artifacts/case_operational_verification_ready/verification/minimal-eval-suite.json`](data/artifacts/case_operational_verification_ready/verification/minimal-eval-suite.json)
+- [`data/artifacts/case_operational_verification_ready/verification/openapi.json`](data/artifacts/case_operational_verification_ready/verification/openapi.json)
+- [`data/artifacts/case_operational_verification_ready/verification/operational-verification-export.json`](data/artifacts/case_operational_verification_ready/verification/operational-verification-export.json)
+- [`data/artifacts/case_operational_verification_ready/export/verification/doctor-handoff.json`](data/artifacts/case_operational_verification_ready/export/verification/doctor-handoff.json)
+- [`data/artifacts/case_operational_verification_ready/export/verification/processing-result.json`](data/artifacts/case_operational_verification_ready/export/verification/processing-result.json)
+- [`data/artifacts/case_operational_verification_ready/export/verification/rag-provenance-examples.json`](data/artifacts/case_operational_verification_ready/export/verification/rag-provenance-examples.json)
+- [`data/artifacts/case_operational_verification_ready/export/verification/source-references.json`](data/artifacts/case_operational_verification_ready/export/verification/source-references.json)
+- [`data/artifacts/case_operational_verification_ready/export/verification/structured-extraction-examples.json`](data/artifacts/case_operational_verification_ready/export/verification/structured-extraction-examples.json)
 - [`_bmad-output/implementation-artifacts/6-7-runtime-api-reference-artifacts-and-operational-examples.md`](_bmad-output/implementation-artifacts/6-7-runtime-api-reference-artifacts-and-operational-examples.md)
 - [`_bmad-output/implementation-artifacts/sprint-status.yaml`](_bmad-output/implementation-artifacts/sprint-status.yaml)
 
@@ -227,7 +248,10 @@ GPT-5 Codex
 
 - 2026-05-07: Created story context for runtime API reference artifacts and operational examples.
 - 2026-05-07: Anchored the story to current OpenAPI, typed schema, and case-scoped verification artifacts.
+- 2026-05-07: Implemented case-scoped runtime API reference artifacts, canonical OpenAPI snapshot, and schema-derived example payloads.
+- 2026-05-07: Updated README and regression coverage to document the canonical verification workflow and recoverable error shapes.
+- 2026-05-07: Regenerated the prepared verification case artifacts and minimal eval bundle.
 
 ## Status
 
-ready-for-dev
+review
