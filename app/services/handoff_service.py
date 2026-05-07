@@ -31,14 +31,17 @@ from app.schemas.patient import PatientProfile
 from app.schemas.rag import (
     GroundedFact,
     GroundedSummaryContract,
+    DoctorFacingSummaryDraft,
     SummaryValidationResult,
 )
+from app.schemas.safety import SafetyCheckResult
 from app.services.access_control_service import authorize_capability
 from app.services.audit_service import AuditService
 from app.services.boundary_copy import SAFETY_BOUNDARY_STATEMENT
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import PatientIntakeService
 from app.services.summary_service import SummaryService
+from app.services.safety_service import SafetyService
 
 Clock = Callable[[], datetime]
 
@@ -50,6 +53,7 @@ class HandoffService:
         case_service: CaseService,
         patient_intake_service: PatientIntakeService | None = None,
         summary_service: SummaryService | None = None,
+        safety_service: SafetyService | None = None,
         audit_service: AuditService | None = None,
         settings: Settings | None = None,
         clock: Clock = utc_now,
@@ -57,6 +61,7 @@ class HandoffService:
         self._case_service = case_service
         self._patient_intake_service = patient_intake_service
         self._summary_service = summary_service or SummaryService()
+        self._safety_service = safety_service or SafetyService()
         self._settings = settings or get_settings()
         self._audit_service = audit_service or AuditService(
             case_service=case_service,
@@ -205,47 +210,67 @@ class HandoffService:
             ),
             indicators=self._flatten_indicators(indicator_records),
         )
-        review_warnings = self._build_review_warnings(
-            extracted_facts=extracted_facts,
-            uncertainty_markers=summary_draft.uncertainty_markers,
-        )
-        card = DoctorCaseCard(
+        safety_result, safety_failure_detail = self._validate_summary_for_doctor(
             case_id=case_id,
-            current_case_status=view.lifecycle_status.value,
-            shared_status=view.handoff_readiness.shared_status,
-            doctor_review_status=view.doctor_review_status,
-            doctor_review_reason=view.doctor_review_reason,
-            ai_boundary_label=SAFETY_BOUNDARY_STATEMENT,
-            patient_goal=(
-                payload.consultation_goal.text if payload and payload.consultation_goal else None
-            ),
-            patient_profile_summary=(
-                self._render_patient_profile_summary(payload.patient_profile)
-                if payload and payload.patient_profile is not None
-                else None
-            ),
-            document_list=tuple(reference.record_id for reference in core_records.documents),
-            source_references=source_references,
-            extracted_facts=extracted_facts,
-            possible_deviations=summary_draft.possible_deviations,
-            uncertainty_markers=summary_draft.uncertainty_markers,
-            questions_for_doctor=summary_draft.questions_for_doctor,
-            review_warnings=review_warnings,
+            draft=summary_draft,
         )
-        audit_event = self._audit_service.record_event(
-            case_id=case_id,
-            event_type=AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_SENT,
-            metadata={
-                "doctor_telegram_id": doctor_telegram_id,
-                "delivery_status": "sent",
-                "card_status": view.handoff_readiness.shared_status.value,
-            },
-        )
-        return DoctorCaseCardDelivery(
+        if safety_result is not None and safety_result.decision == "pass":
+            review_warnings = self._build_review_warnings(
+                extracted_facts=extracted_facts,
+                uncertainty_markers=summary_draft.uncertainty_markers,
+            )
+            card = DoctorCaseCard(
+                case_id=case_id,
+                current_case_status=view.lifecycle_status.value,
+                shared_status=view.handoff_readiness.shared_status,
+                doctor_review_status=view.doctor_review_status,
+                doctor_review_reason=view.doctor_review_reason,
+                ai_boundary_label=SAFETY_BOUNDARY_STATEMENT,
+                patient_goal=(
+                    payload.consultation_goal.text if payload and payload.consultation_goal else None
+                ),
+                patient_profile_summary=(
+                    self._render_patient_profile_summary(payload.patient_profile)
+                    if payload and payload.patient_profile is not None
+                    else None
+                ),
+                document_list=tuple(reference.record_id for reference in core_records.documents),
+                source_references=source_references,
+                extracted_facts=extracted_facts,
+                possible_deviations=summary_draft.possible_deviations,
+                uncertainty_markers=summary_draft.uncertainty_markers,
+                questions_for_doctor=summary_draft.questions_for_doctor,
+                review_warnings=review_warnings,
+            )
+            audit_event = self._audit_service.record_event(
+                case_id=case_id,
+                event_type=AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_SENT,
+                metadata={
+                    "doctor_telegram_id": doctor_telegram_id,
+                    "delivery_status": "sent",
+                    "card_status": view.handoff_readiness.shared_status.value,
+                },
+            )
+            return DoctorCaseCardDelivery(
+                case_id=case_id,
+                doctor_telegram_id=doctor_telegram_id,
+                card=card,
+                audit_event_id=audit_event.event_id,
+            )
+
+        if safety_result is None:
+            return self._build_safety_failure_rejection(
+                case_id=case_id,
+                doctor_telegram_id=doctor_telegram_id,
+                view=view,
+                failure_detail=safety_failure_detail,
+            )
+
+        return self._build_safety_rejection(
             case_id=case_id,
             doctor_telegram_id=doctor_telegram_id,
-            card=card,
-            audit_event_id=audit_event.event_id,
+            safety_result=safety_result,
+            view=view,
         )
 
     def _safe_get_shared_status_view(
@@ -377,6 +402,113 @@ class HandoffService:
             rejection_message=rejection_message,
             required_capability=required_capability,
             shared_status=shared_status,
+        )
+        return DoctorCaseCardDelivery(
+            case_id=case_id,
+            doctor_telegram_id=doctor_telegram_id,
+            rejection=rejection,
+            audit_event_id=audit_event.event_id,
+        )
+
+    def _build_safety_rejection(
+        self,
+        *,
+        case_id: str,
+        doctor_telegram_id: int,
+        safety_result: SafetyCheckResult,
+        view: SharedStatusView,
+    ) -> DoctorCaseCardDelivery:
+        try:
+            self._case_service.transition_case(case_id, CaseStatus.SAFETY_FAILED)
+        except CaseTransitionError:
+            refreshed_view = self._safe_get_shared_status_view(case_id)
+            if refreshed_view is not None:
+                view = refreshed_view
+
+        rejection = DoctorCaseCardRejection(
+            case_id=case_id,
+            doctor_telegram_id=doctor_telegram_id,
+            rejection_code=f"safety_{safety_result.decision}",
+            rejection_message="Safety validation blocked doctor-facing output.",
+            shared_status=view.handoff_readiness.shared_status,
+            safety_check_result=safety_result,
+        )
+        audit_event = self._audit_service.record_event(
+            case_id=case_id,
+            event_type=AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_REJECTED,
+            metadata={
+                "doctor_telegram_id": doctor_telegram_id,
+                "delivery_status": "rejected",
+                "rejection_code": rejection.rejection_code,
+                "shared_status": view.handoff_readiness.shared_status.value,
+                "safety_decision": safety_result.decision,
+                "safety_issue_count": len(safety_result.issues),
+                "safety_correction_path": (
+                    safety_result.correction_path if safety_result.correction_path is not None else "none"
+                ),
+            },
+        )
+        return DoctorCaseCardDelivery(
+            case_id=case_id,
+            doctor_telegram_id=doctor_telegram_id,
+            rejection=rejection,
+            audit_event_id=audit_event.event_id,
+        )
+
+    def _validate_summary_for_doctor(
+        self,
+        *,
+        case_id: str,
+        draft: DoctorFacingSummaryDraft,
+    ) -> tuple[SafetyCheckResult | None, str | None]:
+        try:
+            return (
+                self._safety_service.validate_doctor_facing_summary(
+                    case_id=case_id,
+                    draft=draft,
+                ),
+                None,
+            )
+        except Exception as error:
+            return (
+                None,
+                f"{error.__class__.__name__}: {error}",
+            )
+
+    def _build_safety_failure_rejection(
+        self,
+        *,
+        case_id: str,
+        doctor_telegram_id: int,
+        view: SharedStatusView,
+        failure_detail: str | None,
+    ) -> DoctorCaseCardDelivery:
+        try:
+            self._case_service.transition_case(case_id, CaseStatus.SAFETY_FAILED)
+        except CaseTransitionError:
+            refreshed_view = self._safe_get_shared_status_view(case_id)
+            if refreshed_view is not None:
+                view = refreshed_view
+
+        rejection = DoctorCaseCardRejection(
+            case_id=case_id,
+            doctor_telegram_id=doctor_telegram_id,
+            rejection_code="safety_failed",
+            rejection_message="Safety validation could not complete before doctor-facing exposure.",
+            shared_status=view.handoff_readiness.shared_status,
+            safety_failure_reason_code="validation_execution_failure",
+            safety_failure_detail=failure_detail,
+        )
+        audit_event = self._audit_service.record_event(
+            case_id=case_id,
+            event_type=AuditEventType.DOCTOR_READY_CASE_NOTIFICATION_REJECTED,
+            metadata={
+                "doctor_telegram_id": doctor_telegram_id,
+                "delivery_status": "rejected",
+                "rejection_code": rejection.rejection_code,
+                "shared_status": view.handoff_readiness.shared_status.value,
+                "safety_failure_reason_code": rejection.safety_failure_reason_code,
+            },
         )
         return DoctorCaseCardDelivery(
             case_id=case_id,
