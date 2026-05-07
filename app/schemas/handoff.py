@@ -281,6 +281,9 @@ class DoctorCaseCard(BaseModel):
     case_id: str = Field(min_length=1)
     current_case_status: str = Field(min_length=1)
     shared_status: SharedCaseStatusCode
+    runtime_profile: str = Field(min_length=1)
+    presentation_state: str = Field(min_length=1)
+    presentation_markers: tuple[str, ...] = ()
     doctor_review_status: DoctorFacingStatusCode = DoctorFacingStatusCode.READY
     doctor_review_reason: str = Field(min_length=1)
     ai_boundary_label: str = Field(min_length=1)
@@ -296,7 +299,7 @@ class DoctorCaseCard(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    @field_validator("case_id", "current_case_status", "doctor_review_reason")
+    @field_validator("case_id", "current_case_status", "doctor_review_reason", "runtime_profile", "presentation_state")
     @classmethod
     def normalize_required_text_fields(cls, value: str) -> str:
         normalized = value.strip()
@@ -313,6 +316,22 @@ class DoctorCaseCard(BaseModel):
             msg = "Doctor case boundary label must not be empty"
             raise ValueError(msg)
         return normalized
+
+    @field_validator("presentation_markers")
+    @classmethod
+    def normalize_presentation_markers(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        seen: set[str] = set()
+        for marker in value:
+            stripped = marker.strip()
+            if not stripped:
+                msg = "Doctor case presentation markers must not be empty"
+                raise ValueError(msg)
+            if stripped in seen:
+                continue
+            normalized.append(stripped)
+            seen.add(stripped)
+        return tuple(normalized)
 
 
 class DoctorCaseCardDelivery(BaseModel):
