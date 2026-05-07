@@ -12,6 +12,10 @@ from app.schemas.runtime_health import (
     RuntimeProcess,
     RuntimeReadinessResponse,
     RuntimeReadinessStatus,
+    StartupVerificationResponse,
+    StartupVerificationStatus,
+    StartupVerificationStep,
+    StartupVerificationStepStatus,
 )
 
 QdrantFactory = Callable[[Settings], QdrantVectorStore]
@@ -81,6 +85,46 @@ class RuntimeHealthService:
             reason_codes=reason_codes,
         )
 
+    def verify_startup(
+        self,
+        *,
+        process: RuntimeProcess = RuntimeProcess.API,
+    ) -> StartupVerificationResponse:
+        steps = self._startup_verification_steps()
+        blocked_steps = [
+            step
+            for step in steps
+            if step.required and step.status == StartupVerificationStepStatus.BLOCKED
+        ]
+        degraded_steps = [
+            step
+            for step in steps
+            if step.status == StartupVerificationStepStatus.DEGRADED
+        ]
+        reason_codes = tuple(
+            reason_code
+            for reason_code in (step.reason_code for step in steps)
+            if reason_code is not None
+        )
+        if blocked_steps:
+            status = StartupVerificationStatus.BLOCKED
+            can_process_cases = False
+        elif degraded_steps:
+            status = StartupVerificationStatus.DEGRADED
+            can_process_cases = True
+        else:
+            status = StartupVerificationStatus.PASSED
+            can_process_cases = True
+
+        return StartupVerificationResponse(
+            process=process,
+            status=status,
+            runtime_profile=self._settings.runtime_profile,
+            can_process_cases=can_process_cases,
+            steps=tuple(steps),
+            reason_codes=reason_codes,
+        )
+
     def _dependencies_for_process(self, process: RuntimeProcess) -> list[RuntimeDependencyCheck]:
         dependencies = [self._settings_loaded_dependency()]
         match process:
@@ -96,6 +140,7 @@ class RuntimeHealthService:
 
     def _api_dependencies(self) -> list[RuntimeDependencyCheck]:
         dependencies = [
+            self._startup_verification_dependency(),
             self._database_dependency(),
             self._artifact_storage_dependency(),
             self._knowledge_base_storage_dependency(),
@@ -134,6 +179,7 @@ class RuntimeHealthService:
 
     def _worker_dependencies(self) -> list[RuntimeDependencyCheck]:
         return [
+            self._startup_verification_dependency(),
             self._database_dependency(),
             self._qdrant_dependency(),
             self._knowledge_base_storage_dependency(),
@@ -244,6 +290,106 @@ class RuntimeHealthService:
             required=True,
             status=RuntimeDependencyStatus.READY,
         )
+
+    def _startup_verification_dependency(self) -> RuntimeDependencyCheck:
+        report = self.verify_startup()
+        if report.status == StartupVerificationStatus.BLOCKED:
+            status = RuntimeDependencyStatus.BLOCKED
+        elif report.status == StartupVerificationStatus.DEGRADED:
+            status = RuntimeDependencyStatus.DEGRADED
+        else:
+            status = RuntimeDependencyStatus.READY
+
+        reason_code = self._startup_verification_reason_code(report)
+        return RuntimeDependencyCheck(
+            name="startup_verification",
+            required=True,
+            status=status,
+            reason_code=reason_code,
+            detail=self._startup_verification_detail(report),
+        )
+
+    def _startup_verification_steps(self) -> list[StartupVerificationStep]:
+        steps = [self._runtime_profile_step()]
+        schema_dependency = self._database_dependency()
+        steps.append(
+            self._dependency_to_startup_step(
+                schema_dependency,
+                name="schema_compatibility",
+            )
+        )
+        qdrant_dependency = self._qdrant_dependency()
+        steps.append(
+            self._dependency_to_startup_step(
+                qdrant_dependency,
+                name="qdrant_collection",
+            )
+        )
+        return steps
+
+    def _runtime_profile_step(self) -> StartupVerificationStep:
+        if self._settings.runtime_profile == "operational":
+            return StartupVerificationStep(
+                name="runtime_profile",
+                required=False,
+                status=StartupVerificationStepStatus.READY,
+            )
+        return StartupVerificationStep(
+            name="runtime_profile",
+            required=False,
+            status=StartupVerificationStepStatus.DEGRADED,
+            reason_code="runtime_profile_local",
+            detail="Runtime profile is not operational.",
+        )
+
+    def _dependency_to_startup_step(
+        self,
+        dependency: RuntimeDependencyCheck,
+        *,
+        name: str,
+    ) -> StartupVerificationStep:
+        status_map = {
+            RuntimeDependencyStatus.READY: StartupVerificationStepStatus.READY,
+            RuntimeDependencyStatus.DEGRADED: StartupVerificationStepStatus.DEGRADED,
+            RuntimeDependencyStatus.BLOCKED: StartupVerificationStepStatus.BLOCKED,
+        }
+        return StartupVerificationStep(
+            name=name,
+            required=dependency.required,
+            status=status_map[dependency.status],
+            reason_code=dependency.reason_code,
+            detail=dependency.detail,
+        )
+
+    @staticmethod
+    def _startup_verification_detail(report: StartupVerificationResponse) -> str:
+        if report.status == StartupVerificationStatus.PASSED:
+            return "Startup verification passed."
+        if report.status == StartupVerificationStatus.DEGRADED:
+            return "Startup verification is degraded."
+        failing_steps = [
+            step.name
+            for step in report.steps
+            if step.required and step.status == StartupVerificationStepStatus.BLOCKED
+        ]
+        if failing_steps:
+            joined = ", ".join(failing_steps)
+            return f"Startup verification blocked at: {joined}."
+        return "Startup verification blocked."
+
+    @staticmethod
+    def _startup_verification_reason_code(report: StartupVerificationResponse) -> str | None:
+        blocked_steps = [
+            step.reason_code
+            for step in report.steps
+            if step.required and step.status == StartupVerificationStepStatus.BLOCKED
+        ]
+        if blocked_steps:
+            return next(
+                (reason_code for reason_code in blocked_steps if reason_code is not None),
+                None,
+            )
+        return report.reason_codes[0] if report.reason_codes else None
 
     def _filesystem_dependency(
         self,
