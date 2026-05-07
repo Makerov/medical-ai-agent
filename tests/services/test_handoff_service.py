@@ -225,6 +225,9 @@ def test_get_doctor_case_card_passes_safety_and_keeps_ready_for_doctor() -> None
     assert (
         case_service.get_shared_status_view(case_id).lifecycle_status == CaseStatus.READY_FOR_DOCTOR
     )
+    assert delivery.card.runtime_profile == "local"
+    assert delivery.card.presentation_state == "unverified"
+    assert delivery.card.presentation_markers == ("runtime_profile:local",)
 
 
 def test_get_doctor_case_card_blocks_unsafe_summary_and_marks_safety_failed() -> None:
@@ -413,6 +416,9 @@ def test_get_doctor_case_card_returns_structured_card_for_ready_case() -> None:
             "doctor_telegram_id": 123456,
             "delivery_status": "sent",
             "card_status": "ready_for_doctor",
+            "runtime_profile": "local",
+            "presentation_state": "unverified",
+            "presentation_marker_count": 1,
         },
     )
 
@@ -527,6 +533,11 @@ def test_get_doctor_case_card_includes_extracted_facts_and_uncertainty_warnings(
         "possible_deviation",
     }
     assert delivery.card.uncertainty_markers
+    assert delivery.card.presentation_state == "unverified"
+    assert delivery.card.presentation_markers == (
+        "runtime_profile:local",
+        "uncertainty_visible",
+    )
     assert delivery.card.review_warnings
     assert any("uncertain" in warning.text.lower() for warning in delivery.card.review_warnings)
     assert delivery.card.source_references is not None
@@ -601,7 +612,44 @@ def test_get_doctor_case_card_renders_structured_unavailable_source_references_w
     assert delivery.card is not None
     assert delivery.card.source_references is not None
     assert delivery.card.source_references.unavailable_reason is None
+    assert delivery.card.presentation_state == "unverified"
+    assert delivery.card.presentation_markers == ("runtime_profile:local",)
     assert any(
         reference.unavailable_reason is not None
         for reference in delivery.card.source_references.references
     )
+
+
+def test_get_doctor_case_card_marks_explicit_fallback_runtime_profiles_as_unverified() -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_ready_card_005")
+    patient_intake_service = PatientIntakeService(case_service=case_service)
+    audit_service = RecordingAuditService()
+    handoff_service = HandoffService(
+        case_service=case_service,
+        patient_intake_service=patient_intake_service,
+        audit_service=audit_service,  # type: ignore[arg-type]
+        settings=Settings(
+            runtime_profile="fallback_stub",
+            doctor_telegram_id_allowlist=(123456,),
+        ),
+    )
+    case_id = _build_ready_case(case_service)
+    _build_patient_payload(patient_intake_service, case_id)
+
+    handoff_service.mark_case_ready_for_review(
+        case_id=case_id,
+        doctor_telegram_id=123456,
+    )
+
+    delivery = handoff_service.get_doctor_case_card(
+        case_id=case_id,
+        doctor_telegram_id=123456,
+    )
+
+    assert delivery.card is not None
+    assert delivery.card.runtime_profile == "fallback_stub"
+    assert delivery.card.presentation_state == "unverified"
+    assert delivery.card.presentation_markers == ("runtime_profile:fallback_stub",)
+    assert audit_service.recorded[-1][2]["runtime_profile"] == "fallback_stub"
+    assert audit_service.recorded[-1][2]["presentation_state"] == "unverified"
