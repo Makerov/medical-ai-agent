@@ -22,25 +22,25 @@ Status: ready-for-dev
 
 ## Tasks / Subtasks
 
-- [ ] Keep the minimal eval contract typed, case-linked, and reviewable. (AC: 1, 2)
-  - [ ] Reuse `app/schemas/eval.py` instead of introducing a second eval schema.
-  - [ ] Keep the output shape centered on `EvalCheckResult` and `EvalSuiteSummary`.
-  - [ ] Preserve the category split for `extraction`, `groundedness`, and `safety`.
-  - [ ] Keep the suite case-scoped under the same `case_id` across reruns.
+- [x] Keep the minimal eval contract typed, case-linked, and reviewable. (AC: 1, 2)
+  - [x] Reuse `app/schemas/eval.py` instead of introducing a second eval schema.
+  - [x] Keep the output shape centered on `EvalCheckResult` and `EvalSuiteSummary`.
+  - [x] Preserve the category split for `extraction`, `groundedness`, and `safety`.
+  - [x] Keep the suite case-scoped under the same `case_id` across reruns.
 
-- [ ] Keep the eval runner deterministic and reviewable from JSON output. (AC: 1, 2)
-  - [ ] Keep `scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready` as the canonical command surface.
-  - [ ] Ensure the default output remains structured JSON that can be reviewed without raw provider traces.
-  - [ ] Keep the artifact path under `data/artifacts/<case_id>/verification/minimal-eval-suite.json`.
+- [x] Keep the eval runner deterministic and reviewable from JSON output. (AC: 1, 2)
+  - [x] Keep `scripts/run_minimal_eval_suite.py --case-id case_operational_verification_ready` as the canonical command surface.
+  - [x] Ensure the default output remains structured JSON that can be reviewed without raw provider traces.
+  - [x] Keep the artifact path under `data/artifacts/<case_id>/verification/minimal-eval-suite.json`.
 
-- [ ] Add or update regression coverage for quality-result shape and rerun stability. (AC: 1, 2)
-  - [ ] Verify the suite links every result to the same `case_id`.
-  - [ ] Verify category-level failures surface through stable structured fields such as `category`, `fixture_id`, `threshold_signal`, and `failure_reason`.
-  - [ ] Verify reruns keep the artifact shape stable and do not create duplicate or conflicting narratives.
+- [x] Add or update regression coverage for quality-result shape and rerun stability. (AC: 1, 2)
+  - [x] Verify the suite links every result to the same `case_id`.
+  - [x] Verify category-level failures surface through stable structured fields such as `category`, `fixture_id`, `threshold_signal`, and `failure_reason`.
+  - [x] Verify reruns keep the artifact shape stable and do not create duplicate or conflicting narratives.
 
-- [ ] Align operator docs if wording or paths drift. (AC: 1)
-  - [ ] Keep `README.md` aligned with the documented eval command and the canonical `verification/` artifact path.
-  - [ ] Keep docs tests aligned with the operational verification wording and the reviewable-results contract.
+- [x] Align operator docs if wording or paths drift. (AC: 1)
+  - [x] Keep `README.md` aligned with the documented eval command and the canonical `verification/` artifact path.
+  - [x] Keep docs tests aligned with the operational verification wording and the reviewable-results contract.
 
 ## Dev Notes
 
@@ -171,27 +171,32 @@ GPT-5 Codex
 ### Debug Log References
 
 - 2026-05-07: Analyzed Epic 6, PRD, architecture, current eval runner/schema/tests, README/docs, previous Epic 6 stories, and recent git history for the minimal eval suite story.
+- 2026-05-07: Implemented explicit canonical `verification/` eval layout, kept legacy `demo/` support behind an explicit runner argument, updated regression tests and README wording, and verified with targeted/full pytest runs plus ruff on touched files.
 
 ### Completion Notes List
 
 - Story context created for minimal eval suite and reviewable quality results.
 - Focus preserved on structured, case-linked eval output and operational verification defaults.
+- Canonical eval output now stays under `data/artifacts/<case_id>/verification/minimal-eval-suite.json`.
+- Legacy `demo/` eval layout remains available only through the explicit `artifact_layout="demo"` runner mode.
+- Added regression coverage for case linkage, stable failure fields, rerun shape stability, and docs wording.
+- Validation completed with `uv run pytest`, `uv run pytest tests/evals/test_minimal_suite.py tests/schemas/test_eval_contract.py tests/docs/test_demo_setup_docs.py`, and `uv run ruff check app/evals/minimal_suite.py tests/evals/test_minimal_suite.py tests/schemas/test_eval_contract.py tests/docs/test_demo_setup_docs.py`.
 
 ### File List
 
+- [`_bmad-output/implementation-artifacts/6-6-minimal-eval-suite-and-reviewable-quality-results.md`](/Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts/6-6-minimal-eval-suite-and-reviewable-quality-results.md)
+- [`_bmad-output/implementation-artifacts/sprint-status.yaml`](/Users/maker/Work/medical-ai-agent/_bmad-output/implementation-artifacts/sprint-status.yaml)
 - [`app/evals/minimal_suite.py`](/Users/maker/Work/medical-ai-agent/app/evals/minimal_suite.py)
-- [`app/schemas/eval.py`](/Users/maker/Work/medical-ai-agent/app/schemas/eval.py)
-- [`scripts/run_minimal_eval_suite.py`](/Users/maker/Work/medical-ai-agent/scripts/run_minimal_eval_suite.py)
 - [`tests/evals/test_minimal_suite.py`](/Users/maker/Work/medical-ai-agent/tests/evals/test_minimal_suite.py)
 - [`tests/schemas/test_eval_contract.py`](/Users/maker/Work/medical-ai-agent/tests/schemas/test_eval_contract.py)
 - [`tests/docs/test_demo_setup_docs.py`](/Users/maker/Work/medical-ai-agent/tests/docs/test_demo_setup_docs.py)
 - [`README.md`](/Users/maker/Work/medical-ai-agent/README.md)
-- [`scripts/seed_operational_verification_case.py`](/Users/maker/Work/medical-ai-agent/scripts/seed_operational_verification_case.py)
 
 ## Change Log
 
 - 2026-05-07: Created story context for minimal eval suite and reviewable quality results.
+- 2026-05-07: Tightened minimal eval suite to default to canonical verification artifacts, kept legacy demo layout explicit, and updated regression/docs coverage for reviewable structured results.
 
 ## Status
 
-ready-for-dev
+review
