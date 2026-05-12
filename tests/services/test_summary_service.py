@@ -1,5 +1,6 @@
 from datetime import UTC, date, datetime
 
+from app.core.settings import Settings
 from app.schemas.case import CaseRecordKind, CaseRecordReference
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.knowledge_base import (
@@ -12,10 +13,11 @@ from app.schemas.rag import (
     GeneratedNarrativeClaim,
     GroundedSummaryContract,
     KnowledgeApplicabilityDecision,
-    SummaryGenerationResult,
     SummaryGenerationInput,
+    SummaryGenerationResult,
     SummaryValidationResult,
 )
+from app.services import summary_service as summary_module
 from app.services.boundary_copy import HUMAN_REVIEW_STATEMENT, SAFETY_BOUNDARY_STATEMENT
 from app.services.summary_service import SummaryService
 
@@ -282,3 +284,28 @@ def test_summary_service_maps_llm_client_failure_to_recoverable_summary_failed()
     assert result.failure.code == "provider_request_failed"
     assert result.failure.reason == "llm_provider_failure"
     assert result.grounded_summary is None
+
+
+def test_summary_service_wires_huggingface_client_for_operational_profile(monkeypatch) -> None:
+    built_settings = []
+
+    class FakeOperationalClient:
+        def generate_summary(self, request):
+            raise AssertionError("not called")
+
+    def fake_builder(settings: Settings):
+        built_settings.append(settings)
+        return FakeOperationalClient()
+
+    monkeypatch.setattr(summary_module, "build_operational_llm_client", fake_builder)
+    settings = Settings(
+        runtime_profile="operational",
+        llm_provider="huggingface",
+        llm_model="Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+        hf_token="hf-token",
+    )
+
+    service = SummaryService(settings=settings)
+
+    assert service._llm_client is not None
+    assert built_settings == [settings]

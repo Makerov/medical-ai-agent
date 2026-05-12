@@ -187,6 +187,19 @@ class RuntimeHealthService:
 
     def _operational_runtime_dependencies(self) -> list[RuntimeDependencyCheck]:
         return [
+            self._required_exact_value_dependency(
+                name="llm_provider",
+                value=self._settings.llm_provider,
+                expected_value="huggingface",
+                reason_code="llm_provider_invalid",
+                detail="LLM provider must be configured as huggingface.",
+            ),
+            self._required_value_dependency(
+                name="llm_model",
+                value=self._settings.llm_model,
+                reason_code="llm_model_missing",
+                detail="LLM model is not configured.",
+            ),
             self._required_value_dependency(
                 name="hf_token",
                 value=self._settings.hf_token,
@@ -205,11 +218,24 @@ class RuntimeHealthService:
                 reason_code="doctor_bot_token_missing",
                 detail="Doctor bot token is not configured.",
             ),
-            self._required_value_dependency(
+            self._required_exact_value_dependency(
                 name="ocr_provider_name",
                 value=self._settings.ocr_provider_name,
-                reason_code="ocr_provider_missing",
-                detail="OCR provider is not configured.",
+                expected_value="paddleocr",
+                reason_code="ocr_provider_invalid",
+                detail="OCR provider must be configured as paddleocr.",
+            ),
+            self._required_value_dependency(
+                name="ocr_model",
+                value=self._settings.ocr_model,
+                reason_code="ocr_model_missing",
+                detail="OCR model is not configured.",
+            ),
+            self._required_value_dependency(
+                name="ocr_lang",
+                value=self._settings.ocr_lang,
+                reason_code="ocr_lang_missing",
+                detail="OCR language is not configured.",
             ),
         ]
 
@@ -325,6 +351,31 @@ class RuntimeHealthService:
                 name="qdrant_collection",
             )
         )
+        if self._settings.runtime_profile == "operational":
+            provider_dependencies = self._operational_runtime_dependencies()
+            blocked_provider_dependency = next(
+                (
+                    dependency
+                    for dependency in provider_dependencies
+                    if dependency.status == RuntimeDependencyStatus.BLOCKED
+                ),
+                None,
+            )
+            steps.append(
+                StartupVerificationStep(
+                    name="operational_provider_config",
+                    required=True,
+                    status=StartupVerificationStepStatus.BLOCKED
+                    if blocked_provider_dependency is not None
+                    else StartupVerificationStepStatus.READY,
+                    reason_code=None
+                    if blocked_provider_dependency is None
+                    else blocked_provider_dependency.reason_code,
+                    detail=None
+                    if blocked_provider_dependency is None
+                    else "Operational provider configuration is incomplete.",
+                )
+            )
         return steps
 
     def _runtime_profile_step(self) -> StartupVerificationStep:
@@ -420,6 +471,27 @@ class RuntimeHealthService:
         detail: str,
     ) -> RuntimeDependencyCheck:
         if self._is_truthy_value(value):
+            return RuntimeDependencyCheck(
+                name=name,
+                required=True,
+                status=RuntimeDependencyStatus.READY,
+            )
+        return self._blocked_dependency(
+            name=name,
+            reason_code=reason_code,
+            detail=detail,
+        )
+
+    def _required_exact_value_dependency(
+        self,
+        *,
+        name: str,
+        value: object,
+        expected_value: str,
+        reason_code: str,
+        detail: str,
+    ) -> RuntimeDependencyCheck:
+        if isinstance(value, str) and value.strip().lower() == expected_value:
             return RuntimeDependencyCheck(
                 name=name,
                 required=True,

@@ -1,5 +1,5 @@
 from app.core.settings import Settings, get_settings
-from app.integrations.ocr_client import OCRClient, OCRClientError
+from app.integrations.ocr_client import OCRClient, OCRClientError, build_paddleocr_parser
 from app.schemas.case import (
     CaseRecordKind,
     CaseRecordReference,
@@ -44,7 +44,20 @@ class ParseDocumentNode:
     ) -> None:
         self._case_service = case_service
         self._settings = settings or get_settings()
-        self._ocr_client = ocr_client or OCRClient(
+        self._ocr_client = ocr_client or self._build_default_ocr_client()
+
+    def _build_default_ocr_client(self) -> OCRClient:
+        if (
+            self._settings.runtime_profile == "operational"
+            and self._settings.ocr_provider_name == "paddleocr"
+            and self._settings.ocr_model
+            and self._settings.ocr_lang
+        ):
+            return OCRClient(
+                document_parser=build_paddleocr_parser(self._settings),
+                provider_name="paddleocr",
+            )
+        return OCRClient(
             provider_name=self._settings.ocr_provider_name or "provider_agnostic",
         )
 

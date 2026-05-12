@@ -36,7 +36,11 @@ class Settings(BaseSettings):
     )
     document_upload_max_file_size_bytes: int = TELEGRAM_FILE_DOWNLOAD_LIMIT_BYTES
     document_upload_max_documents_per_case: int = 1
+    llm_provider: str | None = None
+    llm_model: str | None = None
     ocr_provider_name: str | None = None
+    ocr_model: str | None = None
+    ocr_lang: str | None = None
     patient_bot_token: str | None = None
     doctor_bot_token: str | None = None
     debug_admin_static_token: str | None = None
@@ -117,12 +121,36 @@ class Settings(BaseSettings):
     @field_validator("ocr_provider_name", mode="before")
     @classmethod
     def normalize_ocr_provider_name(cls, value: object) -> str | None:
+        return cls._normalize_optional_string(value, "OCR_PROVIDER_NAME")
+
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def normalize_llm_provider(cls, value: object) -> str | None:
+        return cls._normalize_optional_string(value, "LLM_PROVIDER")
+
+    @field_validator("llm_model", mode="before")
+    @classmethod
+    def normalize_llm_model(cls, value: object) -> str | None:
+        return cls._normalize_optional_string(value, "LLM_MODEL")
+
+    @field_validator("ocr_model", mode="before")
+    @classmethod
+    def normalize_ocr_model(cls, value: object) -> str | None:
+        return cls._normalize_optional_string(value, "OCR_MODEL")
+
+    @field_validator("ocr_lang", mode="before")
+    @classmethod
+    def normalize_ocr_lang(cls, value: object) -> str | None:
+        return cls._normalize_optional_string(value, "OCR_LANG")
+
+    @staticmethod
+    def _normalize_optional_string(value: object, field_name: str) -> str | None:
         if value is None:
             return None
         if isinstance(value, str):
             normalized = value.strip()
             return normalized or None
-        msg = "OCR_PROVIDER_NAME must be a string"
+        msg = f"{field_name} must be a string"
         raise ValueError(msg)
 
     @field_validator("debug_admin_static_token", mode="before")
@@ -237,20 +265,35 @@ class Settings(BaseSettings):
         missing: list[str] = []
         if not self.database_url:
             missing.append("DATABASE_URL")
+        elif not self._is_postgresql_url(self.database_url):
+            missing.append("DATABASE_URL (must use postgresql:// or postgresql+...)")
+        if self.llm_provider != "huggingface":
+            missing.append("LLM_PROVIDER (must be huggingface)")
+        if not self.llm_model:
+            missing.append("LLM_MODEL")
         if not self.hf_token:
             missing.append("HF_TOKEN")
         if not self.doctor_bot_token:
             missing.append("DOCTOR_BOT_TOKEN")
         if not self.patient_bot_token:
             missing.append("PATIENT_BOT_TOKEN")
-        if not self.ocr_provider_name:
-            missing.append("OCR_PROVIDER_NAME")
+        if self.ocr_provider_name != "paddleocr":
+            missing.append("OCR_PROVIDER_NAME (must be paddleocr)")
+        if not self.ocr_model:
+            missing.append("OCR_MODEL")
+        if not self.ocr_lang:
+            missing.append("OCR_LANG")
         if not self.qdrant_url:
             missing.append("QDRANT_URL")
         if missing:
             joined = ", ".join(missing)
             msg = f"Operational profile requires configured runtime settings: {joined}"
             raise ValueError(msg)
+
+    @staticmethod
+    def _is_postgresql_url(value: str) -> bool:
+        normalized = value.strip().lower()
+        return normalized.startswith("postgresql://") or normalized.startswith("postgresql+")
 
 
 @lru_cache

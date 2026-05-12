@@ -49,7 +49,11 @@ def _build_ready_runtime_health_service(tmp_path: Path) -> RuntimeHealthService:
             ),
             document_upload_max_file_size_bytes=20_000_000,
             document_upload_max_documents_per_case=1,
-            ocr_provider_name="ocr-provider",
+            llm_provider="huggingface",
+            llm_model="Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+            ocr_provider_name="paddleocr",
+            ocr_model="PP-OCRv5_server",
+            ocr_lang="ru",
             patient_bot_token="patient-token",
             doctor_bot_token="doctor-token",
             debug_admin_static_token=None,
@@ -95,10 +99,14 @@ def test_readiness_endpoint_returns_machine_readable_dependency_details(
         "artifact_storage",
         "knowledge_base_storage",
         "qdrant",
+        "llm_provider",
+        "llm_model",
         "hf_token",
         "patient_bot_token",
         "doctor_bot_token",
         "ocr_provider_name",
+        "ocr_model",
+        "ocr_lang",
     }
     assert "postgresql://localhost:5432/medical" not in str(payload)
     assert "patient-token" not in str(payload)
@@ -123,6 +131,7 @@ def test_startup_endpoint_returns_structured_verification_report(tmp_path: Path)
         "runtime_profile",
         "schema_compatibility",
         "qdrant_collection",
+        "operational_provider_config",
     ]
     assert "postgresql://localhost:5432/medical" not in str(payload)
     assert "patient-token" not in str(payload)
@@ -220,6 +229,26 @@ def test_settings_parse_artifact_root_dir(monkeypatch) -> None:
     assert settings.artifact_root_dir == Path("custom/artifacts")
 
 
+def test_operational_profile_rejects_non_postgresql_database_url(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("RUNTIME_PROFILE", "operational")
+    monkeypatch.setenv("DATABASE_URL", "mysql://localhost:3306/medical")
+    monkeypatch.setenv("HF_TOKEN", "demo-hf-token")
+    monkeypatch.setenv("PATIENT_BOT_TOKEN", "patient-token")
+    monkeypatch.setenv("DOCTOR_BOT_TOKEN", "doctor-token")
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("LLM_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8")
+    monkeypatch.setenv("OCR_PROVIDER_NAME", "paddleocr")
+    monkeypatch.setenv("OCR_MODEL", "PP-OCRv5_server")
+    monkeypatch.setenv("OCR_LANG", "ru")
+
+    try:
+        with pytest.raises(ValueError, match="DATABASE_URL"):
+            get_settings()
+    finally:
+        get_settings.cache_clear()
+
+
 def test_settings_parse_patient_bot_token(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("PATIENT_BOT_TOKEN", " demo-patient-token ")
@@ -236,7 +265,14 @@ def test_settings_parse_runtime_profile_and_database_url(monkeypatch) -> None:
     get_settings.cache_clear()
     monkeypatch.setenv("RUNTIME_PROFILE", " OPERATIONAL ")
     monkeypatch.setenv("DATABASE_URL", "postgresql://localhost:5432/medical")
-    monkeypatch.setenv("OCR_PROVIDER_NAME", "real-provider")
+    monkeypatch.setenv("HF_TOKEN", "demo-hf-token")
+    monkeypatch.setenv("PATIENT_BOT_TOKEN", "patient-token")
+    monkeypatch.setenv("DOCTOR_BOT_TOKEN", "doctor-token")
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("LLM_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8")
+    monkeypatch.setenv("OCR_PROVIDER_NAME", "paddleocr")
+    monkeypatch.setenv("OCR_MODEL", "PP-OCRv5_server")
+    monkeypatch.setenv("OCR_LANG", "ru")
 
     try:
         settings = get_settings()
@@ -245,6 +281,11 @@ def test_settings_parse_runtime_profile_and_database_url(monkeypatch) -> None:
 
     assert settings.runtime_profile == "operational"
     assert settings.database_url == "postgresql://localhost:5432/medical"
+    assert settings.llm_provider == "huggingface"
+    assert settings.llm_model == "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8"
+    assert settings.ocr_provider_name == "paddleocr"
+    assert settings.ocr_model == "PP-OCRv5_server"
+    assert settings.ocr_lang == "ru"
 
 
 def test_settings_parse_doctor_bot_and_hf_tokens(monkeypatch) -> None:
@@ -271,6 +312,24 @@ def test_settings_parse_ocr_provider_name(monkeypatch) -> None:
         get_settings.cache_clear()
 
     assert settings.ocr_provider_name == "real-provider"
+
+
+def test_settings_parse_provider_models(monkeypatch) -> None:
+    get_settings.cache_clear()
+    monkeypatch.setenv("LLM_PROVIDER", " huggingface ")
+    monkeypatch.setenv("LLM_MODEL", " Qwen/Qwen3-30B-A3B-Instruct-2507-FP8 ")
+    monkeypatch.setenv("OCR_MODEL", " PP-OCRv5_server ")
+    monkeypatch.setenv("OCR_LANG", " ru ")
+
+    try:
+        settings = get_settings()
+    finally:
+        get_settings.cache_clear()
+
+    assert settings.llm_provider == "huggingface"
+    assert settings.llm_model == "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8"
+    assert settings.ocr_model == "PP-OCRv5_server"
+    assert settings.ocr_lang == "ru"
 
 
 def test_settings_parse_document_upload_supported_mime_types(monkeypatch) -> None:
@@ -322,6 +381,8 @@ def test_settings_reject_missing_operational_runtime_configuration(monkeypatch) 
     monkeypatch.setenv("DOCTOR_BOT_TOKEN", "demo-doctor-token")
     monkeypatch.setenv("PATIENT_BOT_TOKEN", "demo-patient-token")
     monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("LLM_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8")
 
     try:
         with pytest.raises(
@@ -341,6 +402,8 @@ def test_settings_reject_missing_operational_ocr_provider_configuration(monkeypa
     monkeypatch.setenv("DOCTOR_BOT_TOKEN", "demo-doctor-token")
     monkeypatch.setenv("PATIENT_BOT_TOKEN", "demo-patient-token")
     monkeypatch.setenv("QDRANT_URL", "http://localhost:6333")
+    monkeypatch.setenv("LLM_PROVIDER", "huggingface")
+    monkeypatch.setenv("LLM_MODEL", "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8")
 
     try:
         with pytest.raises(ValueError, match="OCR_PROVIDER_NAME"):

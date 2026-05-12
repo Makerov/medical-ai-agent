@@ -25,7 +25,7 @@ The canonical fresh-checkout path uses the `local` runtime profile and synthetic
 Supported runtime profiles:
 
 - `local` is the default synthetic/anonymized path for fresh checkout and verification work.
-- `operational` is the explicit real-provider path and requires configured real providers plus `Qdrant`.
+- `operational` is the explicit real-provider path and requires PostgreSQL, configured real providers, and `Qdrant`.
 - `dev/test` is for non-operational development and test workflows.
 - explicit fallback profiles such as `fallback_stub` are intentionally degraded and must remain visible downstream.
 
@@ -50,11 +50,16 @@ Copy `.env.example` to `.env` and fill the values that apply to your local run:
 - `PATIENT_BOT_TOKEN`
 - `DOCTOR_BOT_TOKEN`
 - `DOCTOR_TELEGRAM_ID`
+- `LLM_PROVIDER`
+- `LLM_MODEL`
 - `HF_TOKEN`
+- `OCR_PROVIDER_NAME`
+- `OCR_MODEL`
+- `OCR_LANG`
 
 For the default local operational verification run, the bot token, allowlist, and HF values can stay empty unless you are exercising the Telegram adapters or model-backed flows. The containerized stack uses the API, PostgreSQL, and Qdrant services defined in `docker-compose.yml`, while host-run scripts use the `.env` file directly.
 
-The `operational` profile is separate from the default `local` path. It requires real provider configuration, `Qdrant`, and the startup verification gate to pass before cases are processed.
+The `operational` profile is separate from the default `local` path. It requires PostgreSQL, real provider configuration, `Qdrant`, and the startup verification gate to pass before cases are processed. The selected operational providers are `LLM_PROVIDER=huggingface` with `LLM_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507-FP8`, and `OCR_PROVIDER_NAME=paddleocr` with `OCR_MODEL=PP-OCRv5_server` and `OCR_LANG=ru`.
 
 ### Documented startup paths
 
@@ -65,6 +70,25 @@ cp .env.example .env
 uv sync
 docker compose up --build
 ```
+
+For the real-provider operational profile, install the OCR extra and provide secrets/config before startup:
+
+```bash
+uv sync --extra operational
+RUNTIME_PROFILE=operational
+DATABASE_URL=postgresql://medical_ai_agent:medical_ai_agent@localhost:5432/medical_ai_agent
+QDRANT_URL=http://localhost:6333
+LLM_PROVIDER=huggingface
+LLM_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507-FP8
+HF_TOKEN=<set locally>
+OCR_PROVIDER_NAME=paddleocr
+OCR_MODEL=PP-OCRv5_server
+OCR_LANG=ru
+PATIENT_BOT_TOKEN=<set locally>
+DOCTOR_BOT_TOKEN=<set locally>
+```
+
+If any required operational provider setting is missing or incompatible, settings validation and startup/readiness checks block the operational profile with machine-readable reason codes. Health and readiness responses report provider names/models and token presence checks, but never include `HF_TOKEN` or bot token values.
 
 After the stack is up, run the deterministic bootstrap scripts in this order:
 
@@ -194,7 +218,12 @@ Create a local `.env` file from `.env.example` and fill runtime secrets:
 - `PATIENT_BOT_TOKEN` - Telegram bot token for the patient bot.
 - `DOCTOR_BOT_TOKEN` - Telegram bot token for the doctor bot.
 - `DOCTOR_TELEGRAM_ID` - Telegram ID allowed to use doctor-facing bot flows.
-- `HF_TOKEN` - Hugging Face token for model access.
+- `LLM_PROVIDER` - must be `huggingface` for the operational real-provider path.
+- `LLM_MODEL` - Hugging Face model ID used by the LLM adapter.
+- `HF_TOKEN` - credential for the real LLM provider used by the operational runtime.
+- `OCR_PROVIDER_NAME` - must be `paddleocr` for the operational OCR path.
+- `OCR_MODEL` - PaddleOCR model/version selector.
+- `OCR_LANG` - OCR language code, for example `ru`.
 
 The same `.env` file also carries the local operational verification infrastructure contract:
 

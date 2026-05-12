@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from app.core.settings import Settings, get_settings
-from app.integrations.llm_client import LLMClient, LLMClientError
+from app.integrations.llm_client import LLMClient, LLMClientError, build_operational_llm_client
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.rag import (
     DoctorFacingDeviationMarker,
@@ -27,8 +27,17 @@ class SummaryService:
         llm_client: LLMClient | None = None,
         settings: Settings | None = None,
     ) -> None:
-        self._llm_client = llm_client
         self._settings = settings or get_settings()
+        self._llm_client = llm_client or self._build_default_llm_client()
+
+    def _build_default_llm_client(self) -> LLMClient | None:
+        if (
+            self._settings.runtime_profile == "operational"
+            and self._settings.llm_provider == "huggingface"
+            and self._settings.llm_model
+        ):
+            return build_operational_llm_client(self._settings)
+        return None
 
     def build_doctor_facing_summary_draft(
         self,
