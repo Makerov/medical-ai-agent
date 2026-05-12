@@ -6,6 +6,7 @@ from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus
 from app.schemas.document import DocumentUploadMetadata
 from app.services.case_service import CaseService
 from app.services.document_service import DocumentService
+from app.workflow.nodes import parse_document as parse_document_module
 from app.workflow.nodes.parse_document import ParseDocumentNode
 
 
@@ -80,6 +81,28 @@ def test_parse_document_transitions_case_and_attaches_extraction_reference() -> 
         case_service.get_case_core_records(patient_case.case_id).patient_case.status
         == CaseStatus.PROCESSING_DOCUMENTS
     )
+
+
+def test_parse_document_node_wires_paddleocr_parser_for_operational_profile(monkeypatch) -> None:
+    case_service = CaseService(id_generator=lambda: "case_parse_operational")
+    settings = Settings(
+        runtime_profile="operational",
+        ocr_provider_name="paddleocr",
+        ocr_model="PP-OCRv5_server",
+        ocr_lang="ru",
+    )
+    built_settings = []
+
+    def fake_build_parser(payload: Settings):
+        built_settings.append(payload)
+        return lambda _bytes, _document: ("text from paddleocr", 0.9)
+
+    monkeypatch.setattr(parse_document_module, "build_paddleocr_parser", fake_build_parser)
+
+    node = ParseDocumentNode(case_service=case_service, settings=settings)
+
+    assert node._ocr_client._provider_name == "paddleocr"
+    assert built_settings == [settings]
 
 
 def test_parse_document_routes_low_confidence_extraction_to_partial_extraction() -> None:
