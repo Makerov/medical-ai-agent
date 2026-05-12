@@ -38,7 +38,11 @@ def _build_settings(
     doctor_bot_token: str | None = "doctor-token",
     doctor_allowlist: tuple[int, ...] = (123,),
     hf_token: str | None = "hf-token",
-    ocr_provider_name: str | None = "ocr-provider",
+    llm_provider: str | None = "huggingface",
+    llm_model: str | None = "Qwen/Qwen3-30B-A3B-Instruct-2507-FP8",
+    ocr_provider_name: str | None = "paddleocr",
+    ocr_model: str | None = "PP-OCRv5_server",
+    ocr_lang: str | None = "ru",
 ) -> Settings:
     return Settings(
         app_name="medical-ai-agent",
@@ -64,7 +68,11 @@ def _build_settings(
         ),
         document_upload_max_file_size_bytes=20_000_000,
         document_upload_max_documents_per_case=1,
+        llm_provider=llm_provider,
+        llm_model=llm_model,
         ocr_provider_name=ocr_provider_name,
+        ocr_model=ocr_model,
+        ocr_lang=ocr_lang,
         patient_bot_token=patient_bot_token,
         doctor_bot_token=doctor_bot_token,
         debug_admin_static_token=None,
@@ -116,10 +124,14 @@ def test_api_readiness_is_ready_when_operational_dependencies_exist(tmp_path: Pa
         "artifact_storage",
         "knowledge_base_storage",
         "qdrant",
+        "llm_provider",
+        "llm_model",
         "hf_token",
         "patient_bot_token",
         "doctor_bot_token",
         "ocr_provider_name",
+        "ocr_model",
+        "ocr_lang",
     }
     assert all(dependency.status == "ready" for dependency in response.dependencies)
 
@@ -166,7 +178,11 @@ def test_local_profile_is_marked_degraded_even_when_dependencies_exist(tmp_path:
             patient_bot_token=None,
             doctor_bot_token=None,
             hf_token=None,
+            llm_provider=None,
+            llm_model=None,
             ocr_provider_name=None,
+            ocr_model=None,
+            ocr_lang=None,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
     )
@@ -196,7 +212,11 @@ def test_doctor_bot_readiness_requires_allowlist_and_token(tmp_path: Path) -> No
             doctor_bot_token=None,
             patient_bot_token=None,
             hf_token=None,
+            llm_provider=None,
+            llm_model=None,
             ocr_provider_name=None,
+            ocr_model=None,
+            ocr_lang=None,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
     )
@@ -260,6 +280,7 @@ def test_startup_verification_passes_for_ready_operational_runtime(tmp_path: Pat
         "runtime_profile",
         "schema_compatibility",
         "qdrant_collection",
+        "operational_provider_config",
     ]
     assert all(step.status == "ready" for step in response.steps)
 
@@ -317,6 +338,61 @@ def test_startup_verification_blocks_when_qdrant_collection_is_missing(
         step.name == "qdrant_collection"
         and step.status == "blocked"
         and step.reason_code == "qdrant_collection_missing"
+        for step in response.steps
+    )
+
+
+def test_operational_readiness_blocks_when_provider_config_is_missing(tmp_path: Path) -> None:
+    artifact_root_dir = tmp_path / "artifacts"
+    knowledge_base_seed_dir = tmp_path / "knowledge-base"
+    artifact_root_dir.mkdir()
+    knowledge_base_seed_dir.mkdir()
+    service = RuntimeHealthService(
+        settings=_build_settings(
+            artifact_root_dir=artifact_root_dir,
+            knowledge_base_seed_dir=knowledge_base_seed_dir,
+            llm_model=None,
+            ocr_model=None,
+        ),
+        qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+    )
+
+    response = service.evaluate_readiness(process=RuntimeProcess.API)
+
+    assert response.status == RuntimeReadinessStatus.NOT_READY
+    assert {"llm_model_missing", "ocr_model_missing"} <= set(response.reason_codes)
+    assert any(
+        dependency.name == "llm_model" and dependency.reason_code == "llm_model_missing"
+        for dependency in response.dependencies
+    )
+    assert any(
+        dependency.name == "ocr_model" and dependency.reason_code == "ocr_model_missing"
+        for dependency in response.dependencies
+    )
+
+
+def test_startup_verification_blocks_when_provider_config_is_missing(tmp_path: Path) -> None:
+    artifact_root_dir = tmp_path / "artifacts"
+    knowledge_base_seed_dir = tmp_path / "knowledge-base"
+    artifact_root_dir.mkdir()
+    knowledge_base_seed_dir.mkdir()
+    service = RuntimeHealthService(
+        settings=_build_settings(
+            artifact_root_dir=artifact_root_dir,
+            knowledge_base_seed_dir=knowledge_base_seed_dir,
+            llm_provider="openai",
+        ),
+        qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+    )
+
+    response = service.verify_startup(process=RuntimeProcess.API)
+
+    assert response.status == StartupVerificationStatus.BLOCKED
+    assert "llm_provider_invalid" in response.reason_codes
+    assert any(
+        step.name == "operational_provider_config"
+        and step.status == "blocked"
+        and step.reason_code == "llm_provider_invalid"
         for step in response.steps
     )
 
