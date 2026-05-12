@@ -16,6 +16,8 @@ class DocumentUploadRejectionReasonCode(StrEnum):
     FILE_TOO_LARGE = "file_too_large"
     INVALID_DOCUMENT = "invalid_document"
     DOCUMENT_COUNT_LIMIT_EXCEEDED = "document_count_limit_exceeded"
+    DOCUMENT_DOWNLOAD_FAILED = "document_download_failed"
+    DOCUMENT_STORAGE_UNAVAILABLE = "document_storage_unavailable"
 
 
 class DocumentUploadMetadata(BaseModel):

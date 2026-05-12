@@ -16,7 +16,7 @@
     }
   ],
   "export_path": "case_operational_verification_ready/verification/operational-verification-export.json",
-  "generated_at": "2026-05-07T11:50:33.089454Z",
+  "generated_at": "2026-05-12T07:03:13.736145Z",
   "optional_artifacts": [
     {
       "artifact_path": "case_operational_verification_ready/export/verification/shared-status.json",
@@ -34,7 +34,7 @@
   "overview": {
     "case_id": "case_operational_verification_ready",
     "data_classification": "synthetic_anonymized_verification",
-    "generated_at": "2026-05-07T11:50:33.089454Z",
+    "generated_at": "2026-05-12T07:03:13.736145Z",
     "non_goals": [
       "No autonomous diagnosis or treatment guidance.",
       "No real patient documents required.",

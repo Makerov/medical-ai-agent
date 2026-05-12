@@ -14,6 +14,11 @@ from app.schemas.extraction import (
 )
 from app.services.case_service import CaseService
 from app.services.document_service import DocumentService
+from app.services.document_storage_service import (
+    DocumentStorageError,
+    DocumentStorageService,
+    build_document_storage_service,
+)
 
 
 class ParseDocumentNode:
@@ -40,13 +45,19 @@ class ParseDocumentNode:
         *,
         case_service: CaseService,
         ocr_client: OCRClient | None = None,
+        document_storage_service: DocumentStorageService | None = None,
         settings: Settings | None = None,
     ) -> None:
         self._case_service = case_service
         self._settings = settings or get_settings()
-        self._ocr_client = ocr_client or self._build_default_ocr_client()
+        self._document_storage_service = document_storage_service or build_document_storage_service(
+            settings=self._settings,
+            clock=case_service.current_time,
+        )
+        self._ocr_client = ocr_client
+        self._use_case_bound_ocr_client = ocr_client is None
 
-    def _build_default_ocr_client(self) -> OCRClient:
+    def _build_default_ocr_client(self, *, case_id: str) -> OCRClient:
         if (
             self._settings.runtime_profile == "operational"
             and self._settings.ocr_provider_name == "paddleocr"
@@ -54,10 +65,18 @@ class ParseDocumentNode:
             and self._settings.ocr_lang
         ):
             return OCRClient(
+                document_bytes_fetcher=lambda document: self._load_document_bytes(
+                    case_id=case_id,
+                    document=document,
+                ),
                 document_parser=build_paddleocr_parser(self._settings),
                 provider_name="paddleocr",
             )
         return OCRClient(
+            document_bytes_fetcher=lambda document: self._load_document_bytes(
+                case_id=case_id,
+                document=document,
+            ),
             provider_name=self._settings.ocr_provider_name or "provider_agnostic",
         )
 
@@ -159,7 +178,17 @@ class ParseDocumentNode:
                 )
 
         try:
-            extraction = self._ocr_client.extract_text(document)
+            ocr_client = (
+                self._build_default_ocr_client(case_id=case_id)
+                if self._use_case_bound_ocr_client
+                else self._ocr_client
+            )
+            if ocr_client is None:
+                raise OCRClientError(
+                    code="document_fetch_unavailable",
+                    message="OCR document fetcher is not configured",
+                )
+            extraction = ocr_client.extract_text(document)
             extraction_reference = CaseRecordReference(
                 case_id=case_id,
                 record_kind=CaseRecordKind.EXTRACTION,
@@ -201,14 +230,14 @@ class ParseDocumentNode:
                     extraction_reference=attached_extraction_reference,
                     case_status=quality_case_status,
                 )
-        except OCRClientError:
+        except OCRClientError as exc:
             failed_case = self._mark_processing_failed(case_id=case_id)
             return self._build_failure_result(
                 case_id=case_id,
                 case_status=failed_case,
                 document=document,
                 source_document_reference=source_document_reference,
-                failure_code="ocr_failed",
+                failure_code=self._failure_code_for_ocr_error(exc),
                 failure_message="Не удалось обработать документ.",
                 is_recoverable_failure=True,
             )
@@ -259,6 +288,32 @@ class ParseDocumentNode:
             len(extraction_record.extracted_text)
             < self._settings.document_extraction_min_text_length
         )
+
+    def _load_document_bytes(
+        self,
+        *,
+        case_id: str,
+        document: DocumentUploadMetadata,
+    ) -> bytes:
+        try:
+            return self._document_storage_service.load_document_bytes(
+                case_id=case_id,
+                document=document,
+            )
+        except DocumentStorageError as exc:
+            raise OCRClientError(code=exc.code, message=exc.detail) from exc
+
+    @staticmethod
+    def _failure_code_for_ocr_error(error: OCRClientError) -> str:
+        if error.code in {
+            "persisted_document_missing",
+            "persisted_document_metadata_missing",
+            "document_storage_unavailable",
+            "document_download_failed",
+            "document_download_unavailable",
+        }:
+            return error.code
+        return "ocr_failed"
 
     def _find_existing_extraction(
         self,

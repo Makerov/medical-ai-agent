@@ -26,6 +26,7 @@ from app.services.audit_service import AuditService
 from app.services.case_service import CaseService
 from app.services.consent_service import ConsentService
 from app.services.document_service import DocumentService
+from app.services.document_storage_service import DocumentStorageError, DocumentStorageService
 
 
 class PatientIntakeStep(StrEnum):
@@ -102,11 +103,13 @@ class PatientIntakeService:
         case_service: CaseService,
         consent_service: ConsentService | None = None,
         document_service: DocumentService | None = None,
+        document_storage_service: DocumentStorageService | None = None,
         audit_service: AuditService | None = None,
     ) -> None:
         self._case_service = case_service
         self._consent_service = consent_service or ConsentService(case_service=case_service)
         self._document_service = document_service or DocumentService()
+        self._document_storage_service = document_storage_service
         self._audit_service = audit_service
         self._pre_consent_steps: dict[int, IntakeSessionState] = {}
         self._intake_payloads: dict[str, PatientIntakePayload] = {}
@@ -291,6 +294,7 @@ class PatientIntakeService:
         *,
         telegram_user_id: int,
         document: DocumentUploadMetadata,
+        document_bytes: bytes | None = None,
     ) -> DocumentUploadResult:
         session = self._pre_consent_steps.get(telegram_user_id)
         if session is None:
@@ -346,16 +350,32 @@ class PatientIntakeService:
                 validation_context=validation_result.validation_context,
             )
 
-        document_record = self._document_service.build_document_reference(
-            case_id=patient_case.case_id,
-            document_metadata=document,
-            created_at=self._case_service.current_time(),
-        )
-        attached_document_record = self._case_service.attach_case_record_reference(document_record)
-        transitioned_case = self._case_service.transition_case(
-            patient_case.case_id,
-            CaseStatus.DOCUMENTS_UPLOADED,
-        )
+        created_at = self._case_service.current_time()
+        try:
+            if self._document_storage_service is not None:
+                self._document_storage_service.persist_document(
+                    case_id=patient_case.case_id,
+                    document=document,
+                    document_bytes=document_bytes,
+                )
+            document_record = self._document_service.build_document_reference(
+                case_id=patient_case.case_id,
+                document_metadata=document,
+                created_at=created_at,
+            )
+            attached_document_record = self._case_service.attach_case_record_reference(document_record)
+            transitioned_case = self._case_service.transition_case(
+                patient_case.case_id,
+                CaseStatus.DOCUMENTS_UPLOADED,
+            )
+        except DocumentStorageError as exc:
+            return self._reject_document_upload(
+                document=document,
+                case_id=patient_case.case_id,
+                case_status=patient_case.status,
+                rejection_reason_code=self._document_storage_rejection_reason(exc),
+            )
+
         return DocumentUploadResult(
             case_id=transitioned_case.case_id,
             case_status=transitioned_case.status,
@@ -603,6 +623,17 @@ class PatientIntakeService:
             rejection_reason_code=rejection_reason_code,
             validation_context=validation_context,
         )
+
+    @staticmethod
+    def _document_storage_rejection_reason(
+        error: DocumentStorageError,
+    ) -> DocumentUploadRejectionReasonCode:
+        if error.code in {
+            "document_download_unavailable",
+            "document_download_failed",
+        }:
+            return DocumentUploadRejectionReasonCode.DOCUMENT_DOWNLOAD_FAILED
+        return DocumentUploadRejectionReasonCode.DOCUMENT_STORAGE_UNAVAILABLE
 
     def _capture_patient_profile(
         self,

@@ -29,19 +29,19 @@ from app.schemas.handoff import (
 from app.schemas.indicator import StructuredMedicalIndicator
 from app.schemas.patient import PatientProfile
 from app.schemas.rag import (
+    DoctorFacingSummaryDraft,
     GroundedFact,
     GroundedSummaryContract,
-    DoctorFacingSummaryDraft,
     SummaryValidationResult,
 )
 from app.schemas.safety import SafetyCheckResult
 from app.services.access_control_service import authorize_capability
-from app.services.audit_service import AuditService
+from app.services.audit_service import AuditService, build_audit_service
 from app.services.boundary_copy import SAFETY_BOUNDARY_STATEMENT
 from app.services.case_service import CaseService
 from app.services.patient_intake_service import PatientIntakeService
-from app.services.summary_service import SummaryService
 from app.services.safety_service import SafetyService
+from app.services.summary_service import SummaryService
 
 Clock = Callable[[], datetime]
 
@@ -63,9 +63,10 @@ class HandoffService:
         self._summary_service = summary_service or SummaryService()
         self._safety_service = safety_service or SafetyService()
         self._settings = settings or get_settings()
-        self._audit_service = audit_service or AuditService(
+        self._audit_service = audit_service or build_audit_service(
             case_service=case_service,
             artifact_root_dir=Path(self._settings.artifact_root_dir),
+            settings=self._settings,
             clock=clock,
         )
 
@@ -235,7 +236,9 @@ class HandoffService:
                 doctor_review_reason=view.doctor_review_reason,
                 ai_boundary_label=SAFETY_BOUNDARY_STATEMENT,
                 patient_goal=(
-                    payload.consultation_goal.text if payload and payload.consultation_goal else None
+                    payload.consultation_goal.text
+                    if payload and payload.consultation_goal
+                    else None
                 ),
                 patient_profile_summary=(
                     self._render_patient_profile_summary(payload.patient_profile)
@@ -455,7 +458,9 @@ class HandoffService:
                 "safety_decision": safety_result.decision,
                 "safety_issue_count": len(safety_result.issues),
                 "safety_correction_path": (
-                    safety_result.correction_path if safety_result.correction_path is not None else "none"
+                    safety_result.correction_path
+                    if safety_result.correction_path is not None
+                    else "none"
                 ),
             },
         )

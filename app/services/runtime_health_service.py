@@ -4,6 +4,11 @@ from collections.abc import Callable
 from pathlib import Path
 
 from app.core.settings import Settings, get_settings
+from app.db.postgres import (
+    PostgresOperationalStateBootstrap,
+    PostgresOperationalStateError,
+    build_operational_state_bootstrap,
+)
 from app.integrations.qdrant_client import QdrantClientError, QdrantHttpClient, QdrantVectorStore
 from app.schemas.runtime_health import (
     RuntimeDependencyCheck,
@@ -19,6 +24,7 @@ from app.schemas.runtime_health import (
 )
 
 QdrantFactory = Callable[[Settings], QdrantVectorStore]
+PostgresBootstrapFactory = Callable[[str], PostgresOperationalStateBootstrap]
 
 
 class RuntimeHealthService:
@@ -27,9 +33,13 @@ class RuntimeHealthService:
         *,
         settings: Settings | None = None,
         qdrant_client_factory: QdrantFactory | None = None,
+        postgres_bootstrap_factory: PostgresBootstrapFactory | None = None,
     ) -> None:
         self._settings = settings or get_settings()
         self._qdrant_client_factory = qdrant_client_factory or self._default_qdrant_factory
+        self._postgres_bootstrap_factory = (
+            postgres_bootstrap_factory or self._default_postgres_bootstrap_factory
+        )
 
     def build_liveness(
         self,
@@ -142,7 +152,9 @@ class RuntimeHealthService:
         dependencies = [
             self._startup_verification_dependency(),
             self._database_dependency(),
+            self._case_audit_storage_dependency(),
             self._artifact_storage_dependency(),
+            self._document_storage_dependency(),
             self._knowledge_base_storage_dependency(),
             self._qdrant_dependency(),
         ]
@@ -181,6 +193,8 @@ class RuntimeHealthService:
         return [
             self._startup_verification_dependency(),
             self._database_dependency(),
+            self._case_audit_storage_dependency(),
+            self._document_storage_dependency(),
             self._qdrant_dependency(),
             self._knowledge_base_storage_dependency(),
         ]
@@ -260,8 +274,48 @@ class RuntimeHealthService:
                 reason_code="database_url_invalid",
                 detail="Database URL must point to PostgreSQL.",
             )
+        try:
+            bootstrap = self._postgres_bootstrap_factory(database_url)
+            bootstrap.verify_schema()
+        except PostgresOperationalStateError as exc:
+            return self._blocked_dependency(
+                name="postgresql",
+                reason_code=exc.code,
+                detail=exc.detail,
+            )
         return RuntimeDependencyCheck(
             name="postgresql",
+            required=True,
+            status=RuntimeDependencyStatus.READY,
+        )
+
+    def _case_audit_storage_dependency(self) -> RuntimeDependencyCheck:
+        database_url = self._settings.database_url
+        if not database_url or not self._is_postgresql_url(database_url):
+            return self._blocked_dependency(
+                name="case_audit_storage",
+                reason_code="case_audit_storage_unavailable",
+                detail="Case and audit PostgreSQL storage is not configured.",
+            )
+        try:
+            bootstrap = self._postgres_bootstrap_factory(database_url)
+            bootstrap.ensure_schema()
+            schema_status = bootstrap.verify_schema()
+        except PostgresOperationalStateError as exc:
+            return self._blocked_dependency(
+                name="case_audit_storage",
+                reason_code=exc.code,
+                detail=exc.detail,
+            )
+
+        if not schema_status.is_ready:
+            return self._blocked_dependency(
+                name="case_audit_storage",
+                reason_code="case_audit_storage_schema_missing",
+                detail="Case and audit PostgreSQL tables are not ready.",
+            )
+        return RuntimeDependencyCheck(
+            name="case_audit_storage",
             required=True,
             status=RuntimeDependencyStatus.READY,
         )
@@ -272,6 +326,14 @@ class RuntimeHealthService:
             path=self._settings.artifact_root_dir,
             reason_code="artifact_root_dir_missing",
             detail="Artifact storage directory does not exist.",
+        )
+
+    def _document_storage_dependency(self) -> RuntimeDependencyCheck:
+        return self._filesystem_dependency(
+            name="document_storage",
+            path=self._settings.artifact_root_dir,
+            reason_code="document_storage_unavailable",
+            detail="Document storage root is not available.",
         )
 
     def _knowledge_base_storage_dependency(self) -> RuntimeDependencyCheck:
@@ -342,6 +404,20 @@ class RuntimeHealthService:
             self._dependency_to_startup_step(
                 schema_dependency,
                 name="schema_compatibility",
+            )
+        )
+        case_audit_storage_dependency = self._case_audit_storage_dependency()
+        steps.append(
+            self._dependency_to_startup_step(
+                case_audit_storage_dependency,
+                name="case_audit_state_schema",
+            )
+        )
+        document_storage_dependency = self._document_storage_dependency()
+        steps.append(
+            self._dependency_to_startup_step(
+                document_storage_dependency,
+                name="document_storage",
             )
         )
         qdrant_dependency = self._qdrant_dependency()
@@ -456,6 +532,12 @@ class RuntimeHealthService:
                 reason_code=reason_code,
                 detail=detail,
             )
+        if not path.is_dir():
+            return self._blocked_dependency(
+                name=name,
+                reason_code=f"{reason_code}_not_directory",
+                detail=f"{detail.rstrip('.')} Path is not a directory.",
+            )
         return RuntimeDependencyCheck(
             name=name,
             required=True,
@@ -539,3 +621,7 @@ class RuntimeHealthService:
             base_url=settings.qdrant_url,
             api_key=settings.qdrant_api_key,
         )
+
+    @staticmethod
+    def _default_postgres_bootstrap_factory(database_url: str) -> PostgresOperationalStateBootstrap:
+        return build_operational_state_bootstrap(database_url)

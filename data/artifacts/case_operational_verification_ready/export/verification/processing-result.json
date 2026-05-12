@@ -3,7 +3,7 @@
   "case_status": "processing_documents",
   "extraction": {
     "confidence": 0.95,
-    "extracted_at": "2026-05-07T11:50:33.040350Z",
+    "extracted_at": "2026-05-12T07:03:13.678878Z",
     "extracted_text": "Hemoglobin: 13.5 g/dL\nGlucose: 5.6 mmol/L\nFerritin: 42\nCreatinine: 88 umol/L",
     "provider_name": "synthetic_operational_verification_fixture",
     "source_document": {
@@ -16,7 +16,7 @@
   },
   "extraction_reference": {
     "case_id": "case_operational_verification_ready",
-    "created_at": "2026-05-07T11:50:33.040350Z",
+    "created_at": "2026-05-12T07:03:13.678878Z",
     "record_id": "extraction:telegram_document:demo_lab_panel_pdf_v1",
     "record_kind": "extraction"
   },
@@ -32,7 +32,7 @@
   },
   "source_document_reference": {
     "case_id": "case_operational_verification_ready",
-    "created_at": "2026-05-07T11:50:33.040255Z",
+    "created_at": "2026-05-12T07:03:13.678705Z",
     "record_id": "telegram_document:demo_lab_panel_pdf_v1",
     "record_kind": "document"
   },
