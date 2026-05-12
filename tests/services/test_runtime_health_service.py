@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from app.core.settings import Settings
+from app.db.postgres import OperationalStateSchemaStatus, PostgresOperationalStateError
 from app.integrations.qdrant_client import QdrantClientError
 from app.schemas.runtime_health import (
     RuntimeProcess,
@@ -26,6 +27,31 @@ class _AbsentCollectionQdrantClient:
     def collection_exists(self, collection_name: str) -> bool:
         _ = collection_name
         return False
+
+
+class _ReadyBootstrap:
+    def ensure_schema(self) -> None:
+        return None
+
+    def verify_schema(self) -> OperationalStateSchemaStatus:
+        return OperationalStateSchemaStatus(is_ready=True)
+
+
+class _BrokenBootstrap:
+    def __init__(self, *, code: str) -> None:
+        self._code = code
+
+    def ensure_schema(self) -> None:
+        raise PostgresOperationalStateError(
+            code=self._code,
+            detail="PostgreSQL operational state bootstrap failed.",
+        )
+
+    def verify_schema(self) -> OperationalStateSchemaStatus:
+        raise PostgresOperationalStateError(
+            code=self._code,
+            detail="PostgreSQL operational state bootstrap failed.",
+        )
 
 
 def _build_settings(
@@ -109,6 +135,7 @@ def test_api_readiness_is_ready_when_operational_dependencies_exist(tmp_path: Pa
             knowledge_base_seed_dir=knowledge_base_seed_dir,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.evaluate_readiness(process=RuntimeProcess.API)
@@ -121,6 +148,7 @@ def test_api_readiness_is_ready_when_operational_dependencies_exist(tmp_path: Pa
         "settings",
         "startup_verification",
         "postgresql",
+        "case_audit_storage",
         "artifact_storage",
         "knowledge_base_storage",
         "qdrant",
@@ -147,6 +175,7 @@ def test_api_readiness_reports_not_ready_without_qdrant_collection(tmp_path: Pat
             knowledge_base_seed_dir=knowledge_base_seed_dir,
         ),
         qdrant_client_factory=lambda settings: _MissingQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.evaluate_readiness(process=RuntimeProcess.API)
@@ -185,6 +214,7 @@ def test_local_profile_is_marked_degraded_even_when_dependencies_exist(tmp_path:
             ocr_lang=None,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.evaluate_readiness(process=RuntimeProcess.API)
@@ -219,6 +249,7 @@ def test_doctor_bot_readiness_requires_allowlist_and_token(tmp_path: Path) -> No
             ocr_lang=None,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.evaluate_readiness(process=RuntimeProcess.DOCTOR_BOT)
@@ -243,6 +274,7 @@ def test_worker_readiness_requires_backend_storage(tmp_path: Path) -> None:
             knowledge_base_seed_dir=knowledge_base_seed_dir,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.evaluate_readiness(process=RuntimeProcess.WORKER)
@@ -253,9 +285,39 @@ def test_worker_readiness_requires_backend_storage(tmp_path: Path) -> None:
         "settings",
         "startup_verification",
         "postgresql",
+        "case_audit_storage",
         "knowledge_base_storage",
         "qdrant",
     }
+
+
+def test_api_readiness_reports_not_ready_when_case_audit_storage_bootstrap_fails(
+    tmp_path: Path,
+) -> None:
+    artifact_root_dir = tmp_path / "artifacts"
+    knowledge_base_seed_dir = tmp_path / "knowledge-base"
+    artifact_root_dir.mkdir()
+    knowledge_base_seed_dir.mkdir()
+    service = RuntimeHealthService(
+        settings=_build_settings(
+            artifact_root_dir=artifact_root_dir,
+            knowledge_base_seed_dir=knowledge_base_seed_dir,
+        ),
+        qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _BrokenBootstrap(
+            code="case_audit_storage_bootstrap_failed"
+        ),
+    )
+
+    response = service.evaluate_readiness(process=RuntimeProcess.API)
+
+    assert response.status == RuntimeReadinessStatus.NOT_READY
+    assert "case_audit_storage_bootstrap_failed" in response.reason_codes
+    assert any(
+        dependency.name == "case_audit_storage"
+        and dependency.reason_code == "case_audit_storage_bootstrap_failed"
+        for dependency in response.dependencies
+    )
 
 
 def test_startup_verification_passes_for_ready_operational_runtime(tmp_path: Path) -> None:
@@ -269,6 +331,7 @@ def test_startup_verification_passes_for_ready_operational_runtime(tmp_path: Pat
             knowledge_base_seed_dir=knowledge_base_seed_dir,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.verify_startup(process=RuntimeProcess.API)
@@ -279,6 +342,7 @@ def test_startup_verification_passes_for_ready_operational_runtime(tmp_path: Pat
     assert [step.name for step in response.steps] == [
         "runtime_profile",
         "schema_compatibility",
+        "case_audit_state_schema",
         "qdrant_collection",
         "operational_provider_config",
     ]
@@ -327,6 +391,7 @@ def test_startup_verification_blocks_when_qdrant_collection_is_missing(
             knowledge_base_seed_dir=knowledge_base_seed_dir,
         ),
         qdrant_client_factory=lambda settings: _AbsentCollectionQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.verify_startup(process=RuntimeProcess.API)
@@ -355,6 +420,7 @@ def test_operational_readiness_blocks_when_provider_config_is_missing(tmp_path: 
             ocr_model=None,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.evaluate_readiness(process=RuntimeProcess.API)
@@ -383,6 +449,7 @@ def test_startup_verification_blocks_when_provider_config_is_missing(tmp_path: P
             llm_provider="openai",
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.verify_startup(process=RuntimeProcess.API)
@@ -409,6 +476,7 @@ def test_startup_verification_reports_degraded_local_profile(tmp_path: Path) -> 
             knowledge_base_seed_dir=knowledge_base_seed_dir,
         ),
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     response = service.verify_startup(process=RuntimeProcess.API)

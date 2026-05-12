@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from app.core.settings import Settings
+from app.db.postgres import OperationalStateSchemaStatus
 from app.schemas.runtime_health import RuntimeProcess
 from app.services.runtime_health_service import RuntimeHealthService
 from scripts import verify_startup
@@ -19,6 +20,14 @@ class _AbsentCollectionQdrantClient:
     def collection_exists(self, collection_name: str) -> bool:
         _ = collection_name
         return False
+
+
+class _ReadyBootstrap:
+    def ensure_schema(self) -> None:
+        return None
+
+    def verify_schema(self) -> OperationalStateSchemaStatus:
+        return OperationalStateSchemaStatus(is_ready=True)
 
 
 def _build_settings(
@@ -80,6 +89,7 @@ def test_verify_startup_cli_returns_structured_passed_report(
     service = RuntimeHealthService(
         settings=settings,
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     monkeypatch.setattr(verify_startup, "get_settings", lambda: settings)
@@ -133,7 +143,7 @@ def test_verify_startup_cli_returns_nonzero_for_schema_mismatch(
 
     assert exit_code == 1
     assert payload["status"] == "blocked"
-    assert payload["reason_codes"] == ["database_url_invalid"]
+    assert "database_url_invalid" in payload["reason_codes"]
     assert any(
         step["name"] == "schema_compatibility" and step["status"] == "blocked"
         for step in payload["steps"]
@@ -157,6 +167,7 @@ def test_verify_startup_cli_reports_degraded_local_profile(
     service = RuntimeHealthService(
         settings=settings,
         qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
     )
 
     monkeypatch.setattr(verify_startup, "get_settings", lambda: settings)
