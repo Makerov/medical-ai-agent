@@ -45,6 +45,11 @@ from app.schemas.document import (
     DocumentUploadMetadata,
     DocumentUploadResult,
 )
+from app.schemas.document_storage import (
+    DocumentStorageFailureCode,
+    DocumentStorageStatus,
+    PersistedDocumentRecord,
+)
 from app.schemas.eval import EvalCheckResult, EvalSuiteSummary
 from app.schemas.extraction import (
     CaseExtractionRecord,
@@ -140,6 +145,9 @@ __all__ = [
     "DocumentUploadMessageKind",
     "DocumentUploadMetadata",
     "DocumentUploadResult",
+    "DocumentStorageFailureCode",
+    "DocumentStorageStatus",
+    "PersistedDocumentRecord",
     "EvalCheckResult",
     "EvalSuiteSummary",
     "CaseExtractionRecord",

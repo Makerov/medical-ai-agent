@@ -28,6 +28,7 @@ _REQUIRED_TABLES = (
     "cases",
     "case_status_transitions",
     "case_record_references",
+    "case_document_storage_records",
     "case_extraction_records",
     "case_indicator_records",
     "case_readiness_snapshots",
@@ -63,6 +64,17 @@ _SCHEMA_STATEMENTS = (
         created_at TIMESTAMPTZ NOT NULL,
         payload JSONB NOT NULL,
         PRIMARY KEY (case_id, record_kind, record_id)
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS case_document_storage_records (
+        case_id TEXT NOT NULL,
+        document_id TEXT NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        storage_status TEXT NOT NULL,
+        artifact_path TEXT NOT NULL,
+        payload JSONB NOT NULL,
+        PRIMARY KEY (case_id, document_id)
     )
     """,
     """

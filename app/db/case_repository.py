@@ -18,6 +18,7 @@ from app.schemas.case import (
 )
 from app.schemas.extraction import CaseExtractionRecord
 from app.schemas.indicator import CaseIndicatorExtractionRecord
+from app.schemas.document_storage import PersistedDocumentRecord
 
 
 class CaseRepository(Protocol):
@@ -35,6 +36,19 @@ class CaseRepository(Protocol):
     ) -> CaseRecordReference | None: ...
 
     def save_record_reference(self, reference: CaseRecordReference) -> CaseRecordReference: ...
+
+    def get_document_storage_record(
+        self,
+        case_id: str,
+        document_id: str,
+    ) -> PersistedDocumentRecord | None: ...
+
+    def list_document_storage_records(self, case_id: str) -> tuple[PersistedDocumentRecord, ...]: ...
+
+    def save_document_storage_record(
+        self,
+        record: PersistedDocumentRecord,
+    ) -> PersistedDocumentRecord: ...
 
     def list_extraction_records(self, case_id: str) -> tuple[CaseExtractionRecord, ...]: ...
 
@@ -79,6 +93,7 @@ class InMemoryCaseRepository:
     def __init__(self) -> None:
         self._cases: dict[str, PatientCase] = {}
         self._record_references: dict[str, list[CaseRecordReference]] = {}
+        self._document_storage_records: dict[str, dict[str, PersistedDocumentRecord]] = {}
         self._extraction_records: dict[str, list[CaseExtractionRecord]] = {}
         self._indicator_records: dict[str, list[CaseIndicatorExtractionRecord]] = {}
         self._readiness_snapshots: dict[str, CaseReadinessSnapshot] = {}
@@ -108,6 +123,25 @@ class InMemoryCaseRepository:
     def save_record_reference(self, reference: CaseRecordReference) -> CaseRecordReference:
         self._record_references.setdefault(reference.case_id, []).append(reference)
         return reference
+
+    def get_document_storage_record(
+        self,
+        case_id: str,
+        document_id: str,
+    ) -> PersistedDocumentRecord | None:
+        return self._document_storage_records.get(case_id, {}).get(document_id)
+
+    def list_document_storage_records(self, case_id: str) -> tuple[PersistedDocumentRecord, ...]:
+        records = self._document_storage_records.get(case_id, {})
+        return tuple(records[key] for key in sorted(records))
+
+    def save_document_storage_record(
+        self,
+        record: PersistedDocumentRecord,
+    ) -> PersistedDocumentRecord:
+        case_records = self._document_storage_records.setdefault(record.case_id, {})
+        case_records.setdefault(record.document_id, record)
+        return case_records[record.document_id]
 
     def list_extraction_records(self, case_id: str) -> tuple[CaseExtractionRecord, ...]:
         return tuple(self._extraction_records.get(case_id, ()))
@@ -274,6 +308,70 @@ class PostgresCaseRepository:
                     ),
                 )
         return reference
+
+    def get_document_storage_record(
+        self,
+        case_id: str,
+        document_id: str,
+    ) -> PersistedDocumentRecord | None:
+        with self._connection() as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM case_document_storage_records
+                    WHERE case_id = %s AND document_id = %s
+                    """,
+                    (case_id, document_id),
+                )
+                row = cursor.fetchone()
+        return None if row is None else PersistedDocumentRecord.model_validate(_payload(row["payload"]))
+
+    def list_document_storage_records(self, case_id: str) -> tuple[PersistedDocumentRecord, ...]:
+        with self._connection() as connection:
+            with connection.cursor(row_factory=dict_row) as cursor:
+                cursor.execute(
+                    """
+                    SELECT payload
+                    FROM case_document_storage_records
+                    WHERE case_id = %s
+                    ORDER BY created_at, document_id
+                    """,
+                    (case_id,),
+                )
+                rows = cursor.fetchall()
+        return tuple(PersistedDocumentRecord.model_validate(_payload(row["payload"])) for row in rows)
+
+    def save_document_storage_record(
+        self,
+        record: PersistedDocumentRecord,
+    ) -> PersistedDocumentRecord:
+        payload = record.model_dump(mode="json")
+        with self._write_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO case_document_storage_records (
+                        case_id,
+                        document_id,
+                        created_at,
+                        storage_status,
+                        artifact_path,
+                        payload
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (case_id, document_id) DO NOTHING
+                    """,
+                    (
+                        record.case_id,
+                        record.document_id,
+                        record.created_at,
+                        record.storage_status.value,
+                        record.artifact_path,
+                        Jsonb(payload),
+                    ),
+                )
+        return record
 
     def list_extraction_records(self, case_id: str) -> tuple[CaseExtractionRecord, ...]:
         with self._connection() as connection:

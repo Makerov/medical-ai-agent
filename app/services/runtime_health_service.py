@@ -154,6 +154,7 @@ class RuntimeHealthService:
             self._database_dependency(),
             self._case_audit_storage_dependency(),
             self._artifact_storage_dependency(),
+            self._document_storage_dependency(),
             self._knowledge_base_storage_dependency(),
             self._qdrant_dependency(),
         ]
@@ -193,6 +194,7 @@ class RuntimeHealthService:
             self._startup_verification_dependency(),
             self._database_dependency(),
             self._case_audit_storage_dependency(),
+            self._document_storage_dependency(),
             self._qdrant_dependency(),
             self._knowledge_base_storage_dependency(),
         ]
@@ -326,6 +328,14 @@ class RuntimeHealthService:
             detail="Artifact storage directory does not exist.",
         )
 
+    def _document_storage_dependency(self) -> RuntimeDependencyCheck:
+        return self._filesystem_dependency(
+            name="document_storage",
+            path=self._settings.artifact_root_dir,
+            reason_code="document_storage_unavailable",
+            detail="Document storage root is not available.",
+        )
+
     def _knowledge_base_storage_dependency(self) -> RuntimeDependencyCheck:
         return self._filesystem_dependency(
             name="knowledge_base_storage",
@@ -401,6 +411,13 @@ class RuntimeHealthService:
             self._dependency_to_startup_step(
                 case_audit_storage_dependency,
                 name="case_audit_state_schema",
+            )
+        )
+        document_storage_dependency = self._document_storage_dependency()
+        steps.append(
+            self._dependency_to_startup_step(
+                document_storage_dependency,
+                name="document_storage",
             )
         )
         qdrant_dependency = self._qdrant_dependency()
@@ -514,6 +531,12 @@ class RuntimeHealthService:
                 name=name,
                 reason_code=reason_code,
                 detail=detail,
+            )
+        if not path.is_dir():
+            return self._blocked_dependency(
+                name=name,
+                reason_code=f"{reason_code}_not_directory",
+                detail=f"{detail.rstrip('.')} Path is not a directory.",
             )
         return RuntimeDependencyCheck(
             name=name,

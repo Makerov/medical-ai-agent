@@ -95,6 +95,16 @@ class FakeMessage:
         self.text = text
         self.document = document
         self.photo = photo
+        self.bot = SimpleNamespace(
+            get_file=AsyncMock(
+                side_effect=lambda file_id: SimpleNamespace(file_path=f"files/{file_id}")
+            ),
+            download_file=AsyncMock(
+                side_effect=lambda file_path, destination: destination.write(
+                    f"bytes:{file_path}".encode("utf-8")
+                )
+            ),
+        )
         self.answer = AsyncMock()
 
 
@@ -172,8 +182,10 @@ class FakeIntakeService:
         *,
         telegram_user_id: int,
         document: DocumentUploadMetadata,
+        document_bytes: bytes | None = None,
     ) -> DocumentUploadResult:
         self.document_calls.append((telegram_user_id, document))
+        _ = document_bytes
         if self.error is not None:
             raise self.error
         assert self.document_result is not None

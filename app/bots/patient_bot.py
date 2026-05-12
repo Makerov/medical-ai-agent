@@ -1,3 +1,4 @@
+from io import BytesIO
 from typing import Protocol
 
 from aiogram import Bot, Dispatcher, Router
@@ -41,6 +42,7 @@ from app.schemas.patient import PatientIntakeMessageKind
 from app.services.audit_service import AuditService, build_audit_service
 from app.services.case_service import CaseService, build_case_service
 from app.services.document_service import DocumentService
+from app.services.document_storage_service import build_document_storage_service
 from app.services.patient_intake_service import PatientIntakeService
 
 
@@ -69,11 +71,16 @@ def build_patient_intake_service(
         artifact_root_dir=settings.artifact_root_dir,
         settings=settings,
     )
+    document_storage_service = build_document_storage_service(
+        settings=settings,
+        clock=case_service.current_time,
+    )
     document_service = DocumentService(settings=settings)
     return PatientIntakeService(
         case_service=case_service,
         audit_service=audit_service,
         document_service=document_service,
+        document_storage_service=document_storage_service,
     )
 
 
@@ -106,6 +113,20 @@ def _build_photo_metadata(message: Message) -> DocumentUploadMetadata:
 
 def _is_deleted_case_status(case_status: CaseStatus) -> bool:
     return case_status in {CaseStatus.DELETION_REQUESTED, CaseStatus.DELETED}
+
+
+async def _download_telegram_file_bytes(
+    message: MessageResponder,
+    *,
+    file_id: str,
+) -> bytes:
+    bot = getattr(message, "bot", None)
+    if bot is None:
+        raise ValueError("Telegram bot is not available")
+    file = await bot.get_file(file_id)
+    destination = BytesIO()
+    await bot.download_file(file.file_path, destination=destination)
+    return destination.getvalue()
 
 
 async def handle_patient_start(
@@ -344,9 +365,14 @@ async def handle_document_upload(
         if telegram_user_id is None:
             raise ValueError
         document_metadata = _build_document_metadata(message)  # type: ignore[arg-type]
+        document_bytes = await _download_telegram_file_bytes(
+            message,
+            file_id=document_metadata.file_id,
+        )
         upload_result = intake_service.handle_document_upload(
             telegram_user_id=telegram_user_id,
             document=document_metadata,
+            document_bytes=document_bytes,
         )
     except Exception:  # noqa: BLE001 - recoverable adapter boundary
         await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)
@@ -369,9 +395,14 @@ async def handle_photo_upload(
         if telegram_user_id is None:
             raise ValueError
         photo_metadata = _build_photo_metadata(message)  # type: ignore[arg-type]
+        photo_bytes = await _download_telegram_file_bytes(
+            message,
+            file_id=photo_metadata.file_id,
+        )
         upload_result = intake_service.handle_document_upload(
             telegram_user_id=telegram_user_id,
             document=photo_metadata,
+            document_bytes=photo_bytes,
         )
     except Exception:  # noqa: BLE001 - recoverable adapter boundary
         await message.answer(PATIENT_INTAKE_FAILED_MESSAGE)

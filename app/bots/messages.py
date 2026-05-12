@@ -290,6 +290,16 @@ def _render_document_upload_rejection_message(result: DocumentUploadResult) -> s
                 f"Лимит сейчас {limit}.\n"
                 "Если это повторная отправка, подождите обработки текущего файла."
             )
+        case DocumentUploadRejectionReasonCode.DOCUMENT_DOWNLOAD_FAILED:
+            return (
+                "Не удалось получить файл из Telegram.\n"
+                "Отправьте документ еще раз."
+            )
+        case DocumentUploadRejectionReasonCode.DOCUMENT_STORAGE_UNAVAILABLE:
+            return (
+                "Не удалось сохранить документ для обработки.\n"
+                "Попробуйте отправить файл еще раз позже."
+            )
     msg = f"Unsupported document rejection reason code: {result.rejection_reason_code}"
     raise ValueError(msg)
 

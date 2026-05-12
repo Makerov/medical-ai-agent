@@ -109,6 +109,40 @@ class FakePostgresCursor:
             self._rows = []
             return
         if normalized.startswith(
+            "SELECT payload FROM case_document_storage_records WHERE case_id = %s AND document_id = %s"
+        ):
+            key = (params[0], params[1])
+            row = self._mapping_table("case_document_storage_records").get(key)
+            self._rows = [] if row is None else [{"payload": deepcopy(row["payload"])}]
+            return
+        if normalized.startswith(
+            "SELECT payload FROM case_document_storage_records WHERE case_id = %s ORDER BY"
+        ):
+            rows = [
+                deepcopy(row)
+                for key, row in self._mapping_table("case_document_storage_records").items()
+                if key[0] == params[0]
+            ]
+            rows.sort(key=lambda row: (row["created_at"], row["document_id"]))
+            self._rows = [{"payload": row["payload"]} for row in rows]
+            return
+        if normalized.startswith("INSERT INTO case_document_storage_records "):
+            table = self._mapping_table("case_document_storage_records")
+            key = (params[0], params[1])
+            table.setdefault(
+                key,
+                {
+                    "case_id": params[0],
+                    "document_id": params[1],
+                    "created_at": params[2],
+                    "storage_status": params[3],
+                    "artifact_path": params[4],
+                    "payload": self._json_payload(params[5]),
+                },
+            )
+            self._rows = []
+            return
+        if normalized.startswith(
             "SELECT payload FROM case_extraction_records "
             "WHERE case_id = %s AND extraction_reference_id = %s"
         ):

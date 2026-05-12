@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from app.db.case_repository import InMemoryCaseRepository
 from app.schemas.audit import AuditEventType
 from app.schemas.case import CaseRecordKind, CaseStatus
 from app.schemas.consent import ConsentOutcome
@@ -13,6 +15,7 @@ from app.schemas.document import (
 )
 from app.schemas.patient import PatientIntakeField, PatientIntakeMessageKind
 from app.services.case_service import CaseService
+from app.services.document_storage_service import DocumentStorageService
 from app.services.patient_intake_service import (
     ConsentGateStatus,
     PatientIntakeService,
@@ -666,6 +669,66 @@ def test_handle_document_upload_transitions_completed_intake_case_to_documents_u
         case_service.get_shared_status_view("case_patient_upload_001").lifecycle_status
         == CaseStatus.DOCUMENTS_UPLOADED
     )
+
+
+def test_handle_document_upload_persists_source_document_before_transition(tmp_path: Path) -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_patient_upload_store")
+    storage_service = DocumentStorageService(
+        artifact_root_dir=tmp_path / "artifacts",
+        repository=InMemoryCaseRepository(),
+        clock=lambda: now,
+    )
+    intake_service = PatientIntakeService(
+        case_service=case_service,
+        document_storage_service=storage_service,
+    )
+    intake_service.start_intake(telegram_user_id=123456)
+    intake_service.mark_ai_boundary_shown(telegram_user_id=123456)
+    intake_service.accept_consent(
+        telegram_user_id=123456,
+        case_id="case_patient_upload_store",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Иван Петров, 34",
+    )
+    intake_service.handle_patient_message(
+        telegram_user_id=123456,
+        text="Нужно проверить давление и общее самочувствие",
+    )
+
+    document = DocumentUploadMetadata(
+        file_id="file_store_001",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=1024,
+        file_unique_id="unique_store_001",
+    )
+
+    result = intake_service.handle_document_upload(
+        telegram_user_id=123456,
+        document=document,
+        document_bytes=b"persist me",
+    )
+
+    assert result.message_kind == DocumentUploadMessageKind.ACCEPTED
+    persisted = storage_service.get_persisted_record(
+        case_id="case_patient_upload_store",
+        document=document,
+    )
+    assert persisted is not None
+    assert persisted.artifact_path == (
+        "case_patient_upload_store/documents/unique_store_001/scan.pdf"
+    )
+    assert (
+        tmp_path
+        / "artifacts"
+        / "case_patient_upload_store"
+        / "documents"
+        / "unique_store_001"
+        / "scan.pdf"
+    ).read_bytes() == b"persist me"
 
 
 def test_handle_document_upload_accepts_supported_image_document() -> None:

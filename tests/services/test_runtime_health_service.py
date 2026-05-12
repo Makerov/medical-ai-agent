@@ -150,6 +150,7 @@ def test_api_readiness_is_ready_when_operational_dependencies_exist(tmp_path: Pa
         "postgresql",
         "case_audit_storage",
         "artifact_storage",
+        "document_storage",
         "knowledge_base_storage",
         "qdrant",
         "llm_provider",
@@ -286,6 +287,7 @@ def test_worker_readiness_requires_backend_storage(tmp_path: Path) -> None:
         "startup_verification",
         "postgresql",
         "case_audit_storage",
+        "document_storage",
         "knowledge_base_storage",
         "qdrant",
     }
@@ -343,10 +345,45 @@ def test_startup_verification_passes_for_ready_operational_runtime(tmp_path: Pat
         "runtime_profile",
         "schema_compatibility",
         "case_audit_state_schema",
+        "document_storage",
         "qdrant_collection",
         "operational_provider_config",
     ]
     assert all(step.status == "ready" for step in response.steps)
+
+
+def test_api_readiness_reports_not_ready_when_document_storage_root_is_unavailable(
+    tmp_path: Path,
+) -> None:
+    artifact_root_dir = tmp_path / "artifacts-file"
+    artifact_root_dir.write_text("not a directory", encoding="utf-8")
+    knowledge_base_seed_dir = tmp_path / "knowledge-base"
+    knowledge_base_seed_dir.mkdir()
+    service = RuntimeHealthService(
+        settings=_build_settings(
+            artifact_root_dir=artifact_root_dir,
+            knowledge_base_seed_dir=knowledge_base_seed_dir,
+        ),
+        qdrant_client_factory=lambda settings: _ReadyQdrantClient(),
+        postgres_bootstrap_factory=lambda database_url: _ReadyBootstrap(),
+    )
+
+    response = service.evaluate_readiness(process=RuntimeProcess.API)
+    startup = service.verify_startup(process=RuntimeProcess.API)
+
+    assert response.status == RuntimeReadinessStatus.NOT_READY
+    assert "document_storage_unavailable_not_directory" in response.reason_codes
+    assert any(
+        dependency.name == "document_storage"
+        and dependency.reason_code == "document_storage_unavailable_not_directory"
+        for dependency in response.dependencies
+    )
+    assert startup.status == StartupVerificationStatus.BLOCKED
+    assert any(
+        step.name == "document_storage"
+        and step.reason_code == "document_storage_unavailable_not_directory"
+        for step in startup.steps
+    )
 
 
 def test_startup_verification_blocks_on_schema_compatibility_failure(

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from app.core.settings import Settings
 from app.integrations.ocr_client import OCRClient
@@ -6,6 +7,7 @@ from app.schemas.case import CaseRecordKind, CaseRecordReference, CaseStatus
 from app.schemas.document import DocumentUploadMetadata
 from app.services.case_service import CaseService
 from app.services.document_service import DocumentService
+from app.services.document_storage_service import DocumentStorageService
 from app.workflow.nodes import parse_document as parse_document_module
 from app.workflow.nodes.parse_document import ParseDocumentNode
 
@@ -100,8 +102,8 @@ def test_parse_document_node_wires_paddleocr_parser_for_operational_profile(monk
     monkeypatch.setattr(parse_document_module, "build_paddleocr_parser", fake_build_parser)
 
     node = ParseDocumentNode(case_service=case_service, settings=settings)
-
-    assert node._ocr_client._provider_name == "paddleocr"
+    built_client = node._build_default_ocr_client(case_id="case_parse_operational")
+    assert built_client._provider_name == "paddleocr"
     assert built_settings == [settings]
 
 
@@ -613,3 +615,106 @@ def test_parse_document_returns_recoverable_failure_when_document_reference_is_m
     )
     assert result.extraction is None
     assert case_service.get_case_core_records(patient_case.case_id).extractions == ()
+
+
+def test_parse_document_reads_bytes_from_persisted_artifact(tmp_path: Path, monkeypatch) -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_persisted")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_persisted",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_persisted",
+    )
+    document_reference = _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+    storage_service = DocumentStorageService(
+        artifact_root_dir=tmp_path / "artifacts",
+        document_downloader=lambda _: b"persisted bytes",
+        clock=lambda: now,
+    )
+    storage_service.persist_document(case_id=patient_case.case_id, document=document)
+    settings = Settings(
+        runtime_profile="operational",
+        ocr_provider_name="paddleocr",
+        ocr_model="PP-OCRv5_server",
+        ocr_lang="ru",
+    )
+
+    monkeypatch.setattr(
+        parse_document_module,
+        "build_paddleocr_parser",
+        lambda _settings: lambda document_bytes, _document: (
+            document_bytes.decode("utf-8"),
+            0.92,
+        ),
+    )
+    node = ParseDocumentNode(
+        case_service=case_service,
+        document_storage_service=storage_service,
+        settings=settings,
+    )
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.source_document_reference == document_reference
+    assert result.extraction is not None
+    assert result.extraction.extracted_text == "persisted bytes"
+    assert result.case_status == CaseStatus.PROCESSING_DOCUMENTS
+
+
+def test_parse_document_returns_explicit_failure_when_persisted_artifact_is_missing(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    now = datetime(2026, 4, 28, 6, 0, tzinfo=UTC)
+    case_service = CaseService(clock=lambda: now, id_generator=lambda: "case_parse_missing_file")
+    patient_case = case_service.create_case()
+    document = DocumentUploadMetadata(
+        file_id="file_parse_missing_file",
+        file_name="scan.pdf",
+        mime_type="application/pdf",
+        file_size=4096,
+        file_unique_id="unique_parse_missing_file",
+    )
+    _build_processed_case(
+        case_service=case_service,
+        case_id=patient_case.case_id,
+        document=document,
+        now=now,
+    )
+    storage_service = DocumentStorageService(
+        artifact_root_dir=tmp_path / "artifacts",
+        document_downloader=lambda _: b"persisted bytes",
+        clock=lambda: now,
+    )
+    persisted = storage_service.persist_document(case_id=patient_case.case_id, document=document)
+    (tmp_path / "artifacts" / persisted.artifact_path).unlink()
+    settings = Settings(
+        runtime_profile="operational",
+        ocr_provider_name="paddleocr",
+        ocr_model="PP-OCRv5_server",
+        ocr_lang="ru",
+    )
+    monkeypatch.setattr(
+        parse_document_module,
+        "build_paddleocr_parser",
+        lambda _settings: lambda _document_bytes, _document: ("unused", 0.9),
+    )
+    node = ParseDocumentNode(
+        case_service=case_service,
+        document_storage_service=storage_service,
+        settings=settings,
+    )
+
+    result = node.parse_document(case_id=patient_case.case_id, document=document)
+
+    assert result.case_status == CaseStatus.EXTRACTION_FAILED
+    assert result.is_recoverable_failure is True
+    assert result.failure_code == "persisted_document_missing"
