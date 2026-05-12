@@ -8,11 +8,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from app.main import app as fastapi_app
 from app.core.settings import Settings, get_settings
 from app.integrations.ocr_client import OCRClient
+from app.main import app as fastapi_app
 from app.schemas.audit import ArtifactKind
-from app.schemas.auth import AuthorizationError, Capability, CallerRole
+from app.schemas.auth import AuthorizationError, CallerRole, Capability
 from app.schemas.case import (
     CaseReadinessSnapshot,
     CaseRecordKind,
@@ -55,8 +55,8 @@ from app.schemas.rag import (
     SummaryValidationResult,
 )
 from app.schemas.safety import SafetyCheckExampleSet, SafetyCheckResult, SafetyIssue
-from app.services.audit_service import AuditService
-from app.services.case_service import CaseService
+from app.services.audit_service import AuditService, build_audit_service
+from app.services.case_service import build_case_service
 from app.services.document_service import DocumentService
 from app.services.handoff_service import HandoffService
 from app.services.patient_intake_service import PatientIntakeService
@@ -101,10 +101,15 @@ def seed_operational_verification_case(
     fixture = load_operational_verification_fixture(fixture_path)
     resolved_settings = settings or get_settings()
     current_time = clock or (lambda: datetime.now(UTC))
-    case_service = CaseService(clock=current_time, id_generator=lambda: fixture["case_id"])
-    audit_service = AuditService(
+    case_service = build_case_service(
+        settings=resolved_settings,
+        clock=current_time,
+        id_generator=lambda: fixture["case_id"],
+    )
+    audit_service = build_audit_service(
         case_service=case_service,
         artifact_root_dir=Path(resolved_settings.artifact_root_dir),
+        settings=resolved_settings,
         clock=current_time,
     )
     intake_service = PatientIntakeService(
@@ -742,7 +747,9 @@ def _build_example_payloads(
         "data_classification": data_classification,
         "canonical_path": {
             "verification_root": f"data/artifacts/{case_id}/verification",
-            "canonical_export_bundle": f"{case_id}/verification/operational-verification-export.json",
+            "canonical_export_bundle": (
+                f"{case_id}/verification/operational-verification-export.json"
+            ),
             "runtime_reference_bundle": f"{case_id}/verification/api-runtime-reference.json",
             "example_payloads": f"{case_id}/verification/example-payloads.json",
             "openapi_snapshot": f"{case_id}/verification/openapi.json",
@@ -750,7 +757,9 @@ def _build_example_payloads(
         "typed_examples": {
             "shared_status": shared_view.model_dump(mode="json"),
             "document_processing_result": processing_result.model_dump(mode="json"),
-            "document_processing_recoverable_failure": openapi_example_failure.model_dump(mode="json"),
+            "document_processing_recoverable_failure": openapi_example_failure.model_dump(
+                mode="json"
+            ),
             "structured_extraction_examples": _build_structured_extraction_examples(
                 case_id=case_id,
                 data_classification=data_classification,
@@ -908,7 +917,10 @@ def _build_api_runtime_reference_bundle(
         ],
         "canonical_operational_guidance": [
             "Use the typed schema payloads in example-payloads.json as the contract source.",
-            "Use machine-readable error codes from recoverable_error_shapes instead of stack traces.",
+            (
+                "Use machine-readable error codes from recoverable_error_shapes "
+                "instead of stack traces."
+            ),
             "Keep the verification workflow under verification/ and treat demo/ as non-canonical.",
             "No live provider calls or real patient data are required to review these artifacts.",
         ],

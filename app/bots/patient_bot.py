@@ -38,8 +38,8 @@ from app.core.settings import Settings, get_settings
 from app.schemas.case import CaseStatus
 from app.schemas.document import DocumentUploadMessageKind, DocumentUploadMetadata
 from app.schemas.patient import PatientIntakeMessageKind
-from app.services.audit_service import AuditService
-from app.services.case_service import CaseService
+from app.services.audit_service import AuditService, build_audit_service
+from app.services.case_service import CaseService, build_case_service
 from app.services.document_service import DocumentService
 from app.services.patient_intake_service import PatientIntakeService
 
@@ -63,10 +63,11 @@ def build_patient_intake_service(
     audit_service: AuditService | None = None,
 ) -> PatientIntakeService:
     settings = settings or get_settings()
-    case_service = case_service or CaseService()
-    audit_service = audit_service or AuditService(
+    case_service = case_service or build_case_service(settings=settings)
+    audit_service = audit_service or build_audit_service(
         case_service=case_service,
         artifact_root_dir=settings.artifact_root_dir,
+        settings=settings,
     )
     document_service = DocumentService(settings=settings)
     return PatientIntakeService(

@@ -1,6 +1,12 @@
 from collections.abc import Callable
 from datetime import datetime
 
+from app.core.settings import Settings, get_settings
+from app.db.case_repository import (
+    CaseRepository,
+    InMemoryCaseRepository,
+    PostgresCaseRepository,
+)
 from app.schemas.case import (
     CaseCoreRecords,
     CaseIdGenerator,
@@ -8,6 +14,7 @@ from app.schemas.case import (
     CaseRecordKind,
     CaseRecordReference,
     CaseStatus,
+    CaseTransition,
     CaseTransitionError,
     DoctorFacingStatusCode,
     HandoffBlockingReason,
@@ -64,19 +71,16 @@ class CaseService:
         *,
         clock: Clock = utc_now,
         id_generator: CaseIdGenerator = generate_case_id,
+        repository: CaseRepository | None = None,
     ) -> None:
         self._clock = clock
         self._id_generator = id_generator
-        self._cases: dict[str, PatientCase] = {}
-        self._record_references: dict[str, list[CaseRecordReference]] = {}
-        self._extraction_records: dict[str, list[CaseExtractionRecord]] = {}
-        self._indicator_records: dict[str, list[CaseIndicatorExtractionRecord]] = {}
-        self._readiness_snapshots: dict[str, CaseReadinessSnapshot] = {}
+        self._repository = repository or InMemoryCaseRepository()
 
     def create_case(self) -> PatientCase:
         now = self._clock()
         case_id = self._id_generator()
-        if case_id in self._cases:
+        if self._repository.get_case(case_id) is not None:
             raise CaseTransitionError(
                 code="duplicate_case_id",
                 case_id=case_id,
@@ -90,7 +94,7 @@ class CaseService:
             created_at=now,
             updated_at=now,
         )
-        self._cases[case.case_id] = case
+        self._repository.save_case(case)
         return case
 
     def attach_case_record_reference(
@@ -117,7 +121,7 @@ class CaseService:
                 to_status="attach_case_record_reference",
             )
 
-        references = self._record_references.setdefault(target_case_id, [])
+        references = list(self._repository.list_record_references(target_case_id))
         existing_reference = self._find_reference(
             references,
             reference.record_kind,
@@ -134,13 +138,12 @@ class CaseService:
                     from_status=None,
                     to_status=reference.record_kind,
                 )
-
-        references.append(reference)
+        self._repository.save_record_reference(reference)
         return reference
 
     def get_case_core_records(self, case_id: str) -> CaseCoreRecords:
         patient_case = self._get_existing_case(case_id)
-        references = tuple(self._record_references.get(case_id, ()))
+        references = self._repository.list_record_references(case_id)
         return CaseCoreRecords(
             patient_case=patient_case,
             patient_profile=self._single_reference(references, CaseRecordKind.PATIENT_PROFILE),
@@ -166,7 +169,7 @@ class CaseService:
                 to_status="attach_case_extraction_record",
             )
 
-        records = self._extraction_records.setdefault(target_case_id, [])
+        records = list(self._repository.list_extraction_records(target_case_id))
         existing_record = self._find_extraction_record(
             records,
             extraction_record.extraction_reference.record_id,
@@ -174,12 +177,12 @@ class CaseService:
         if existing_record is not None:
             return existing_record
 
-        records.append(extraction_record)
+        self._repository.save_extraction_record(extraction_record)
         return extraction_record
 
     def get_case_extraction_records(self, case_id: str) -> tuple[CaseExtractionRecord, ...]:
         self._get_existing_case(case_id)
-        return tuple(self._extraction_records.get(case_id, ()))
+        return self._repository.list_extraction_records(case_id)
 
     def attach_case_indicator_record(
         self,
@@ -195,7 +198,7 @@ class CaseService:
                 to_status="attach_case_indicator_record",
             )
 
-        records = self._indicator_records.setdefault(target_case_id, [])
+        records = list(self._repository.list_indicator_records(target_case_id))
         existing_record = self._find_indicator_record(
             records,
             indicator_record.indicator_reference.record_id,
@@ -204,13 +207,13 @@ class CaseService:
             self.attach_case_record_reference(indicator_record.indicator_reference)
             return existing_record
 
-        records.append(indicator_record)
+        self._repository.save_indicator_record(indicator_record)
         self.attach_case_record_reference(indicator_record.indicator_reference)
         return indicator_record
 
     def get_case_indicator_records(self, case_id: str) -> tuple[CaseIndicatorExtractionRecord, ...]:
         self._get_existing_case(case_id)
-        return tuple(self._indicator_records.get(case_id, ()))
+        return self._repository.list_indicator_records(case_id)
 
     def get_case_document_reference(
         self,
@@ -230,12 +233,11 @@ class CaseService:
         snapshot: CaseReadinessSnapshot,
     ) -> CaseReadinessSnapshot:
         self._get_existing_case(case_id)
-        self._readiness_snapshots[case_id] = snapshot
-        return snapshot
+        return self._repository.save_readiness_snapshot(case_id, snapshot)
 
     def evaluate_handoff_readiness(self, case_id: str) -> HandoffReadinessResult:
         records = self.get_case_core_records(case_id)
-        snapshot = self._readiness_snapshots.get(case_id, CaseReadinessSnapshot())
+        snapshot = self._repository.get_readiness_snapshot(case_id) or CaseReadinessSnapshot()
         return self._evaluate_handoff_readiness(records, snapshot)
 
     def get_shared_status_view(self, case_id: str) -> SharedStatusView:
@@ -277,7 +279,15 @@ class CaseService:
             created_at=current_case.created_at,
             updated_at=self._clock(),
         )
-        self._cases[case_id] = transitioned_case
+        self._repository.save_case(transitioned_case)
+        self._repository.append_transition(
+            CaseTransition(
+                case_id=case_id,
+                from_status=current_case.status,
+                to_status=normalized_to_status,
+                transitioned_at=transitioned_case.updated_at,
+            )
+        )
         return transitioned_case
 
     @staticmethod
@@ -298,7 +308,7 @@ class CaseService:
         *,
         to_status: CaseStatus | str = "case_lookup",
     ) -> PatientCase:
-        patient_case = self._cases.get(case_id)
+        patient_case = self._repository.get_case(case_id)
         if patient_case is None:
             raise CaseTransitionError(
                 code="case_not_found",
@@ -611,3 +621,23 @@ class CaseService:
             if record.indicator_reference.record_id == indicator_reference_id:
                 return record
         return None
+
+
+def build_case_service(
+    *,
+    settings: Settings | None = None,
+    clock: Clock = utc_now,
+    id_generator: CaseIdGenerator = generate_case_id,
+) -> CaseService:
+    resolved_settings = settings or get_settings()
+    if resolved_settings.database_url:
+        repository = PostgresCaseRepository(
+            resolved_settings.database_url,
+            bootstrap=True,
+        )
+        return CaseService(
+            clock=clock,
+            id_generator=id_generator,
+            repository=repository,
+        )
+    return CaseService(clock=clock, id_generator=id_generator)

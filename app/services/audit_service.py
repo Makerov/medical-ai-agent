@@ -3,6 +3,12 @@ from datetime import datetime
 from pathlib import Path
 from uuid import uuid4
 
+from app.core.settings import Settings, get_settings
+from app.db.audit_repository import (
+    AuditRepository,
+    InMemoryAuditRepository,
+    PostgresAuditRepository,
+)
 from app.schemas.audit import (
     ArtifactKind,
     AuditEvent,
@@ -64,12 +70,12 @@ class AuditService:
         case_service: CaseService,
         artifact_root_dir: Path,
         clock: Callable[[], datetime] = utc_now,
+        repository: AuditRepository | None = None,
     ) -> None:
         self._case_service = case_service
         self._artifact_root_dir = Path(artifact_root_dir)
         self._clock = clock
-        self._events_by_id: dict[str, AuditEvent] = {}
-        self._summary_traces_by_id: dict[str, SummaryAuditTrace] = {}
+        self._repository = repository or InMemoryAuditRepository()
 
     def record_event(
         self,
@@ -82,7 +88,7 @@ class AuditService:
     ) -> AuditEvent:
         self._ensure_case_accepts_audit_events(case_id)
         normalized_event_id = event_id or self._generate_event_id()
-        existing_event = self._events_by_id.get(normalized_event_id)
+        existing_event = self._repository.get_event(normalized_event_id)
         normalized_metadata = dict(metadata or {})
         normalized_created_at = self._clock() if created_at is None else created_at
 
@@ -114,7 +120,7 @@ class AuditService:
             created_at=event.created_at,
         )
         self._case_service.attach_case_record_reference(reference)
-        self._events_by_id[event.event_id] = event
+        self._repository.save_event(event)
         return event
 
     def record_summary_trace(
@@ -134,7 +140,7 @@ class AuditService:
     ) -> SummaryAuditTrace:
         self._ensure_case_accepts_audit_events(case_id)
         normalized_trace_id = trace_id or self._generate_trace_id()
-        existing_trace = self._summary_traces_by_id.get(normalized_trace_id)
+        existing_trace = self._repository.get_summary_trace(normalized_trace_id)
         if existing_trace is not None:
             candidate = self._build_summary_trace(
                 trace_id=normalized_trace_id,
@@ -182,7 +188,7 @@ class AuditService:
             event_id=trace.trace_id,
             created_at=self._clock(),
         )
-        self._summary_traces_by_id[trace.trace_id] = trace
+        self._repository.save_summary_trace(trace)
         _ = event
         return trace
 
@@ -212,15 +218,19 @@ class AuditService:
         )
 
     def get_summary_trace(self, trace_id: str) -> SummaryAuditTrace | None:
-        return self._summary_traces_by_id.get(trace_id)
+        return self._repository.get_summary_trace(trace_id)
 
     def get_case_audit_review(self, *, case_id: str) -> CaseAuditReview:
         records = self._case_service.get_case_core_records(case_id)
         runtime_profile, degraded_markers, fallback_markers = self._case_review_markers(case_id)
         transitions = []
         provider_outcomes = []
+        events_by_id = {
+            event.event_id: event
+            for event in self._repository.list_case_events(case_id)
+        }
         for reference in records.audit_events:
-            event = self._events_by_id.get(reference.record_id)
+            event = events_by_id.get(reference.record_id)
             if event is None:
                 continue
             if event.event_type == AuditEventType.CASE_STATUS_CHANGED:
@@ -261,9 +271,7 @@ class AuditService:
         retry_recovery_events: list[AuditReviewRecoveryEvent] = []
         summary_artifacts: list[AuditReviewSummaryArtifact] = []
         safety_decisions: list[AuditReviewSafetyDecision] = []
-        for trace in self._summary_traces_by_id.values():
-            if trace.case_id != case_id:
-                continue
+        for trace in self._repository.list_case_summary_traces(case_id):
             for source in trace.retrieved_sources:
                 retrieval_citations.append(
                     AuditReviewRetrievalCitation(
@@ -590,9 +598,7 @@ class AuditService:
         runtime_profile: str | None = None
         degraded_markers: list[str] = []
         fallback_markers: list[str] = []
-        for trace in self._summary_traces_by_id.values():
-            if trace.case_id != case_id:
-                continue
+        for trace in self._repository.list_case_summary_traces(case_id):
             runtime_profile = runtime_profile or trace.metadata.runtime_profile
             for marker in trace.metadata.presentation_markers:
                 if marker.startswith("runtime_profile:") or marker.startswith("degraded:"):
@@ -621,3 +627,29 @@ class AuditService:
                 from_status=records.patient_case.status,
                 to_status="attach_case_record_reference",
             )
+
+
+def build_audit_service(
+    *,
+    case_service: CaseService,
+    artifact_root_dir: Path,
+    settings: Settings | None = None,
+    clock: Callable[[], datetime] = utc_now,
+) -> AuditService:
+    resolved_settings = settings or get_settings()
+    if resolved_settings.database_url:
+        repository = PostgresAuditRepository(
+            resolved_settings.database_url,
+            bootstrap=True,
+        )
+        return AuditService(
+            case_service=case_service,
+            artifact_root_dir=artifact_root_dir,
+            clock=clock,
+            repository=repository,
+        )
+    return AuditService(
+        case_service=case_service,
+        artifact_root_dir=artifact_root_dir,
+        clock=clock,
+    )
