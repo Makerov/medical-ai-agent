@@ -32,10 +32,12 @@ stepsCompleted:
   - "step-e-01-discovery"
   - "step-e-02-review"
   - "step-e-03-edit"
-lastEdited: "2026-05-02"
+lastEdited: "2026-05-12"
 editHistory:
   - date: "2026-05-02"
     changes: "Reframed PRD to operational pet project with real Telegram runtimes, anonymized-data defaults, Qdrant-based operational RAG, real provider assumptions, and explicit recoverable failure behavior."
+  - date: "2026-05-12"
+    changes: "Added approved MVP hardening addendum for RU-first Real RAG requirements FR51-FR62 and NFR31-NFR40."
 ---
 
 # Product Requirements Document - medical-ai-agent
@@ -458,6 +460,58 @@ SDK is not required for MVP. API versioning can start with `/v1` and schema vers
 - Basic auditability: `case_id`, source provenance, safety decisions, audit artifacts.
 - Minimal eval suite для extraction, groundedness и safety.
 - Docker Compose, prepared anonymized test case, README и architecture diagram.
+
+### Approved MVP Hardening Addendum: RU-first Real RAG Layer
+
+This addendum records the approved 2026-05-12 course correction for the next MVP hardening slice. It does not replace the baseline operational MVP scope. It adds source-governed RU-first retrieval requirements on top of the existing backend-first workflow.
+
+#### Additional Functional Requirements
+
+FR51: Maintainer can manage a typed source registry for each knowledge source with jurisdiction, source class, intended audience, allowed output audiences, claim permissions and refresh policy.
+
+FR52: Ingestion preserves immutable raw snapshots, normalized documents and section-aware chunks with checksum, source provenance and deterministic IDs.
+
+FR53: Runtime retrieval uses only a pre-indexed local Qdrant knowledge base through an active alias, not live web search.
+
+FR54: Qdrant knowledge collections are versioned, validated before alias promotion and can be rolled back to a previous validated collection.
+
+FR55: Query and document embeddings go through `EmbeddingProvider`; BGE-M3 may be used locally, and deterministic hash embeddings are allowed only in test profile.
+
+FR56: Runtime case processing does not access Hugging Face network; local model/cache absence becomes an explicit recoverable failure.
+
+FR57: Retrieval planning prefers RU patient-facing sources for Russian patient context and allows international fallback only with downgrade and limitation note.
+
+FR58: Retrieval blocks or downgrades clinician-only, registry/provenance-only and foreign sources according to output audience and applicability gates.
+
+FR59: Every retrieval run stores a case-scoped trace artifact with active alias, collection, index version, selected/rejected chunks, source metadata, confidence category and applicability decisions.
+
+FR60: Summary and safety artifacts reference retrieval run ID and cannot be considered ready without minimum provenance.
+
+FR61: Safety validation blocks foreign-source-as-RU guidance, clinician-only leakage into patient instructions, ГРЛС-derived medication advice and claims without source chunks.
+
+FR62: Real RAG eval fixtures cover RU source preference, international fallback downgrade, clinician-only blocking, insufficient support, embedding runtime failure and hash embeddings blocked in operational profile.
+
+#### Additional Non-Functional Requirements
+
+NFR31: Runtime case processing remains offline with respect to web/Hugging Face access and uses only the promoted local index.
+
+NFR32: Knowledge ingestion is reproducible: snapshots, normalized artifacts, chunking, embedding metadata and manifest explain index composition.
+
+NFR33: Embedding/index compatibility is checked on startup/readiness and before runtime retrieval.
+
+NFR34: Source applicability is machine-readable and testable, not only prose in citations.
+
+NFR35: Russian patient context is the default jurisdiction for patient-facing retrieval behavior.
+
+NFR36: International fallback must not be presented as locally applicable Russian clinical guidance.
+
+NFR37: Clinician-facing Russian clinical recommendations must not become direct patient-facing instructions.
+
+NFR38: ГРЛС is registry/provenance context, not a medication advice or dosage/instruction source.
+
+NFR39: Retrieval traces and logs minimize sensitive payload and do not persist full OCR/source text unnecessarily.
+
+NFR40: Alias promotion, rollback and eval failures are audit-friendly and reproducible by the operator.
 
 ### Post-MVP Features
 
